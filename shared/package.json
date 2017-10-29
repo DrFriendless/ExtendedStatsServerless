@@ -1,0 +1,9 @@
+{
+  "name": "ExtendedStatsAWS",
+  "description": "Extended Stats in the cloud, built with AWS CodeStar",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@types/node": "^8.0.34"
+  }
+}
