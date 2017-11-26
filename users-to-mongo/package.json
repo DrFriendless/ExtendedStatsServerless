@@ -8,6 +8,6 @@
     "@types/node": "^8.0.34",
     "aws-lambda": "^0.1.2",
     "aws-lambda-typescript": "0.0.10",
-    "stitch": "^0.3.3"
+    "mongodb-stitch": "^2.2.0"
   }
 }

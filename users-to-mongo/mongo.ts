@@ -1,10 +1,9 @@
 // code to deal with MongoDB
 
 import {Configuration} from "./config";
-
-const stitch = require("stitch");
+import {StitchClient} from "mongodb-stitch";
 
 export const ensureUser: (config: Configuration, user: string) => void = (config: Configuration, user: string) => {
-    const client = new stitch.StitchClient(config["mongoStitchID"]);
+    const client = new StitchClient(config["mongoStitchID"]);
     console.log("mongo " + user);
 };
