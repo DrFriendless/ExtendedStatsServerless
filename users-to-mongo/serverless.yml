@@ -16,7 +16,13 @@ provider:
   name: aws
   runtime: nodejs6.10
   stage: dev
+  timeout: 30
   region: ap-southeast-2
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - "S3:*"
+      Resource: arn:aws:s3:::*
 
 functions:
   writeToDB:

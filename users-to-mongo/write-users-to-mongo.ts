@@ -11,6 +11,7 @@ export const writeToDB: Handler = (event, context, callback: Callback) => {
     console.log(body);
     const usernames = body.split(/\r?\n/);
     getConfig(config => {
+        console.log(config);
         usernames.forEach((username: string) => {
             ensureUser(config, username);
         });
