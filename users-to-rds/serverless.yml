@@ -1,0 +1,86 @@
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+
+service: users-to-rds
+
+plugins:
+  - serverless-plugin-typescript
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  stage: dev
+  timeout: 30
+  region: ap-southeast-2
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - "S3:*"
+      Resource: arn:aws:s3:::*
+  vpc:
+    securityGroupIds:
+      - sg-4d4b742b
+    subnetIds:
+      - subnet-44646e1d
+      - subnet-a865decf
+      - subnet-f565d0bc
+
+functions:
+  writeToDB:
+    handler: write-users-to-rds.writeToDB
+    events:
+      - sns: userlists
+    role:
+        "doStuffFromInsideVPC"
+
+Resources:
+  SNSInvokeLambdaPermission:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      Principal: "sns.amazonaws.com"
+      SourceArn:
+        Ref: UserListNotification
+      FunctionName:
+        Fn::GetAtt: [ "UserListToRDS", "Arn" ]
+  doStuffFromInsideVPC:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2017'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: doStuffFromInsideVPCPolicy
+          PolicyDocument:
+            Version: '2017'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - 'Fn::Join':
+                    - ':'
+                    - - 'arn:aws:logs'
+                      - Ref: 'AWS::Region'
+                      - Ref: 'AWS::AccountId'
+                      - 'log-group:/aws/lambda/*:*:*'
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DetachNetworkInterface
+                  - ec2:DeleteNetworkInterface
+                Resource: "*"

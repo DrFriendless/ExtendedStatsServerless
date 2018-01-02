@@ -5,13 +5,13 @@
   "private": true,
   "dependencies": {
     "@types/aws-lambda": "0.0.17",
-    "@types/node": "^8.0.34",
     "aws-lambda": "^0.1.2",
     "aws-lambda-typescript": "0.0.10",
-    "mongodb-stitch": "^2.2.0",
-    "aws-sdk": "^2.133.0"
+    "aws-sdk": "^2.133.0",
+    "mysql": "^2.15.0"
   },
   "devDependencies": {
+    "@types/node": "^8.5.2",
     "serverless-plugin-typescript": "^1.1.5"
   }
 }
