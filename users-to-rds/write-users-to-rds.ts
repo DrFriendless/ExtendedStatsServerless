@@ -10,11 +10,14 @@ export const writeToDB: Handler = (event, context, callback: Callback) => {
     const body = event.Records[0].Sns.Message;
     console.log(body);
     const usernames = body.split(/\r?\n/);
+    console.log("checking for " + usernames.length + " users");
     getConfig(config => {
-        console.log(config);
-        usernames.forEach((username: string) => {
-            ensureUser(config, username);
-        });
+        // usernames.forEach((username: string) => {
+        //     ensureUser(config, username);
+        // });
+        ensureUser(config, "Friendless");
+        ensureUser(config, "ferrao");
+        ensureUser(config, "Critical Mass");
     });
 };
 

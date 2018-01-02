@@ -6,7 +6,6 @@ export const ensureUser: (config: Configuration, user: string) => void = (config
 };
 
 function doEnsureUser(conn: mysql.Connection, user: string) {
-    console.log("doEnsureUser " + user);
     conn.connect(err => {
         if (err) throw err;
         console.log("doEnsureUser Connected!");
@@ -16,7 +15,7 @@ function doEnsureUser(conn: mysql.Connection, user: string) {
         const countSql = "select count(*) from geeks where username = %s";
         conn.query(countSql, [user], (err, result) => {
             if (err) throw err;
-            console.log("query results");
+            console.log("query result");
             console.log(result);
         });
     });
