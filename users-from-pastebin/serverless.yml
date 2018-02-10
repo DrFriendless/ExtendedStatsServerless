@@ -25,18 +25,27 @@ provider:
     - Effect: Allow
       Action:
         - SNS:Publish
-      Resource: arn:aws:sns:${self:provider.region}:067508173724:userlists
-
+      Resource:
+        Ref: "UserListNotification"
 
 functions:
   readFromPastebin:
     handler: index.readFromPastebin
     environment:
-      SNS_ENDPOINT: arn:aws:sns:${self:provider.region}:067508173724:userlists
+      SNS_ENDPOINT:
+         Ref: "UserListNotification"
 
-Resources:
-  UserListNotification:
-    Type: "AWS::SNS::Topic"
-    Properties:
-      TopicName: "userlists"
+resources:
+  Resources:
+    UserListNotification:
+      Type: "AWS::SNS::Topic"
+      Properties:
+        TopicName: "userlists"
+  Outputs:
+    UserListNotificationTopic:
+      Description: "SNS topic that new lists of users arrive on."
+      Value:
+        Ref: "UserListNotification"
+      Export:
+        Name: "UserListNotificationTopic"
 

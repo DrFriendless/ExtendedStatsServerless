@@ -9,7 +9,7 @@ export const ensureUser: (config: Configuration, user: string) => void = (config
     client.login(config["mongoLogin"], config["mongoPwd"])
         .then(() => {
             console.log('logged in as: ' + client.authedId());
-            const db = client.service('mongodb', 'mongodb1').db('Extended');
+            const db = client.service('mongodb', 'mongodb-atlas').db('Extended');
             doEnsureUser(db, client, user);
         })
         .catch(e => console.log('error: ', e));

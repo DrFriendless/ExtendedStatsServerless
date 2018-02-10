@@ -1,6 +1,6 @@
 // code to deal with the configuration secrets which are stored on S3
 
-import {S3} from 'aws-sdk';
+import {S3, AWSError} from 'aws-sdk';
 
 export type Configuration = { [key: string]: string };
 export type ConfigurationConsumer = (o: Configuration) => void;
@@ -12,13 +12,13 @@ export const getConfig: ConfigurationProducer = (callback: ConfigurationConsumer
         Bucket: "extended-stats-aws",
         Key: "config.txt"
     };
-    s3.getObject(params, (err, data) => {
+    s3.getObject(params, (err: AWSError, data: S3.Types.GetObjectOutput) => {
         if (err) {
             console.log(err);
             console.log("Unable to read config file.");
             callback({});
         } else {
-            const s = data.Body.toString();
+            const s = data.Body ? data.Body.toString() : "";
             const re = /[\r\n]+/;
             const lines = s.split(re);
             const result = {};
