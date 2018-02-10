@@ -23,6 +23,10 @@ provider:
       Action:
         - "S3:*"
       Resource: arn:aws:s3:::*
+    - Effect: Allow
+      Action:
+        - "RDS:*"
+      Resource: "arn:aws:rds:ap-southeast-2:067508173724:db:extendedcloud"
   vpc:
     securityGroupIds:
       - sg-4d4b742b

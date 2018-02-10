@@ -15,6 +15,7 @@ export const writeToDB: Handler = (event, context, callback: Callback) => {
         // usernames.forEach((username: string) => {
         //     ensureUser(config, username);
         // });
+        console.log("got config");
         ensureUser(config, "Friendless");
         ensureUser(config, "ferrao");
         ensureUser(config, "Critical Mass");

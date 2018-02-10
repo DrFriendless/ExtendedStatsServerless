@@ -2,15 +2,20 @@ import {Configuration} from "./config";
 import mysql = require('mysql');
 
 export const ensureUser: (config: Configuration, user: string) => void = (config: Configuration, user: string) => {
-    doEnsureUser(getConnection(config), user);
+    console.log("ensureUser");
+    console.log(user);
+    const conn = getConnection(config);
+    console.log(conn);
+    doEnsureUser(conn, user);
 };
 
 function doEnsureUser(conn: mysql.Connection, user: string) {
+    console.log("doEnsureUser");
     conn.connect(err => {
         if (err) throw err;
         console.log("doEnsureUser Connected!");
         // count = db.execute("select count(*) from geeks where username = '%s'" % geek)[0][0]
-        // if count == 0l:
+        // if count === 0l:
         //     db.execute("insert into geeks (username) values ('%s')" % geek)
         const countSql = "select count(*) from geeks where username = %s";
         conn.query(countSql, [user], (err, result) => {
@@ -22,10 +27,13 @@ function doEnsureUser(conn: mysql.Connection, user: string) {
 }
 
 function getConnection(config: Configuration): mysql.Connection {
-    return mysql.createConnection({
+    console.log("getConnection");
+    const params = {
         host: config['mysqlHost'],
         user: config["mysqlUsername"],
         password: config["mysqlPassword"],
         database: config["mysqlDatabase"]
-    });
+    };
+    console.log(params);
+    return mysql.createConnection(params);
 }
