@@ -8,7 +8,10 @@
     "aws-lambda": "^0.1.2",
     "aws-lambda-typescript": "0.0.10",
     "aws-sdk": "^2.133.0",
-    "mysql": "^2.15.0"
+    "graphql": "^0.13.0",
+    "graphql-tag": "^2.7.3",
+    "mysql": "^2.15.0",
+    "serverless": "^1.26.0"
   },
   "devDependencies": {
     "@types/node": "^8.5.2",

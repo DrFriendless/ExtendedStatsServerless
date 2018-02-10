@@ -18,15 +18,6 @@ provider:
   stage: dev
   timeout: 30
   region: ap-southeast-2
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - "S3:*"
-      Resource: arn:aws:s3:::*
-    - Effect: Allow
-      Action:
-        - "RDS:*"
-      Resource: "arn:aws:rds:ap-southeast-2:067508173724:db:extendedcloud"
   vpc:
     securityGroupIds:
       - sg-4d4b742b
@@ -35,9 +26,16 @@ provider:
       - subnet-a865decf
       - subnet-f565d0bc
 
+custom: ${file(../secrets.json)}
+
 functions:
   writeToDB:
     handler: write-users-to-rds.writeToDB
+    environment:
+      mysqlHost: ${self:custom.mysqlHost}
+      mysqlUsername: ${self:custom.mysqlUsername}
+      mysqlPassword: ${self:custom.mysqlPassword}
+      mysqlDatabase: ${self:custom.mysqlDatabase}
     events:
       - sns: ${cf:users-from-pastebin-dev.UserListNotificationTopic}
     role:
@@ -61,6 +59,10 @@ resources:
             PolicyDocument:
               Version: '2012-10-17'
               Statement:
+                - Effect: Allow
+                  Action:
+                    - "S3:*"
+                  Resource: arn:aws:s3:::*
                 - Effect: Allow
                   Action:
                     - logs:CreateLogGroup

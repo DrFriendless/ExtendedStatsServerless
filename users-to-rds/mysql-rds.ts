@@ -1,39 +1,37 @@
-import {Configuration} from "./config";
 import mysql = require('mysql');
 
-export const ensureUser: (config: Configuration, user: string) => void = (config: Configuration, user: string) => {
-    console.log("ensureUser");
-    console.log(user);
-    const conn = getConnection(config);
+export const ensureUsers: (users: string[]) => void = (users: string[]) => {
+    const conn = getConnection();
     console.log(conn);
-    doEnsureUser(conn, user);
+    doEnsureUsers(conn, users);
 };
 
-function doEnsureUser(conn: mysql.Connection, user: string) {
+function doEnsureUsers(conn: mysql.Connection, users: string[]) {
     console.log("doEnsureUser");
     conn.connect(err => {
         if (err) throw err;
         console.log("doEnsureUser Connected!");
-        // count = db.execute("select count(*) from geeks where username = '%s'" % geek)[0][0]
-        // if count === 0l:
-        //     db.execute("insert into geeks (username) values ('%s')" % geek)
-        const countSql = "select count(*) from geeks where username = %s";
-        conn.query(countSql, [user], (err, result) => {
-            if (err) throw err;
-            console.log("query result");
-            console.log(result);
+        const countSql = "select count(*) from geeks where username = ?";
+        const insertSql = "insert into geeks (username) values (?)";
+        users.forEach(user => {
+            conn.query(countSql, [user], (err, result) => {
+                if (err) throw err;
+                const count = result[0]["count(*)"];
+                if (count === 0) {
+                    conn.query(insertSql, [user]);
+                }
+            });
         });
     });
 }
 
-function getConnection(config: Configuration): mysql.Connection {
+function getConnection(): mysql.Connection {
     console.log("getConnection");
     const params = {
-        host: config['mysqlHost'],
-        user: config["mysqlUsername"],
-        password: config["mysqlPassword"],
-        database: config["mysqlDatabase"]
+        host: process.env.mysqlHost,
+        user: process.env.mysqlUsername,
+        password: process.env.mysqlPassword,
+        database: process.env.mysqlDatabase
     };
-    console.log(params);
     return mysql.createConnection(params);
 }

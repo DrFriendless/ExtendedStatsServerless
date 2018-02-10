@@ -12,7 +12,10 @@ export const getConfig: ConfigurationProducer = (callback: ConfigurationConsumer
         Bucket: "extended-stats-aws",
         Key: "config.txt"
     };
+    console.log(params);
     s3.getObject(params, (err: AWSError, data: S3.Types.GetObjectOutput) => {
+        console.log(err);
+        console.log(data);
         if (err) {
             console.log(err);
             console.log("Unable to read config file.");
@@ -28,6 +31,7 @@ export const getConfig: ConfigurationProducer = (callback: ConfigurationConsumer
                     result[fields[0].trim()] = fields[1].trim();
                 }
             });
+            console.log(result);
             callback(result);
         }
     });
