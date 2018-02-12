@@ -30,7 +30,7 @@ custom: ${file(../secrets.json)}
 
 functions:
   writeToDB:
-    handler: write-users-to-rds.writeToDB
+    handler: functions.writeToDB
     environment:
       mysqlHost: ${self:custom.mysqlHost}
       mysqlUsername: ${self:custom.mysqlUsername}
@@ -38,6 +38,20 @@ functions:
       mysqlDatabase: ${self:custom.mysqlDatabase}
     events:
       - sns: ${cf:users-from-pastebin-dev.UserListNotificationTopic}
+    role:
+        "doStuffFromInsideVPC"
+  userlist:
+    handler: functions.userlist
+    environment:
+      mysqlHost: ${self:custom.mysqlHost}
+      mysqlUsername: ${self:custom.mysqlUsername}
+      mysqlPassword: ${self:custom.mysqlPassword}
+      mysqlDatabase: ${self:custom.mysqlDatabase}
+    events:
+      - http:
+          path: users
+          method: get
+          cors: true
     role:
         "doStuffFromInsideVPC"
 
