@@ -15,5 +15,11 @@ export const writeToDB: Handler = (event, context, callback: Callback) => {
 export const userlist: Handler = (event, context, callback: Callback) => {
     console.log("userlists");
     context.callbackWaitsForEmptyEventLoop = false;
-    listUsers(callback);
+    listUsers((err, result) => {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(null, { statusCode: 200, body: result });
+        }
+    });
 };
