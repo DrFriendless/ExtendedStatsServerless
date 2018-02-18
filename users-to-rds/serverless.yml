@@ -52,6 +52,7 @@ functions:
           path: users
           method: get
           cors: true
+          integration: lambda
     role:
         "doStuffFromInsideVPC"
   fireProcessUsers:
