@@ -30,7 +30,7 @@ provider:
 
 functions:
   readFromPastebin:
-    handler: index.readFromPastebin
+    handler: functions.readFromPastebin
     environment:
       SNS_ENDPOINT:
          Ref: "UserListNotification"
@@ -41,6 +41,10 @@ resources:
       Type: "AWS::SNS::Topic"
       Properties:
         TopicName: "userlists"
+    ProcessUserNotification:
+      Type: "AWS::SNS::Topic"
+      Properties:
+        TopicName: "processUser"
   Outputs:
     UserListNotificationTopic:
       Description: "SNS topic that new lists of users arrive on."
@@ -48,4 +52,10 @@ resources:
         Ref: "UserListNotification"
       Export:
         Name: "UserListNotificationTopic"
+    ProcessUserNotificationTopic:
+      Description: "SNS topic for usernames of users whose profile should be retrieved."
+      Value:
+        Ref: "ProcessUserNotification"
+      Export:
+        Name: "ProcessUserNotificationTopic"
 

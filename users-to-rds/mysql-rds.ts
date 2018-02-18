@@ -6,7 +6,7 @@ const PROFILE_URL = "https://boardgamegeek.com/user/";
 export const ensureUsers: (users: string[]) => void = (users: string[]) => {
     const conn = getConnection();
     console.log(conn);
-    doEnsureUsers(conn, users);
+    return doEnsureUsers(conn, users);
 };
 
 function doEnsureUsers(conn: mysql.Connection, users: string[]) {
@@ -52,25 +52,39 @@ function doEnsureFileProcessUser(conn: mysql.Connection, user: string) {
     doRecordFile(conn, PROFILE_URL + user, "processUser", user, "User's profile");
 }
 
+export const findProcessUserFiles: (processUser: Callback) => void = (processUser: Callback) => {
+    console.log("findProcessUserFiles");
+    const conn = getConnection();
+    conn.connect(err => {
+        if (err) return processUser(err);
+        console.log("findProcessUserFiles connected");
+        const sql = "select * from files where processMethod = 'processUser' and (lastUpdate is null || nextUpdate < now())";
+        conn.query(sql, null, (err, result) => {
+            if (err) return processUser(err);
+            console.log("Found " + result.length + " files to be processed.");
+            result.forEach(u => processUser(null, u));
+            console.log("findProcessUserFiles complete");
+        });
+    });
+};
+
 export const listUsers: (callback: Callback) => void = (callback: Callback) => {
     console.log("listUsers");
     const conn = getConnection();
     conn.connect(err => {
         if (err) {
-            callback(err);
-            return;
+            return callback(err);
         }
         console.log("listUsers connected");
         const sql = "select username from geeks";
         conn.query(sql, null, (err, result) => {
             if (err) {
-                callback(err);
-                return;
+                return callback(err);
             }
             const val = result.map(row => row['username']);
             console.log(val);
-            callback(null, val);
             console.log("listUsers complete");
+            return callback(null, val);
         });
     });
 };

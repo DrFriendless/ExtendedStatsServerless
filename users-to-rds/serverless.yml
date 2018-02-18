@@ -54,6 +54,16 @@ functions:
           cors: true
     role:
         "doStuffFromInsideVPC"
+  fireProcessUsers:
+    handler: functions.fireProcessUsers
+    environment:
+      mysqlHost: ${self:custom.mysqlHost}
+      mysqlUsername: ${self:custom.mysqlUsername}
+      mysqlPassword: ${self:custom.mysqlPassword}
+      mysqlDatabase: ${self:custom.mysqlDatabase}
+      SNS_ENDPOINT: ${cf:users-from-pastebin-dev.ProcessUserNotificationTopic}
+    role:
+        "doStuffFromInsideVPC"
 
 resources:
   Resources:
@@ -75,10 +85,6 @@ resources:
               Statement:
                 - Effect: Allow
                   Action:
-                    - "S3:*"
-                  Resource: arn:aws:s3:::*
-                - Effect: Allow
-                  Action:
                     - logs:CreateLogGroup
                     - logs:CreateLogStream
                     - logs:PutLogEvents
@@ -96,3 +102,7 @@ resources:
                     - ec2:DetachNetworkInterface
                     - ec2:DeleteNetworkInterface
                   Resource: "*"
+                - Effect: Allow
+                  Action:
+                    - SNS:Publish
+                  Resource: ${cf:users-from-pastebin-dev.ProcessUserNotificationTopic}

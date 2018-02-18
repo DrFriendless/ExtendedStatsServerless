@@ -8,6 +8,8 @@
     "@types/node": "^8.0.34",
     "aws-lambda": "^0.1.2",
     "aws-lambda-typescript": "0.0.10",
-    "aws-sdk": "^2.133.0"
+    "aws-sdk": "^2.133.0",
+    "serverless": "^1.26.0",
+    "serverless-plugin-typescript": "^1.1.5"
   }
 }
