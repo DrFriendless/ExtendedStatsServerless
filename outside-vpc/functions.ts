@@ -3,7 +3,7 @@ import {IncomingMessage} from "http";
 import {Callback, Handler} from "aws-lambda";
 
 const https = require('https');
-const TO_PROCESS_URL = "https://9b7nnh3dwe.execute-api.ap-southeast-2.amazonaws.com/dev/toProcess?count=20";
+const PROCESS_COUNT = 1;
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export const readFromPastebin: Handler = (event, context, callback: Callback) => {
@@ -35,13 +35,27 @@ export const readFromPastebin: Handler = (event, context, callback: Callback) =>
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export const fireFileProcessing: Handler = (event, context, callback: Callback) => {
+    const apiServer = process.env["apiServer"];
+    const apiKey = process.env["apiKey"];
     const data: Buffer[] = [];
-
-    https.get(TO_PROCESS_URL, (response: IncomingMessage) => {
+    const request = {
+        method: "GET",
+        protocol: "https:",
+        hostname: apiServer,
+        path: "/v1/toProcess?count=" + PROCESS_COUNT,
+        headers: {
+            "x-api-key": apiKey
+        }
+    };
+    console.log("apiKey " + apiKey);
+    console.log("apiServer " + apiServer);
+    https.get(request, (response: IncomingMessage) => {
         response.on('error', (err: Error) => { return callback(err) });
         response.on('data', (chunk: Buffer) => data.push(chunk));
         response.on('end', () => {
+            console.log(response);
             const body = Buffer.concat(data).toString();
+            console.log(body);
             const obj = JSON.parse(body);
             console.log(obj);
         });

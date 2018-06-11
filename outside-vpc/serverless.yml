@@ -28,7 +28,8 @@ provider:
       Resource:
         Ref: "UserListNotification"
 
-custom: ${file(../secrets.json)}
+custom:
+  secret: ${file(../secrets.json)}
 
 functions:
   readFromPastebin:
@@ -39,6 +40,9 @@ functions:
          Ref: "UserListNotification"
   fireFileProcessing:
     handler: functions.fireFileProcessing
+    environment:
+      apiKey: ${self:custom.secret.apiKey}
+      apiServer: ${self:custom.secret.apiServer}
 
 resources:
   Resources:

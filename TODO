@@ -1,5 +1,12 @@
-* Add an outside lambda which reads user details from BGG, then posts the result to an inside lambda which writes the results to the USERS table.
+* In outside, get the fireFileProcessing lambda to successfully invoke toProcess, parse the JSON, and fire off some
+othe outside lambdas.
 
 * Add an outside lambda which reads from the toProcess list and fires processUser lambdas.
 
-* Add an inside lambda which updates the time that a file was processed at.
+* Add an inside lambda which updates the time that a file was processed at. Maybe this just needs to be a library function.
+
+* give the inside and outside APIs different root paths
+
+* create a system health dashboard
+
+* can I wrap the https access stuff in a method?
