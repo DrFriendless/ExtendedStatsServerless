@@ -11,7 +11,7 @@ service: inside-vpc
 
 plugins:
   - serverless-plugin-typescript
-#  - serverless-domain-manager
+  - serverless-domain-manager
 
 provider:
   name: aws
@@ -29,12 +29,12 @@ provider:
 
 custom:
   secret: ${file(../secrets.json)}
-#  customDomain:
-#    domainName: api.drfriendless.com
-#    basePath: 'api'
-#    stage: ${self:provider.stage}
-#    createRoute53Record: false
-#    certificateName: "*.drfriendless.com"
+  customDomain:
+    domainName: api.drfriendless.com
+    basePath: 'v1'
+    stage: ${self:provider.stage}
+    createRoute53Record: false
+    certificateName: "api.drfriendless.com"
 
 functions:
   writeToDB:
@@ -48,7 +48,7 @@ functions:
       - sns: ${cf:outside-vpc-dev.UserListNotificationTopic}
     role:
         "doStuffFromInsideVPC"
-  userlist:
+  userlistFunction:
     handler: functions.userlist
     environment:
       mysqlHost: ${self:custom.secret.mysqlHost}
@@ -68,7 +68,7 @@ functions:
           integration: lambda
     role:
         "doStuffFromInsideVPC"
-  toProcess:
+  toProcessFunction:
     handler: functions.toProcess
     environment:
       mysqlHost: ${self:custom.secret.mysqlHost}
@@ -88,8 +88,33 @@ functions:
           integration: lambda
     role:
         "doStuffFromInsideVPC"
+
 resources:
   Resources:
+#    insideAPI:
+#      Type: "AWS:ApiGateway::RestApi"
+#      Properties:
+#        Name: "inside-vpc"
+#        Description: "API to access services inside the VPC"
+#        EndpointConfiguration:
+#          Types:
+#            - EDGE
+#    toProcessResource:
+#      Type: "AWS::ApiGateway::Resource"
+#      Properties:
+#        PathPart: "toProcess"
+#        RestApiId: insideAPI
+#        ParentId: insideAPI.RootResourceId
+#    toProcessMethodPOST:
+#      Type: "AWS::ApiGateway::Method"
+#      Properties:
+#        HttpMethod: POST
+#        ResourceId: toProcessResource
+#        RestApiId: insideAPI
+#        Integration:
+#          Type: AWS_PROXY
+#          IntegrationHttpMethod: POST
+#          Uri: "arn:aws:apigateway:#{AWS::Region}:lambda:path/2015-03-31/functions/${cf:toProcessFunction.Arn}/invocations"
     doStuffFromInsideVPC:
       Type: "AWS::IAM::Role"
       Properties:

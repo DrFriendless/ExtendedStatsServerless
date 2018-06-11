@@ -11,11 +11,11 @@
     "graphql": "^0.13.0",
     "graphql-tag": "^2.7.3",
     "mysql": "^2.15.0",
-    "serverless": "^1.26.0"
+    "serverless": "^1.27.3"
   },
   "devDependencies": {
     "@types/node": "^8.5.2",
-    "serverless-domain-manager": "^2.3.1",
+    "serverless-domain-manager": "^2.4.0",
     "serverless-plugin-typescript": "^1.1.5"
   }
 }
