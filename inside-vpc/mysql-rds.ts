@@ -52,22 +52,6 @@ function doEnsureFileProcessUser(conn: mysql.Connection, user: string) {
     doRecordFile(conn, PROFILE_URL + user, "processUser", user, "User's profile");
 }
 
-export const findProcessUserFiles: (processUser: Callback) => void = (processUser: Callback) => {
-    console.log("findProcessUserFiles");
-    const conn = getConnection();
-    conn.connect(err => {
-        if (err) return processUser(err);
-        console.log("findProcessUserFiles connected");
-        const sql = "select * from files where processMethod = 'processUser' and (lastUpdate is null || nextUpdate < now())";
-        conn.query(sql, null, (err, result) => {
-            if (err) return processUser(err);
-            console.log("Found " + result.length + " files to be processed.");
-            result.forEach(u => processUser(null, u));
-            console.log("findProcessUserFiles complete");
-        });
-    });
-};
-
 export const listUsers: (callback: Callback) => void = (callback: Callback) => {
     console.log("listUsers");
     const conn = getConnection();
@@ -85,6 +69,42 @@ export const listUsers: (callback: Callback) => void = (callback: Callback) => {
             console.log(val);
             console.log("listUsers complete");
             return callback(null, val);
+        });
+    });
+};
+
+export const listToProcess: (count: number, callback: Callback) => void = (count: number, callback: Callback) => {
+    console.log("listToProcess");
+    const conn = getConnection();
+    conn.connect(err => {
+        if (err) {
+            return callback(err);
+        }
+        console.log("listToProcess connected");
+        const sql = "select * from files where (lastUpdate is null || nextUpdate < now()) limit " + count;
+        conn.query(sql, null, (err, result) => {
+            if (err) {
+                return callback(err);
+            }
+            console.log(result);
+            console.log("listToProcess complete");
+            return callback(null, result);
+        });
+    });
+};
+
+export const findProcessUserFiles: (processUser: Callback) => void = (processUser: Callback) => {
+    console.log("findProcessUserFiles");
+    const conn = getConnection();
+    conn.connect(err => {
+        if (err) return processUser(err);
+        console.log("findProcessUserFiles connected");
+        const sql = "select * from files where processMethod = 'processUser' and (lastUpdate is null || nextUpdate < now())";
+        conn.query(sql, null, (err, result) => {
+            if (err) return processUser(err);
+            console.log("Found " + result.length + " files to be processed.");
+            result.forEach(u => processUser(null, u));
+            console.log("findProcessUserFiles complete");
         });
     });
 };

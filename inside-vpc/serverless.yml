@@ -7,10 +7,11 @@
 # For full config options, check the docs:
 #    docs.serverless.com
 
-service: users-to-rds
+service: inside-vpc
 
 plugins:
   - serverless-plugin-typescript
+#  - serverless-domain-manager
 
 provider:
   name: aws
@@ -26,28 +27,40 @@ provider:
       - subnet-a865decf
       - subnet-f565d0bc
 
-custom: ${file(../secrets.json)}
+custom:
+  secret: ${file(../secrets.json)}
+#  customDomain:
+#    domainName: api.drfriendless.com
+#    basePath: 'api'
+#    stage: ${self:provider.stage}
+#    createRoute53Record: false
+#    certificateName: "*.drfriendless.com"
 
 functions:
   writeToDB:
     handler: functions.writeToDB
     environment:
-      mysqlHost: ${self:custom.mysqlHost}
-      mysqlUsername: ${self:custom.mysqlUsername}
-      mysqlPassword: ${self:custom.mysqlPassword}
-      mysqlDatabase: ${self:custom.mysqlDatabase}
+      mysqlHost: ${self:custom.secret.mysqlHost}
+      mysqlUsername: ${self:custom.secret.mysqlUsername}
+      mysqlPassword: ${self:custom.secret.mysqlPassword}
+      mysqlDatabase: ${self:custom.secret.mysqlDatabase}
     events:
-      - sns: ${cf:users-from-pastebin-dev.UserListNotificationTopic}
+      - sns: ${cf:outside-vpc-dev.UserListNotificationTopic}
     role:
         "doStuffFromInsideVPC"
   userlist:
     handler: functions.userlist
     environment:
-      mysqlHost: ${self:custom.mysqlHost}
-      mysqlUsername: ${self:custom.mysqlUsername}
-      mysqlPassword: ${self:custom.mysqlPassword}
-      mysqlDatabase: ${self:custom.mysqlDatabase}
+      mysqlHost: ${self:custom.secret.mysqlHost}
+      mysqlUsername: ${self:custom.secret.mysqlUsername}
+      mysqlPassword: ${self:custom.secret.mysqlPassword}
+      mysqlDatabase: ${self:custom.secret.mysqlDatabase}
     events:
+      - http:
+          path: users
+          method: post
+          cors: true
+          integration: lambda
       - http:
           path: users
           method: get
@@ -55,17 +68,26 @@ functions:
           integration: lambda
     role:
         "doStuffFromInsideVPC"
-  fireProcessUsers:
-    handler: functions.fireProcessUsers
+  toProcess:
+    handler: functions.toProcess
     environment:
-      mysqlHost: ${self:custom.mysqlHost}
-      mysqlUsername: ${self:custom.mysqlUsername}
-      mysqlPassword: ${self:custom.mysqlPassword}
-      mysqlDatabase: ${self:custom.mysqlDatabase}
-      SNS_ENDPOINT: ${cf:users-from-pastebin-dev.ProcessUserNotificationTopic}
+      mysqlHost: ${self:custom.secret.mysqlHost}
+      mysqlUsername: ${self:custom.secret.mysqlUsername}
+      mysqlPassword: ${self:custom.secret.mysqlPassword}
+      mysqlDatabase: ${self:custom.secret.mysqlDatabase}
+    events:
+      - http:
+          path: toProcess
+          method: post
+          cors: true
+          integration: lambda
+      - http:
+          path: toProcess
+          method: get
+          cors: true
+          integration: lambda
     role:
         "doStuffFromInsideVPC"
-
 resources:
   Resources:
     doStuffFromInsideVPC:
@@ -103,7 +125,3 @@ resources:
                     - ec2:DetachNetworkInterface
                     - ec2:DeleteNetworkInterface
                   Resource: "*"
-                - Effect: Allow
-                  Action:
-                    - SNS:Publish
-                  Resource: ${cf:users-from-pastebin-dev.ProcessUserNotificationTopic}

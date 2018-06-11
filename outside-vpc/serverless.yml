@@ -11,7 +11,7 @@
 #
 # Happy Coding!
 
-service: users-from-pastebin
+service: outside-vpc
 
 plugins:
   - serverless-plugin-typescript
@@ -28,12 +28,17 @@ provider:
       Resource:
         Ref: "UserListNotification"
 
+custom: ${file(../secrets.json)}
+
 functions:
   readFromPastebin:
     handler: functions.readFromPastebin
     environment:
+      USERS_FILE: ${self:custom.usersFile}
       SNS_ENDPOINT:
          Ref: "UserListNotification"
+  fireFileProcessing:
+    handler: functions.fireFileProcessing
 
 resources:
   Resources:
@@ -52,10 +57,4 @@ resources:
         Ref: "UserListNotification"
       Export:
         Name: "UserListNotificationTopic"
-    ProcessUserNotificationTopic:
-      Description: "SNS topic for usernames of users whose profile should be retrieved."
-      Value:
-        Ref: "ProcessUserNotification"
-      Export:
-        Name: "ProcessUserNotificationTopic"
 

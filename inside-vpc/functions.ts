@@ -1,6 +1,6 @@
 import {SNS} from 'aws-sdk';
 import {Callback, Handler} from 'aws-lambda';
-import {ensureUsers, findProcessUserFiles, listUsers} from "./mysql-rds";
+import {ensureUsers, listToProcess, listUsers} from "./mysql-rds";
 
 const PROFILE_URL = "https://boardgamegeek.com/user/";
 
@@ -40,17 +40,26 @@ function sendProcessUserToSNS(sns: SNS, endpoint: string): Callback {
     };
 }
 
-export const fireProcessUsers: Handler = (event, context, callback: Callback) => {
-    console.log("SNS_ENDPOINT = " + process.env["SNS_ENDPOINT"]);
-    const snsEndpoint = process.env["SNS_ENDPOINT"];
-    const sns = new SNS();
-    findProcessUserFiles(sendProcessUserToSNS(sns, snsEndpoint));
-};
-
 export const userlist: Handler = (event, context, callback: Callback) => {
     console.log("userlists");
     context.callbackWaitsForEmptyEventLoop = false;
     listUsers((err, result) => {
+        if (err) {
+            callback(err, null);
+        } else {
+            callback(null, { statusCode: 200, body: result });
+        }
+    });
+};
+
+export const toProcess: Handler = (event, context, callback: Callback) => {
+    console.log("toProcess");
+    console.log(event);
+    context.callbackWaitsForEmptyEventLoop = false;
+    const countParam = (event.query && event.query.count) || event.count;
+    let count = parseInt(countParam);
+    if (!count || count < 1 || count > 1000) count = 10;
+    listToProcess(count, (err, result) => {
         if (err) {
             callback(err, null);
         } else {
