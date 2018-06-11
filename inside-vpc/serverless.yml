@@ -26,6 +26,9 @@ provider:
       - subnet-44646e1d
       - subnet-a865decf
       - subnet-f565d0bc
+  apiKeys:
+    - Demo
+    - DrFriendless
 
 custom:
   secret: ${file(../secrets.json)}
@@ -61,11 +64,13 @@ functions:
           method: post
           cors: true
           integration: lambda
+          private: true
       - http:
           path: users
           method: get
           cors: true
           integration: lambda
+          private: true
     role:
         "doStuffFromInsideVPC"
   toProcessFunction:
@@ -81,40 +86,18 @@ functions:
           method: post
           cors: true
           integration: lambda
+          private: true
       - http:
           path: toProcess
           method: get
           cors: true
           integration: lambda
+          private: true
     role:
         "doStuffFromInsideVPC"
 
 resources:
   Resources:
-#    insideAPI:
-#      Type: "AWS:ApiGateway::RestApi"
-#      Properties:
-#        Name: "inside-vpc"
-#        Description: "API to access services inside the VPC"
-#        EndpointConfiguration:
-#          Types:
-#            - EDGE
-#    toProcessResource:
-#      Type: "AWS::ApiGateway::Resource"
-#      Properties:
-#        PathPart: "toProcess"
-#        RestApiId: insideAPI
-#        ParentId: insideAPI.RootResourceId
-#    toProcessMethodPOST:
-#      Type: "AWS::ApiGateway::Method"
-#      Properties:
-#        HttpMethod: POST
-#        ResourceId: toProcessResource
-#        RestApiId: insideAPI
-#        Integration:
-#          Type: AWS_PROXY
-#          IntegrationHttpMethod: POST
-#          Uri: "arn:aws:apigateway:#{AWS::Region}:lambda:path/2015-03-31/functions/${cf:toProcessFunction.Arn}/invocations"
     doStuffFromInsideVPC:
       Type: "AWS::IAM::Role"
       Properties:

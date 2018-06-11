@@ -1,0 +1,5 @@
+* Add an outside lambda which reads user details from BGG, then posts the result to an inside lambda which writes the results to the USERS table.
+
+* Add an outside lambda which reads from the toProcess list and fires processUser lambdas.
+
+* Add an inside lambda which updates the time that a file was processed at.
