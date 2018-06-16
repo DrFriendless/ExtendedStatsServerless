@@ -3,6 +3,8 @@ TODO
 
 * what's the accepted style for programming Node with all these callbacks?
 
+* Add an inside side of processUser.
+
 * Add an inside lambda which updates the time that a file was processed at. Maybe this just needs to be a library function.
 
 * what needs to be in the API? What can be invoked directly by lamnbda?

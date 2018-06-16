@@ -1,4 +1,4 @@
-import {SNS, Lambda, config} from 'aws-sdk';
+import {SNS, Lambda} from 'aws-sdk';
 import {IncomingMessage} from "http";
 import {Callback, Handler} from "aws-lambda";
 
@@ -95,7 +95,6 @@ export const fireFileProcessing: Handler = (event, context, callback: Callback) 
 export const processUser: Handler = (event, context, callback: Callback) => {
     console.log("processUser");
     console.log(event);
-    console.log(context);
     const invocation = event as ProcessUserInvocation;
 
     const BEFORE_USER_IMAGE = "/images/user/";
@@ -109,16 +108,13 @@ export const processUser: Handler = (event, context, callback: Callback) => {
         }
         let bggid = -1;
         let country = "";
-        const lines = data.toString().split("\n");
-        for (let line in lines) {
-            if (line.indexOf(BEFORE_USER_IMAGE) >= 0) {
-                const bggids = between(line, BEFORE_USER_IMAGE, AFTER_USER_IMAGE);
-                if (bggids) bggid = parseInt(bggids);
-                if (country.length > 0) break;
-            } else if (line.indexOf(BEFORE_COUNTRY) >= 0) {
-                country = between(line, BEFORE_COUNTRY, AFTER_COUNTRY);
-                if (bggid >= 0) break;
-            }
+        const file = data.toString();
+        if (file.indexOf(BEFORE_USER_IMAGE) >= 0) {
+            const bggids = between(file, BEFORE_USER_IMAGE, AFTER_USER_IMAGE);
+            if (bggids) bggid = parseInt(bggids);
+        }
+        if (file.indexOf(BEFORE_COUNTRY) >= 0) {
+            country = between(file, BEFORE_COUNTRY, AFTER_COUNTRY);
         }
         const result: ProcessUserResult = {
             geek: invocation.geek,
@@ -182,7 +178,7 @@ function assemble(callback: Callback): GetProcessor {
             data.push(chunk);
         });
         response.on('end', () => {
-            callback(null, Buffer.concat(data).toString());
+            callback(null, Buffer.concat(data));
         });
     }
 }
