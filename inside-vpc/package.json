@@ -7,7 +7,7 @@
     "@types/aws-lambda": "0.0.17",
     "aws-lambda": "^0.1.2",
     "aws-lambda-typescript": "0.0.10",
-    "aws-sdk": "^2.133.0",
+    "aws-sdk": "^2.259.1",
     "graphql": "^0.13.0",
     "graphql-tag": "^2.7.3",
     "mysql": "^2.15.0",

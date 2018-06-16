@@ -1,5 +1,11 @@
+Architecture doc is here: https://docs.google.com/document/d/1I2JdrnmywGvKkJ2cTo1g1qKDI2fSKbRrjCqgP3wrOCg/edit
+
 TODO
 ----
+
+* files table needs a "last submitted for processing" column
+
+* need a lambda to periodically check the user list for updates - invoke processUserList
 
 * what's the accepted style for programming Node with all these callbacks?
 
@@ -7,14 +13,13 @@ TODO
 
 * Add an inside lambda which updates the time that a file was processed at. Maybe this just needs to be a library function.
 
-* what needs to be in the API? What can be invoked directly by lamnbda?
-
 * create a system health dashboard
+
+* inside-vpc -> inside, outside-vpc -> downloader, client stack?
+* API should be in the inside stack.
 
 TESTING
 -------
-
-* can I wrap the https access stuff in a method?
 
 
 DONE
@@ -23,4 +28,6 @@ DONE
 * In outside, get the fireFileProcessing lambda to successfully invoke toProcess, parse the JSON, and fire off some
 other outside lambdas.
 * Add an outside lambda which reads from the toProcess list and fires processUser lambdas.
+* can I wrap the https access stuff in a method?
+* what needs to be in the API? What can be invoked directly by lambda? - only things needed by clients need to be in the API.
 
