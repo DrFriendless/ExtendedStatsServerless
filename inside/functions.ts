@@ -1,8 +1,15 @@
 import {Callback, Handler} from 'aws-lambda';
 import {ensureUsers, listToProcess, listUsers, updateLastScheduledForUrls} from "./mysql-rds";
 import {ToProcessElement} from "interfaces";
+import {ProcessUserResult} from "./interfaces";
 
-// receive the list of users from processUserList and make sure they are all in the database
+// export function updateUser(event, context, callback: Callback) {
+//     const data = event as ProcessUserResult;
+//     updateUserValues(data.geek, data.bggid, data.country);
+//     // TODO mark URL as processed
+// }
+
+// Lambda to receive the list of users from processUserList and make sure they are all in the database
 export const updateUserList: Handler = (event, context, callback: Callback) => {
     const body = event;
     const usernames = body.split(/\r?\n/);
@@ -10,6 +17,7 @@ export const updateUserList: Handler = (event, context, callback: Callback) => {
     ensureUsers(usernames);
 };
 
+// Lambda to retrieve the list of users
 export const getUserList: Handler = (event, context, callback: Callback) => {
     console.log("getUserList");
     context.callbackWaitsForEmptyEventLoop = false;
@@ -22,6 +30,7 @@ export const getUserList: Handler = (event, context, callback: Callback) => {
     });
 };
 
+// Lambda to retrieve some number of files that need processing
 export const getToProcessList: Handler = (event, context, callback: Callback) => {
     console.log("getToProcessList");
     console.log(event);

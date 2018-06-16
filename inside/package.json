@@ -11,6 +11,7 @@
     "graphql": "^0.13.0",
     "graphql-tag": "^2.7.3",
     "mysql": "^2.15.0",
+    "promise-mysql": "^3.2.1",
     "serverless": "^1.27.3"
   },
   "devDependencies": {

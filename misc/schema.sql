@@ -313,6 +313,8 @@ CREATE TABLE `geeks` (
   `username` varchar(128) NOT NULL DEFAULT '',
   `shouldplay` int(10) unsigned NOT NULL DEFAULT '0',
   `avatar` varchar(256) DEFAULT '',
+  `bggid` int(11) NOT NULL DEFAULT '-1',
+  `country` varchar(64) DEFAULT NULL,
   PRIMARY KEY (`username`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -497,23 +499,6 @@ CREATE TABLE `series` (
   KEY `series_name` (`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `users`
---
-
-DROP TABLE IF EXISTS `users`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `users` (
-  `geek` varchar(128) NOT NULL,
-  `lastProfileView` timestamp NULL DEFAULT NULL,
-  `profileViews` int(11) NOT NULL DEFAULT '0',
-  `bggid` int(11) DEFAULT '0',
-  `country` varchar(64) DEFAULT NULL,
-  PRIMARY KEY (`geek`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-/*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -524,4 +509,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2018-06-16 20:41:26
+-- Dump completed on 2018-06-17  7:43:22

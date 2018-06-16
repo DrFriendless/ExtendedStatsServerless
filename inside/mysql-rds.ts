@@ -1,53 +1,64 @@
-import mysql = require('mysql');
+import mysql = require('promise-mysql');
 import {Callback} from "aws-lambda";
 
 const PROFILE_URL = "https://boardgamegeek.com/user/";
 
-export const ensureUsers: (users: string[]) => void = (users: string[]) => {
-    const conn = getConnection();
-    console.log(conn);
-    return doEnsureUsers(conn, users);
+// function updateUserValues(geek: string, bggid: number, country: string): Promise {
+//     return getConnection()
+//         .then(conn => {
+//
+//         });
+// }
+
+export const ensureUsers: (users: string[]) => Promise<[number]> = (users: string[]) => {
+    return getConnection().then(conn => doEnsureUsers(conn, users));
 };
 
-function doEnsureUsers(conn: mysql.Connection, users: string[]) {
-    conn.connect(err => {
-        if (err) throw err;
-        const countSql = "select count(*) from geeks where username = ?";
-        const insertSql = "insert into geeks (username) values (?)";
-        users.forEach(user => {
-            conn.query(countSql, [user], (err, result) => {
-                if (err) throw err;
-                const count = result[0]["count(*)"];
-                if (count === 0) {
-                    conn.query(insertSql, [user]);
+function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<[number]> {
+    const countSql = "select username, count(*) from geeks where username = ?";
+    const insertSql = "insert into geeks (username) values (?)";
+    for (let i=0; i<users.length; i++) {
+        if (users.indexOf(users[i]) != i) console.log("User " + users[i] + " is duplicated in the users list.");
+    }
+    return Promise.all(users.map(user => {
+        conn.query(countSql, [user])
+            .then(result => {
+                return { count: result[0]["count(*)"], user: result[0]["username"] }
+            })
+            .then(uc => {
+                if (uc.count == 0) {
+                    return conn.query(insertSql, [uc.user]).then(junk => console.log("added user " + user)).thenReturn(uc);
+                } else {
+                    return Promise.resolve(uc);
                 }
-                doEnsureFileProcessUser(conn, user);
-            });
-        });
-    });
+            })
+            .then(uc => doEnsureFileProcessUser(conn, uc.user))
+    }));
 }
 
-function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string, description: string) {
+// promise returns how many rows were inserted
+function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string, description: string): Promise<number> {
     const countSql = "select count(*) from files where geek = ? and processMethod = ?";
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description) values (?, ?, ?, ?, ?, ?)";
-    conn.query(countSql, [user, processMethod], (err, result) => {
-        if (err) throw err;
-        const count = result[0]["count(*)"];
-        if (count === 0) {
-            const tillNext = TILL_NEXT_UPDATE[processMethod];
-            const insertParams = [url, processMethod, user, null, tillNext, description];
-            conn.query(insertSql, insertParams);
-            console.log("added user " + user);
-        }
-    });
+    return conn.query(countSql, [user, processMethod])
+        .then(result => {
+            const count = result[0]["count(*)"];
+            if (count === 0) {
+                const tillNext = TILL_NEXT_UPDATE[processMethod];
+                const insertParams = [url, processMethod, user, null, tillNext, description];
+                return conn.query(insertSql, insertParams).then(junk => console.log("added url " + url)).thenReturn(1);
+            } else {
+                return Promise.resolve(0);
+            }
+        });
 }
 
 // longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
 const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '72:00:00', 'processPlayed' : '72:00:00',
     'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00' };
 
-function doEnsureFileProcessUser(conn: mysql.Connection, user: string) {
-    doRecordFile(conn, PROFILE_URL + user, "processUser", user, "User's profile");
+function doEnsureFileProcessUser(conn: mysql.Connection, user: string): Promise<number> {
+    return doRecordFile(conn, PROFILE_URL + user, "processUser", user, "User's profile");
 }
 
 export const listUsers: (callback: Callback) => void = (callback: Callback) => {
@@ -111,7 +122,7 @@ export const updateLastScheduledForUrls: (urls: string[], callback: Callback) =>
     });
 };
 
-function getConnection(): mysql.Connection {
+function getConnection(): Promise {
     const params = {
         host: process.env.mysqlHost,
         user: process.env.mysqlUsername,
