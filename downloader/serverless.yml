@@ -1,17 +1,4 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
-service: outside-vpc
+service: downloader
 
 plugins:
   - serverless-plugin-typescript
@@ -32,8 +19,8 @@ custom:
   secret: ${file(../secrets.json)}
 
 functions:
-  readFromPastebin:
-    handler: functions.readFromPastebin
+  processUserList:
+    handler: functions.processUserList
     environment:
       USERS_FILE: ${self:custom.secret.usersFile}
       SNS_ENDPOINT:
@@ -103,10 +90,3 @@ resources:
                     - ec2:DeleteNetworkInterface
                   Resource: "*"
 
-  Outputs:
-    UserListNotificationTopic:
-      Description: "SNS topic that new lists of users arrive on."
-      Value:
-        Ref: "UserListNotification"
-      Export:
-        Name: "UserListNotificationTopic"

@@ -59,4 +59,5 @@ typings/
 
 /.idea/
 /secrets.json
+/database.json
 .serverless

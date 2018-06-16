@@ -3,9 +3,10 @@ import {IncomingMessage} from "http";
 import {Callback, Handler} from "aws-lambda";
 
 const https = require('https');
+// the max files to start processing for at once
 const PROCESS_COUNT = 1;
-const INSIDE_PREFIX = "inside-vpc-dev-";
-const OUTSIDE_PREFIX = "outside-vpc-dev-";
+const INSIDE_PREFIX = "inside-dev-";
+const OUTSIDE_PREFIX = "downloader-dev-";
 
 // method names from the database - this is the type of thing we have to do.
 const METHOD_PROCESS_USER = "processUser";
@@ -47,7 +48,7 @@ interface ProcessUserResult {
 }
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
-export const readFromPastebin: Handler = (event, context, callback: Callback) => {
+export const processUserList: Handler = (event, context, callback: Callback) => {
     console.log("SNS_ENDPOINT = " + process.env["SNS_ENDPOINT"]);
     const snsEndpoint = process.env["SNS_ENDPOINT"];
     const usersFile = process.env["USERS_FILE"];

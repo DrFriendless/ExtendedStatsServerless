@@ -15,7 +15,6 @@ TODO
 
 * create a system health dashboard
 
-* inside-vpc -> inside, outside-vpc -> downloader, client stack?
 * API should be in the inside stack.
 
 TESTING
@@ -30,4 +29,5 @@ other outside lambdas.
 * Add an outside lambda which reads from the toProcess list and fires processUser lambdas.
 * can I wrap the https access stuff in a method?
 * what needs to be in the API? What can be invoked directly by lambda? - only things needed by clients need to be in the API.
+* inside-vpc -> inside, outside-vpc -> downloader, client stack?
 

@@ -1,13 +1,4 @@
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-
-service: inside-vpc
+service: inside
 
 plugins:
   - serverless-plugin-typescript
@@ -32,6 +23,7 @@ provider:
 
 custom:
   secret: ${file(../secrets.json)}
+  database: ${file(../database.json)}
   customDomain:
     domainName: api.drfriendless.com
     basePath: 'v1'
@@ -40,24 +32,24 @@ custom:
     certificateName: "api.drfriendless.com"
 
 functions:
-  writeToDB:
-    handler: functions.writeToDB
+  updateUserList:
+    handler: functions.updateUserList
     environment:
-      mysqlHost: ${self:custom.secret.mysqlHost}
-      mysqlUsername: ${self:custom.secret.mysqlUsername}
-      mysqlPassword: ${self:custom.secret.mysqlPassword}
-      mysqlDatabase: ${self:custom.secret.mysqlDatabase}
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
     events:
       - sns: ${cf:outside-vpc-dev.UserListNotificationTopic}
     role:
         "doStuffFromInsideVPC"
-  userlistFunction:
-    handler: functions.userlist
+  getUserList:
+    handler: functions.getUserList
     environment:
-      mysqlHost: ${self:custom.secret.mysqlHost}
-      mysqlUsername: ${self:custom.secret.mysqlUsername}
-      mysqlPassword: ${self:custom.secret.mysqlPassword}
-      mysqlDatabase: ${self:custom.secret.mysqlDatabase}
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
     events:
       - http:
           path: users
@@ -73,13 +65,13 @@ functions:
           private: true
     role:
         "doStuffFromInsideVPC"
-  toProcessFunction:
-    handler: functions.toProcess
+  getToProcessList:
+    handler: functions.getToProcessList
     environment:
-      mysqlHost: ${self:custom.secret.mysqlHost}
-      mysqlUsername: ${self:custom.secret.mysqlUsername}
-      mysqlPassword: ${self:custom.secret.mysqlPassword}
-      mysqlDatabase: ${self:custom.secret.mysqlDatabase}
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
     events:
       - http:
           path: toProcess

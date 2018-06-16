@@ -5,7 +5,8 @@ import {ensureUsers, listToProcess, listUsers} from "./mysql-rds";
 const PROFILE_URL = "https://boardgamegeek.com/user/";
 
 // Lambda to get the list of users from an SQS queue and write it to Mongo DB.
-export const writeToDB: Handler = (event, context, callback: Callback) => {
+export const updateUserList: Handler = (event, context, callback: Callback) => {
+    console.log("updateUserList");
     const body = event.Records[0].Sns.Message;
     const usernames = body.split(/\r?\n/);
     console.log("checking for " + usernames.length + " users");
@@ -40,8 +41,8 @@ function sendProcessUserToSNS(sns: SNS, endpoint: string): Callback {
     };
 }
 
-export const userlist: Handler = (event, context, callback: Callback) => {
-    console.log("userlists");
+export const getUserList: Handler = (event, context, callback: Callback) => {
+    console.log("getUserList");
     context.callbackWaitsForEmptyEventLoop = false;
     listUsers((err, result) => {
         if (err) {
@@ -52,8 +53,8 @@ export const userlist: Handler = (event, context, callback: Callback) => {
     });
 };
 
-export const toProcess: Handler = (event, context, callback: Callback) => {
-    console.log("toProcess");
+export const getToProcessList: Handler = (event, context, callback: Callback) => {
+    console.log("getToProcessList");
     console.log(event);
     context.callbackWaitsForEmptyEventLoop = false;
     const countParam = (event.query && event.query.count) || event.count;
