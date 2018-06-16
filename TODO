@@ -1,5 +1,8 @@
+TODO
+----
+
 * In outside, get the fireFileProcessing lambda to successfully invoke toProcess, parse the JSON, and fire off some
-othe outside lambdas.
+other outside lambdas.
 
 * Add an outside lambda which reads from the toProcess list and fires processUser lambdas.
 
@@ -9,4 +12,11 @@ othe outside lambdas.
 
 * create a system health dashboard
 
+TESTING
+-------
+
 * can I wrap the https access stuff in a method?
+
+
+DONE
+----

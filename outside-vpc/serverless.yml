@@ -35,7 +35,7 @@ functions:
   readFromPastebin:
     handler: functions.readFromPastebin
     environment:
-      USERS_FILE: ${self:custom.usersFile}
+      USERS_FILE: ${self:custom.secret.usersFile}
       SNS_ENDPOINT:
          Ref: "UserListNotification"
   fireFileProcessing:
@@ -43,6 +43,15 @@ functions:
     environment:
       apiKey: ${self:custom.secret.apiKey}
       apiServer: ${self:custom.secret.apiServer}
+    role:
+        "invokeLambdas"
+  processUser:
+    handler: functions.processUser
+    environment:
+      apiKey: ${self:custom.secret.apiKey}
+      apiServer: ${self:custom.secret.apiServer}
+    role:
+        "invokeLambdas"
 
 resources:
   Resources:
@@ -54,6 +63,46 @@ resources:
       Type: "AWS::SNS::Topic"
       Properties:
         TopicName: "processUser"
+    invokeLambdas:
+      Type: "AWS::IAM::Role"
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: invokeLambdasPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - lambda:InvokeFunction
+                  Resource: "*"
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - 'Fn::Join':
+                      - ':'
+                      - - 'arn:aws:logs'
+                        - Ref: 'AWS::Region'
+                        - Ref: 'AWS::AccountId'
+                        - 'log-group:/aws/lambda/*:*:*'
+                - Effect: Allow
+                  Action:
+                    - ec2:CreateNetworkInterface
+                    - ec2:DescribeNetworkInterfaces
+                    - ec2:DetachNetworkInterface
+                    - ec2:DeleteNetworkInterface
+                  Resource: "*"
+
   Outputs:
     UserListNotificationTopic:
       Description: "SNS topic that new lists of users arrive on."
@@ -61,4 +110,3 @@ resources:
         Ref: "UserListNotification"
       Export:
         Name: "UserListNotificationTopic"
-

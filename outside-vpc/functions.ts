@@ -1,9 +1,46 @@
-import {SNS} from 'aws-sdk';
+import {SNS, Lambda, config} from 'aws-sdk';
 import {IncomingMessage} from "http";
 import {Callback, Handler} from "aws-lambda";
 
 const https = require('https');
 const PROCESS_COUNT = 1;
+
+// method names from the database - this is the type of thing we have to do.
+const METHOD_PROCESS_USER = "processUser";
+
+// lambda names we expect to see
+const FUNCTION_PROCESS_USER = "processUser";
+
+type GetProcessor = (response: IncomingMessage) => void;
+
+interface ToProcessElement {
+    filename: string,
+    url: string,
+    lastUpdate: any,
+    processMethod: string,
+    nextUpdate: any,
+    geek: string,
+    tillNextUpdate: any,
+    description: string,
+    lastattempt: any
+}
+
+interface ToProcessList {
+    statusCode: number;
+    body: [ToProcessElement];
+}
+
+interface ProcessUserInvocation {
+    geek: string,
+    url: string
+}
+
+interface ProcessUserResult {
+    geek: string;
+    bggid: number;
+    country: string;
+    url: string;
+}
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export const readFromPastebin: Handler = (event, context, callback: Callback) => {
@@ -11,53 +48,156 @@ export const readFromPastebin: Handler = (event, context, callback: Callback) =>
     const snsEndpoint = process.env["SNS_ENDPOINT"];
     const usersFile = process.env["USERS_FILE"];
     const sns = new SNS();
-    const data: Buffer[] = [];
 
-    https.get(usersFile, (response: IncomingMessage) => {
-        response.on('error', (err: Error) => { return callback(err) });
-        response.on('data', (chunk: Buffer) => data.push(chunk));
-        response.on('end', () => {
-            const body = Buffer.concat(data).toString();
-            sns.publish({
-                Message: body,
-                TargetArn: snsEndpoint
-            }, function(err, data) {
-                if (err) {
-                    console.log(err.stack);
-                    return;
-                }
-                console.log('Sent to SNS');
-                console.log(data);
-            });
+    https.get(usersFile, assemble((err, data) => {
+        if (err) {
+            console.log(err.stack);
+            return;
+        }
+        sns.publish({
+            Message: data.toString(),
+            TargetArn: snsEndpoint
+        }, function(err, data) {
+            if (err) {
+                console.log(err.stack);
+                return;
+            }
+            console.log('Sent to SNS');
+            console.log(data);
         });
-    });
+    }));
 };
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export const fireFileProcessing: Handler = (event, context, callback: Callback) => {
+    console.log("fireFileProcessing");
+    const request = makeAPIGetRequest("/v1/toProcess?count=" + PROCESS_COUNT);
+    console.log(request);
+    https.get(request, assemble((err, data) => {
+        if (err) {
+            console.log(err.stack);
+            return;
+        }
+        console.log(data);
+        const result = data as ToProcessList;
+        result.body.forEach(element => {
+            if (element.processMethod == METHOD_PROCESS_USER) {
+                invokeProcessUser(element);
+            }
+        });
+    }));
+};
+
+export const processUser: Handler = (event, context, callback: Callback) => {
+    console.log("processUser");
+    console.log(event);
+    console.log(context);
+    const invocation = event as ProcessUserInvocation;
+
+    const BEFORE_USER_IMAGE = "/images/user/";
+    const BEFORE_COUNTRY = "/users?country=";
+    const AFTER_USER_IMAGE = "/";
+    const AFTER_COUNTRY = '"';
+    https.get(invocation.url, assemble((err, data) => {
+        if (err) {
+            console.log(err.stack);
+            return;
+        }
+        let bggid = -1;
+        let country = "";
+        const lines = data.toString().split("\n");
+        for (let line in lines) {
+            if (line.indexOf(BEFORE_USER_IMAGE) >= 0) {
+                const bggids = between(line, BEFORE_USER_IMAGE, AFTER_USER_IMAGE);
+                if (bggids) bggid = parseInt(bggids);
+                if (country.length > 0) break;
+            } else if (line.indexOf(BEFORE_COUNTRY) >= 0) {
+                country = between(line, BEFORE_COUNTRY, AFTER_COUNTRY);
+                if (bggid >= 0) break;
+            }
+        }
+        const result: ProcessUserResult = {
+            geek: invocation.geek,
+            url: invocation.url,
+            country: country,
+            bggid: bggid
+        };
+    }));
+};
+
+function invokeProcessUser(toProcessElement: ToProcessElement) {
+    const payload: ProcessUserInvocation = {
+        geek: toProcessElement.geek,
+        url: toProcessElement.url
+    };
+    console.log(JSON.stringify(payload));
+    invokelambdaAsync("invokeProcessUser", FUNCTION_PROCESS_USER, payload);
+}
+
+function invokelambdaAsync(context: string, func: string, payload: object) {
+    const params = {
+        ClientContext: context,
+        FunctionName: FUNCTION_PROCESS_USER,
+        InvocationType: "Event", // this is an async invocation
+        LogType: "None",
+        Payload: JSON.stringify(payload),
+    };
+    // const lambdaConfig: Lambda.ClientConfiguration = {
+    //     apiVersion: '2015-03-31'
+    // };
+    config.update({region: 'ap-southeast-2'});
+    const lambda = new Lambda();
+    lambda.invoke(params, function(err, data) {
+        if (err) {
+            console.log(err, err.stack);
+        } else {
+            console.log(func + " invoked apparently successfully");
+            console.log(data);
+        }
+    });
+}
+
+function assemble(callback?: Callback): GetProcessor {
+   return (response: IncomingMessage) => {
+       const data: Buffer[] = [];
+       response.on('error', (err: Error) => {
+           console.log("got error in assemble");
+           return callback(err);
+       });
+       response.on('data', (chunk: Buffer) => {
+           console.log("got data in assemble");
+           data.push(chunk);
+       });
+       response.on('end', () => {
+           console.log(response);
+           const body = Buffer.concat(data).toString();
+           const obj = JSON.parse(body);
+           callback(null, obj);
+       });
+   }
+}
+
+function makeAPIGetRequest(path: string): object {
     const apiServer = process.env["apiServer"];
     const apiKey = process.env["apiKey"];
-    const data: Buffer[] = [];
-    const request = {
+    return {
         method: "GET",
         protocol: "https:",
         hostname: apiServer,
-        path: "/v1/toProcess?count=" + PROCESS_COUNT,
+        path: path,
         headers: {
             "x-api-key": apiKey
         }
     };
-    console.log("apiKey " + apiKey);
-    console.log("apiServer " + apiServer);
-    https.get(request, (response: IncomingMessage) => {
-        response.on('error', (err: Error) => { return callback(err) });
-        response.on('data', (chunk: Buffer) => data.push(chunk));
-        response.on('end', () => {
-            console.log(response);
-            const body = Buffer.concat(data).toString();
-            console.log(body);
-            const obj = JSON.parse(body);
-            console.log(obj);
-        });
-    });
-};
+}
+
+function between(s: string, before: string, after: string): string {
+    const i = s.indexOf(before);
+    if (i < 0) return "";
+    s = s.substring(i+before.length);
+    const j = s.indexOf(after);
+    if (j < 0) return "";
+    return s.substring(0, j);
+}
+
+
