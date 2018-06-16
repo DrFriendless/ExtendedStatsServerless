@@ -2,10 +2,9 @@ import {Callback, Handler} from 'aws-lambda';
 import {ensureUsers, listToProcess, listUsers, updateLastScheduledForUrls} from "./mysql-rds";
 import {ToProcessElement} from "interfaces";
 
-// Lambda to get the list of users from an SQS queue and write it to Mongo DB.
+// receive the list of users from processUserList and make sure they are all in the database
 export const updateUserList: Handler = (event, context, callback: Callback) => {
-    console.log("updateUserList");
-    const body = event.Records[0].Sns.Message;
+    const body = event;
     const usernames = body.split(/\r?\n/);
     console.log("checking for " + usernames.length + " users");
     ensureUsers(usernames);

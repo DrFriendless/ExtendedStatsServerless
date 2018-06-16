@@ -37,3 +37,29 @@ export const getConfig: ConfigurationProducer = (callback: ConfigurationConsumer
     });
 };
 
+function assemble(callback: Callback): GetProcessor {
+    return (response: IncomingMessage) => {
+        const data: Buffer[] = [];
+        response.on('error', (err: Error) => {
+            console.log("got error in assemble");
+            return callback(err);
+        });
+        response.on('data', (chunk: Buffer) => {
+            data.push(chunk);
+        });
+        response.on('end', () => {
+            callback(null, Buffer.concat(data));
+        });
+    }
+}
+
+function assembleJson(callback: Callback): GetProcessor {
+    return assemble((error?: Error | null, result?: object) => {
+        if (error) {
+            callback(error)
+        } else {
+            callback(null, JSON.parse(result.toString()));
+        }
+    });
+}
+

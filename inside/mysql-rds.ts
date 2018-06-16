@@ -10,10 +10,8 @@ export const ensureUsers: (users: string[]) => void = (users: string[]) => {
 };
 
 function doEnsureUsers(conn: mysql.Connection, users: string[]) {
-    console.log("doEnsureUser");
     conn.connect(err => {
         if (err) throw err;
-        console.log("doEnsureUser Connected!");
         const countSql = "select count(*) from geeks where username = ?";
         const insertSql = "insert into geeks (username) values (?)";
         users.forEach(user => {
@@ -39,6 +37,7 @@ function doRecordFile(conn: mysql.Connection, url: string, processMethod: string
             const tillNext = TILL_NEXT_UPDATE[processMethod];
             const insertParams = [url, processMethod, user, null, tillNext, description];
             conn.query(insertSql, insertParams);
+            console.log("added user " + user);
         }
     });
 }
@@ -48,7 +47,6 @@ const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '
     'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00' };
 
 function doEnsureFileProcessUser(conn: mysql.Connection, user: string) {
-    console.log("doEnsureFileProcessUser");
     doRecordFile(conn, PROFILE_URL + user, "processUser", user, "User's profile");
 }
 
@@ -93,7 +91,7 @@ export const updateLastScheduledForUrls: (urls: string[], callback: Callback) =>
         if (err) return callback(err);
         console.log("updateLastScheduledForUrls connected");
         if (urls.length == 0) {
-            callback(null, null);
+            callback(undefined, undefined);
         } else if (urls.length == 1) {
             const sql = "update files set last_scheduled = now() where url = ?";
             conn.query(sql, urls, (err, result) => {
@@ -101,13 +99,13 @@ export const updateLastScheduledForUrls: (urls: string[], callback: Callback) =>
                     console.log(err);
                     return callback(err);
                 }
-                return callback(null, null);
+                return callback(undefined, undefined);
             });
         } else {
             const sql = "update files set last_scheduled = now() where url in ?";
             conn.query(sql, [urls], (err, result) => {
                 if (err) return callback(err);
-                return callback(null, null);
+                return callback(undefined, undefined);
             });
         }
     });

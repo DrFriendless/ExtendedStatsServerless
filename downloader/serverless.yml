@@ -8,12 +8,6 @@ provider:
   runtime: nodejs6.10
   stage: dev
   region: ap-southeast-2
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - SNS:Publish
-      Resource:
-        Ref: "UserListNotification"
 
 custom:
   secret: ${file(../secrets.json)}
@@ -23,33 +17,25 @@ functions:
     handler: functions.processUserList
     environment:
       USERS_FILE: ${self:custom.secret.usersFile}
-      SNS_ENDPOINT:
-         Ref: "UserListNotification"
+    role:
+      "invokeLambdas"
   fireFileProcessing:
     handler: functions.fireFileProcessing
     environment:
       apiKey: ${self:custom.secret.apiKey}
       apiServer: ${self:custom.secret.apiServer}
     role:
-        "invokeLambdas"
+      "invokeLambdas"
   processUser:
     handler: functions.processUser
     environment:
       apiKey: ${self:custom.secret.apiKey}
       apiServer: ${self:custom.secret.apiServer}
     role:
-        "invokeLambdas"
+      "invokeLambdas"
 
 resources:
   Resources:
-    UserListNotification:
-      Type: "AWS::SNS::Topic"
-      Properties:
-        TopicName: "userlists"
-    ProcessUserNotification:
-      Type: "AWS::SNS::Topic"
-      Properties:
-        TopicName: "processUser"
     invokeLambdas:
       Type: "AWS::IAM::Role"
       Properties:

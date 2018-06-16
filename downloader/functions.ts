@@ -1,9 +1,7 @@
-import {SNS, Lambda} from 'aws-sdk';
-import {IncomingMessage} from "http";
 import {Callback, Handler} from "aws-lambda";
-import {ToProcessElement, ToProcessList, ToProcessList, ProcessUserInvocation, ProcessUserResult} from "./interfaces"
+import {ToProcessList, ProcessUserInvocation, ProcessUserResult} from "./interfaces"
+import {between, invokelambdaAsync, makeAPIGetRequest} from "./library";
 
-const https = require('https');
 const request = require('request-promise-native');
 // the max files to start processing for at once
 const PROCESS_COUNT = 1;
@@ -15,164 +13,87 @@ const METHOD_PROCESS_USER = "processUser";
 
 // lambda names we expect to see
 const FUNCTION_PROCESS_USER = "processUser";
+const FUNCTION_UPDATE_USER_LIST = "updateUserList";
 
 const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 
-type GetProcessor = (response: IncomingMessage) => void;
-
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export const processUserList: Handler = (event, context, callback: Callback) => {
-    console.log("SNS_ENDPOINT = " + process.env["SNS_ENDPOINT"]);
-    const snsEndpoint = process.env["SNS_ENDPOINT"];
     const usersFile = process.env["USERS_FILE"];
-    const sns = new SNS();
-
-    request(usersFile).then(data => {
-        console.log(data);
-        sns.publish({
-            Message: data.toString(),
-            TargetArn: snsEndpoint
-        })
-    }).then(junk => {
-        console.log('Sent to SNS');
-    }).catch(err => {
-        console.log(err);
-        callback(err);
-    });
+    request(usersFile)
+        .then(data => invokelambdaAsync("processUserList", INSIDE_PREFIX + FUNCTION_UPDATE_USER_LIST, data))
+        .then(data => console.log('Sent ' + data.split(/\r?\n/).length + ' users to ' + FUNCTION_UPDATE_USER_LIST))
+        .catch(err => {
+            console.log(err);
+            callback(err);
+        });
 };
 
-// Lambda to get the list of users from pastebin and stick it on a queue to be processed.
+// Lambda to get files to be processed and invoke the lambdas to do that
 export const fireFileProcessing: Handler = (event, context, callback: Callback) => {
     console.log("fireFileProcessing");
-    const request = makeAPIGetRequest("/v1/toProcess?count=" + PROCESS_COUNT);
-    console.log(request);
-    https.get(request, assembleJson((err, data) => {
-        if (err) {
-            console.log(err.stack);
-            return;
-        }
-        console.log(data);
-        const result = data as ToProcessList;
-        result.body.forEach(element => {
-            if (element.processMethod == METHOD_PROCESS_USER) {
-                invokeProcessUser(element);
-            }
+    const req = makeAPIGetRequest("/v1/toProcess?count=" + PROCESS_COUNT);
+    console.log(req);
+    request(req)
+        .then(json => JSON.parse(json) as ToProcessList)
+        .then(data => {
+            data.body.forEach(element => {
+                if (element.processMethod == METHOD_PROCESS_USER) {
+                    const payload: ProcessUserInvocation = {
+                        geek: element.geek,
+                        url: element.url
+                    };
+                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, payload);
+                }
+            })
+        })
+        .catch(err => {
+            console.log(err);
+            callback(err);
         });
-    }));
 };
 
+// Lambda to harvest data about a user
 export const processUser: Handler = (event, context, callback: Callback) => {
     console.log("processUser");
     console.log(event);
     const invocation = event as ProcessUserInvocation;
 
+    request(invocation.url)
+        .then(data => extractUserDataFromPage(invocation.geek, invocation.url, data.toString()))
+        .then(result => console.log(result))
+        .then(result => invokelambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_USER_RESULT, result))
+        .catch(err => {
+            console.log(err);
+            callback(err);
+        });
+};
+
+function extractUserDataFromPage(geek: string, url: string, pageContent: string): ProcessUserResult {
     const BEFORE_USER_IMAGE = "/images/user/";
     const BEFORE_COUNTRY = "/users?country=";
     const AFTER_USER_IMAGE = "/";
     const AFTER_COUNTRY = '"';
-    https.get(invocation.url, assemble((err, data) => {
-        if (err) {
-            console.log(err.stack);
-            return;
-        }
-        let bggid = -1;
-        let country = "";
-        const file = data.toString();
-        if (file.indexOf(BEFORE_USER_IMAGE) >= 0) {
-            const bggids = between(file, BEFORE_USER_IMAGE, AFTER_USER_IMAGE);
-            if (bggids) bggid = parseInt(bggids);
-        }
-        if (file.indexOf(BEFORE_COUNTRY) >= 0) {
-            country = between(file, BEFORE_COUNTRY, AFTER_COUNTRY);
-        }
-        const result: ProcessUserResult = {
-            geek: invocation.geek,
-            url: invocation.url,
-            country: country,
-            bggid: bggid
-        };
-        console.log(result);
-        invokelambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_USER_RESULT, result);
-    }));
-};
 
-function invokeProcessUser(toProcessElement: ToProcessElement) {
-    const payload: ProcessUserInvocation = {
-        geek: toProcessElement.geek,
-        url: toProcessElement.url
-    };
-    invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, payload);
-}
-
-function invokelambdaAsync(context: string, func: string, payload: object) {
-    const params = {
-        ClientContext: context,
-        FunctionName: func,
-        InvocationType: "Event", // this is an async invocation
-        LogType: "None",
-        Payload: JSON.stringify(payload),
-    };
-    // const lambdaConfig: Lambda.ClientConfiguration = {
-    //     apiVersion: '2015-03-31'
-    // };
-    const lambda = new Lambda();
-    lambda.invoke(params, function(err, data) {
-        if (err) {
-            console.log(err, err.stack);
-        } else {
-            console.log(func + " invoked apparently successfully");
-            console.log(data);
-        }
-    });
-}
-
-function assembleJson(callback: Callback): GetProcessor {
-    return assemble((error?: Error | null, result?: object) => {
-        if (error) {
-            callback(error)
-        } else {
-            callback(null, JSON.parse(result.toString()));
-        }
-    });
-}
-
-function assemble(callback: Callback): GetProcessor {
-    return (response: IncomingMessage) => {
-        const data: Buffer[] = [];
-        response.on('error', (err: Error) => {
-            console.log("got error in assemble");
-            return callback(err);
-        });
-        response.on('data', (chunk: Buffer) => {
-            data.push(chunk);
-        });
-        response.on('end', () => {
-            callback(null, Buffer.concat(data));
-        });
+    let bggid = -1;
+    let country = "";
+    if (pageContent.indexOf(BEFORE_USER_IMAGE) >= 0) {
+        const bggids = between(pageContent, BEFORE_USER_IMAGE, AFTER_USER_IMAGE);
+        if (bggids) bggid = parseInt(bggids);
     }
-}
-
-function makeAPIGetRequest(path: string): object {
-    const apiServer = process.env["apiServer"];
-    const apiKey = process.env["apiKey"];
-    return {
-        method: "GET",
-        protocol: "https:",
-        hostname: apiServer,
-        path: path,
-        headers: {
-            "x-api-key": apiKey
-        }
+    if (pageContent.indexOf(BEFORE_COUNTRY) >= 0) {
+        country = between(pageContent, BEFORE_COUNTRY, AFTER_COUNTRY);
+    }
+    const result: ProcessUserResult = {
+        geek: geek,
+        url: url,
+        country: country,
+        bggid: bggid
     };
+    return result;
 }
 
-function between(s: string, before: string, after: string): string {
-    const i = s.indexOf(before);
-    if (i < 0) return "";
-    s = s.substring(i+before.length);
-    const j = s.indexOf(after);
-    if (j < 0) return "";
-    return s.substring(0, j);
-}
+
+
 
 
