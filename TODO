@@ -1,9 +1,9 @@
 Architecture doc is here: https://docs.google.com/document/d/1I2JdrnmywGvKkJ2cTo1g1qKDI2fSKbRrjCqgP3wrOCg/edit
 
+System dashboard is here: https://ap-southeast-2.console.aws.amazon.com/cloudwatch/home?region=ap-southeast-2#dashboards:name=Extended-Stats-Serverless
+
 TODO
 ----
-
-* files table needs a "last submitted for processing" column
 
 * need a lambda to periodically check the user list for updates - invoke processUserList
 
@@ -12,14 +12,6 @@ TODO
 * Add an inside side of processUser.
 
 * Add an inside lambda which updates the time that a file was processed at. Maybe this just needs to be a library function.
-
-* create a system health dashboard
-
-* API should be in the inside stack.
-
-TESTING
--------
-
 
 DONE
 ----
@@ -30,4 +22,6 @@ other outside lambdas.
 * can I wrap the https access stuff in a method?
 * what needs to be in the API? What can be invoked directly by lambda? - only things needed by clients need to be in the API.
 * inside-vpc -> inside, outside-vpc -> downloader, client stack?
-
+* files table needs a "last submitted for processing" column
+* API should be in the inside stack.
+* create a system health dashboard
