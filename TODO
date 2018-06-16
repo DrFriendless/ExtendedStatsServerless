@@ -1,14 +1,11 @@
 TODO
 ----
 
-* In outside, get the fireFileProcessing lambda to successfully invoke toProcess, parse the JSON, and fire off some
-other outside lambdas.
-
-* Add an outside lambda which reads from the toProcess list and fires processUser lambdas.
+* what's the accepted style for programming Node with all these callbacks?
 
 * Add an inside lambda which updates the time that a file was processed at. Maybe this just needs to be a library function.
 
-* give the inside and outside APIs different root paths
+* what needs to be in the API? What can be invoked directly by lamnbda?
 
 * create a system health dashboard
 
@@ -20,3 +17,8 @@ TESTING
 
 DONE
 ----
+
+* In outside, get the fireFileProcessing lambda to successfully invoke toProcess, parse the JSON, and fire off some
+other outside lambdas.
+* Add an outside lambda which reads from the toProcess list and fires processUser lambdas.
+

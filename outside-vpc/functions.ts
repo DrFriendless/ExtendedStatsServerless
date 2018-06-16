@@ -4,12 +4,16 @@ import {Callback, Handler} from "aws-lambda";
 
 const https = require('https');
 const PROCESS_COUNT = 1;
+const INSIDE_PREFIX = "inside-vpc-dev-";
+const OUTSIDE_PREFIX = "outside-vpc-dev-";
 
 // method names from the database - this is the type of thing we have to do.
 const METHOD_PROCESS_USER = "processUser";
 
 // lambda names we expect to see
 const FUNCTION_PROCESS_USER = "processUser";
+
+const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 
 type GetProcessor = (response: IncomingMessage) => void;
 
@@ -73,7 +77,7 @@ export const fireFileProcessing: Handler = (event, context, callback: Callback) 
     console.log("fireFileProcessing");
     const request = makeAPIGetRequest("/v1/toProcess?count=" + PROCESS_COUNT);
     console.log(request);
-    https.get(request, assemble((err, data) => {
+    https.get(request, assembleJson((err, data) => {
         if (err) {
             console.log(err.stack);
             return;
@@ -122,6 +126,8 @@ export const processUser: Handler = (event, context, callback: Callback) => {
             country: country,
             bggid: bggid
         };
+        console.log(result);
+        invokelambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_USER_RESULT, result);
     }));
 };
 
@@ -130,14 +136,13 @@ function invokeProcessUser(toProcessElement: ToProcessElement) {
         geek: toProcessElement.geek,
         url: toProcessElement.url
     };
-    console.log(JSON.stringify(payload));
-    invokelambdaAsync("invokeProcessUser", FUNCTION_PROCESS_USER, payload);
+    invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, payload);
 }
 
 function invokelambdaAsync(context: string, func: string, payload: object) {
     const params = {
         ClientContext: context,
-        FunctionName: FUNCTION_PROCESS_USER,
+        FunctionName: func,
         InvocationType: "Event", // this is an async invocation
         LogType: "None",
         Payload: JSON.stringify(payload),
@@ -145,7 +150,6 @@ function invokelambdaAsync(context: string, func: string, payload: object) {
     // const lambdaConfig: Lambda.ClientConfiguration = {
     //     apiVersion: '2015-03-31'
     // };
-    config.update({region: 'ap-southeast-2'});
     const lambda = new Lambda();
     lambda.invoke(params, function(err, data) {
         if (err) {
@@ -157,24 +161,30 @@ function invokelambdaAsync(context: string, func: string, payload: object) {
     });
 }
 
-function assemble(callback?: Callback): GetProcessor {
-   return (response: IncomingMessage) => {
-       const data: Buffer[] = [];
-       response.on('error', (err: Error) => {
-           console.log("got error in assemble");
-           return callback(err);
-       });
-       response.on('data', (chunk: Buffer) => {
-           console.log("got data in assemble");
-           data.push(chunk);
-       });
-       response.on('end', () => {
-           console.log(response);
-           const body = Buffer.concat(data).toString();
-           const obj = JSON.parse(body);
-           callback(null, obj);
-       });
-   }
+function assembleJson(callback: Callback): GetProcessor {
+    return assemble((error?: Error | null, result?: object) => {
+        if (error) {
+            callback(error)
+        } else {
+            callback(null, JSON.parse(result.toString()));
+        }
+    });
+}
+
+function assemble(callback: Callback): GetProcessor {
+    return (response: IncomingMessage) => {
+        const data: Buffer[] = [];
+        response.on('error', (err: Error) => {
+            console.log("got error in assemble");
+            return callback(err);
+        });
+        response.on('data', (chunk: Buffer) => {
+            data.push(chunk);
+        });
+        response.on('end', () => {
+            callback(null, Buffer.concat(data).toString());
+        });
+    }
 }
 
 function makeAPIGetRequest(path: string): object {
