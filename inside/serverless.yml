@@ -39,8 +39,6 @@ functions:
       mysqlUsername: ${self:custom.database.mysqlUsername}
       mysqlPassword: ${self:custom.database.mysqlPassword}
       mysqlDatabase: ${self:custom.database.mysqlDatabase}
-    events:
-      - sns: ${cf:outside-vpc-dev.UserListNotificationTopic}
     role:
         "doStuffFromInsideVPC"
   getUserList:

@@ -45,7 +45,7 @@ function doRecordFile(conn: mysql.Connection, url: string, processMethod: string
 
 // longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
 const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '72:00:00', 'processPlayed' : '72:00:00',
-        'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00' };
+    'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00' };
 
 function doEnsureFileProcessUser(conn: mysql.Connection, user: string) {
     console.log("doEnsureFileProcessUser");
@@ -74,38 +74,42 @@ export const listUsers: (callback: Callback) => void = (callback: Callback) => {
 };
 
 export const listToProcess: (count: number, callback: Callback) => void = (count: number, callback: Callback) => {
-    console.log("listToProcess");
     const conn = getConnection();
     conn.connect(err => {
-        if (err) {
-            return callback(err);
-        }
+        if (err) return callback(err);
         console.log("listToProcess connected");
-        const sql = "select * from files where (lastUpdate is null || nextUpdate < now()) limit " + count;
+        const sql = "select * from files where (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit " + count;
         conn.query(sql, null, (err, result) => {
-            if (err) {
-                return callback(err);
-            }
+            if (err) return callback(err);
             console.log(result);
-            console.log("listToProcess complete");
             return callback(null, result);
         });
     });
 };
 
-export const findProcessUserFiles: (processUser: Callback) => void = (processUser: Callback) => {
-    console.log("findProcessUserFiles");
+export const updateLastScheduledForUrls: (urls: string[], callback: Callback) => void = (urls: string[], callback: Callback) => {
     const conn = getConnection();
     conn.connect(err => {
-        if (err) return processUser(err);
-        console.log("findProcessUserFiles connected");
-        const sql = "select * from files where processMethod = 'processUser' and (lastUpdate is null || nextUpdate < now())";
-        conn.query(sql, null, (err, result) => {
-            if (err) return processUser(err);
-            console.log("Found " + result.length + " files to be processed.");
-            result.forEach(u => processUser(null, u));
-            console.log("findProcessUserFiles complete");
-        });
+        if (err) return callback(err);
+        console.log("updateLastScheduledForUrls connected");
+        if (urls.length == 0) {
+            callback(null, null);
+        } else if (urls.length == 1) {
+            const sql = "update files set last_scheduled = now() where url = ?";
+            conn.query(sql, urls, (err, result) => {
+                if (err) {
+                    console.log(err);
+                    return callback(err);
+                }
+                return callback(null, null);
+            });
+        } else {
+            const sql = "update files set last_scheduled = now() where url in ?";
+            conn.query(sql, [urls], (err, result) => {
+                if (err) return callback(err);
+                return callback(null, null);
+            });
+        }
     });
 };
 

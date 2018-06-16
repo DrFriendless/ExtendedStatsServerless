@@ -1,6 +1,7 @@
 import {SNS, Lambda} from 'aws-sdk';
 import {IncomingMessage} from "http";
 import {Callback, Handler} from "aws-lambda";
+import {ToProcessElement, ToProcessList, ToProcessList, ProcessUserInvocation, ProcessUserResult} from "./interfaces"
 
 const https = require('https');
 // the max files to start processing for at once
@@ -17,35 +18,6 @@ const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 
 type GetProcessor = (response: IncomingMessage) => void;
-
-interface ToProcessElement {
-    filename: string,
-    url: string,
-    lastUpdate: any,
-    processMethod: string,
-    nextUpdate: any,
-    geek: string,
-    tillNextUpdate: any,
-    description: string,
-    lastattempt: any
-}
-
-interface ToProcessList {
-    statusCode: number;
-    body: [ToProcessElement];
-}
-
-interface ProcessUserInvocation {
-    geek: string,
-    url: string
-}
-
-interface ProcessUserResult {
-    geek: string;
-    bggid: number;
-    country: string;
-    url: string;
-}
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export const processUserList: Handler = (event, context, callback: Callback) => {

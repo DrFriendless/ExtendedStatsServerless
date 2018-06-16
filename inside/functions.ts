@@ -1,8 +1,6 @@
-import {SNS} from 'aws-sdk';
 import {Callback, Handler} from 'aws-lambda';
-import {ensureUsers, listToProcess, listUsers} from "./mysql-rds";
-
-const PROFILE_URL = "https://boardgamegeek.com/user/";
+import {ensureUsers, listToProcess, listUsers, updateLastScheduledForUrls} from "./mysql-rds";
+import {ToProcessElement} from "interfaces";
 
 // Lambda to get the list of users from an SQS queue and write it to Mongo DB.
 export const updateUserList: Handler = (event, context, callback: Callback) => {
@@ -12,34 +10,6 @@ export const updateUserList: Handler = (event, context, callback: Callback) => {
     console.log("checking for " + usernames.length + " users");
     ensureUsers(usernames);
 };
-
-function sendProcessUserToSNS(sns: SNS, endpoint: string): Callback {
-    return function(error?: Error | null, result?: object) {
-        console.log("inner");
-        console.log(sns);
-        console.log(endpoint);
-        if (error) {
-            console.log(error);
-            return null;
-        }
-        const body = {
-            url: result.url,
-            geek: result.geek
-        };
-        console.log(body);
-        sns.publish({
-            Message: body.toString(),
-            TargetArn: endpoint
-        }, function(err, data) {
-            if (err) {
-                console.log(err);
-                return;
-            }
-            console.log('Sent to SNS');
-            return;
-        });
-    };
-}
 
 export const getUserList: Handler = (event, context, callback: Callback) => {
     console.log("getUserList");
@@ -56,6 +26,8 @@ export const getUserList: Handler = (event, context, callback: Callback) => {
 export const getToProcessList: Handler = (event, context, callback: Callback) => {
     console.log("getToProcessList");
     console.log(event);
+    // TODO - this needs to be true only when we are going to process these files.
+    const updateLastScheduled = true;
     context.callbackWaitsForEmptyEventLoop = false;
     const countParam = (event.query && event.query.count) || event.count;
     let count = parseInt(countParam);
@@ -64,7 +36,20 @@ export const getToProcessList: Handler = (event, context, callback: Callback) =>
         if (err) {
             callback(err, null);
         } else {
-            callback(null, { statusCode: 200, body: result });
+            if (updateLastScheduled) {
+                const rows = result as [ToProcessElement];
+                const urls = rows.map(row => row.url);
+                updateLastScheduledForUrls(urls, (err, result2) => {
+                    if (err) {
+                        console.log(err);
+                        callback(err, null);
+                    } else {
+                        callback(null, {statusCode: 200, body: result});
+                    }
+                });
+            } else {
+                callback(null, {statusCode: 200, body: result});
+            }
         }
     });
 };
