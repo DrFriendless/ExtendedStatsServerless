@@ -4,6 +4,7 @@ import {Callback, Handler} from "aws-lambda";
 import {ToProcessElement, ToProcessList, ToProcessList, ProcessUserInvocation, ProcessUserResult} from "./interfaces"
 
 const https = require('https');
+const request = require('request-promise-native');
 // the max files to start processing for at once
 const PROCESS_COUNT = 1;
 const INSIDE_PREFIX = "inside-dev-";
@@ -26,23 +27,18 @@ export const processUserList: Handler = (event, context, callback: Callback) => 
     const usersFile = process.env["USERS_FILE"];
     const sns = new SNS();
 
-    https.get(usersFile, assemble((err, data) => {
-        if (err) {
-            console.log(err.stack);
-            return;
-        }
+    request(usersFile).then(data => {
+        console.log(data);
         sns.publish({
             Message: data.toString(),
             TargetArn: snsEndpoint
-        }, function(err, data) {
-            if (err) {
-                console.log(err.stack);
-                return;
-            }
-            console.log('Sent to SNS');
-            console.log(data);
-        });
-    }));
+        })
+    }).then(junk => {
+        console.log('Sent to SNS');
+    }).catch(err => {
+        console.log(err);
+        callback(err);
+    });
 };
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.

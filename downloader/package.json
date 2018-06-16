@@ -8,8 +8,10 @@
     "@types/node": "^8.0.34",
     "aws-lambda": "^0.1.2",
     "aws-lambda-typescript": "0.0.10",
-    "aws-sdk": "^2.133.0",
+    "aws-sdk": "^2.259.1",
     "npm": "^6.1.0",
+    "request": "^2.87.0",
+    "request-promise-native": "^1.0.5",
     "serverless": "^1.27.3",
     "serverless-plugin-typescript": "^1.1.5"
   }
