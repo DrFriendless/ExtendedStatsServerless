@@ -44,6 +44,9 @@ export function fireFileProcessing(event, context, callback: Callback) {
     let count = PROCESS_COUNT;
     if (event.hasOwnProperty("count")) count = event.count;
     const payload = { count: count, updateLastScheduled: true };
+    if (event.hasOwnProperty("processMethod")) {
+        Object.assign(payload, {processMethod: event.processMethod});
+    }
     return invokelambdaSync("{}", INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload)
         .then(data => {
             console.log(data.body);

@@ -96,6 +96,13 @@ export function listToProcess(count: number): Promise<[ToProcessElement]> {
         .then(result => result.map(row => row as ToProcessElement));
 }
 
+export function listToProcessByMethod(count: number, processMethod: string): Promise<[ToProcessElement]> {
+    const sql = "select * from files where processMethod = ? and (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    return getConnection()
+        .then(conn => conn.query(sql, [processMethod, count]))
+        .then(result => result.map(row => row as ToProcessElement));
+}
+
 export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
     const sqlOne = "update files set last_scheduled = now() where url = ?";
     const sqlMany = "update files set last_scheduled = now() where url in (?)";

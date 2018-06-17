@@ -1,7 +1,7 @@
 import {Callback} from 'aws-lambda';
 import {
     ensureUsers,
-    listToProcess,
+    listToProcess, listToProcessByMethod,
     listUsers,
     markUrlProcessed,
     updateLastScheduledForUrls,
@@ -40,18 +40,23 @@ export function getUserList(event, context, callback: Callback) {
 // Lambda to retrieve some number of files that need processing
 export function getToProcessList(event, context, callback: Callback) {
     // updateLastScheduled cannot be set from the URL
-    const updateLastScheduled = event.updateLastScheduled;
     context.callbackWaitsForEmptyEventLoop = false;
     const countParam = (event.query && event.query.count) || event.count;
     let count = parseInt(countParam);
     if (!count || count < 1 || count > 1000) count = 10;
-    listToProcess(count)
+    let query;
+    if (event.processMethod) {
+        query = listToProcessByMethod(count, event.processMethod);
+    } else {
+        query =  listToProcess(count);
+    }
+    query
         .then(elements => {
             const urls = elements.map(row => row.url);
-            if (!updateLastScheduled) {
-                return Promise.resolve(elements);
-            } else {
+            if (event.updateLastScheduled) {
                 return updateLastScheduledForUrls(urls).thenReturn(elements);
+            } else {
+                return Promise.resolve(elements);
             }
         })
         .then(result => callback(undefined, {statusCode: 200, body: result}))

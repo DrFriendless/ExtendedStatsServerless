@@ -30,9 +30,6 @@ functions:
               stage: dev
   fireFileProcessing:
     handler: functions.fireFileProcessing
-    environment:
-      apiKey: ${self:custom.secret.apiKey}
-      apiServer: ${self:custom.secret.apiServer}
     role:
       "invokeLambdas"
     events:
@@ -47,9 +44,10 @@ functions:
               stage: dev
   processUser:
     handler: functions.processUser
-    environment:
-      apiKey: ${self:custom.secret.apiKey}
-      apiServer: ${self:custom.secret.apiServer}
+    role:
+      "invokeLambdas"
+  processCollection:
+    handler: functions.processCollection
     role:
       "invokeLambdas"
 
