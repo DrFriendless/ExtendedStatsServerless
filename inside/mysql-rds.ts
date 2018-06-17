@@ -1,5 +1,5 @@
 import mysql = require('promise-mysql');
-import {Callback} from "aws-lambda";
+import {ToProcessElement} from "./interfaces";
 
 const PROFILE_URL = "https://boardgamegeek.com/user/";
 
@@ -10,11 +10,11 @@ const PROFILE_URL = "https://boardgamegeek.com/user/";
 //         });
 // }
 
-export const ensureUsers: (users: string[]) => Promise<[number]> = (users: string[]) => {
+export const ensureUsers: (users: string[]) => Promise<void[]> = (users: string[]) => {
     return getConnection().then(conn => doEnsureUsers(conn, users));
 };
 
-function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<[number]> {
+function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void[]> {
     const countSql = "select username, count(*) from geeks where username = ?";
     const insertSql = "insert into geeks (username) values (?)";
     for (let i=0; i<users.length; i++) {
@@ -61,66 +61,35 @@ function doEnsureFileProcessUser(conn: mysql.Connection, user: string): Promise<
     return doRecordFile(conn, PROFILE_URL + user, "processUser", user, "User's profile");
 }
 
-export const listUsers: (callback: Callback) => void = (callback: Callback) => {
+export function listUsers(): Promise<[string]> {
     console.log("listUsers");
-    const conn = getConnection();
-    conn.connect(err => {
-        if (err) {
-            return callback(err);
-        }
-        console.log("listUsers connected");
-        const sql = "select username from geeks";
-        conn.query(sql, null, (err, result) => {
-            if (err) {
-                return callback(err);
-            }
-            const val = result.map(row => row['username']);
-            console.log(val);
-            console.log("listUsers complete");
-            return callback(null, val);
-        });
-    });
-};
+    const sql = "select username from geeks";
+    return getConnection()
+        .then(conn => conn.query(sql))
+        .then(result => result.map(row => row['username']));
+}
 
-export const listToProcess: (count: number, callback: Callback) => void = (count: number, callback: Callback) => {
-    const conn = getConnection();
-    conn.connect(err => {
-        if (err) return callback(err);
-        console.log("listToProcess connected");
-        const sql = "select * from files where (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit " + count;
-        conn.query(sql, null, (err, result) => {
-            if (err) return callback(err);
-            console.log(result);
-            return callback(null, result);
-        });
-    });
-};
+export function listToProcess(count: number): Promise<[ToProcessElement]> {
+    const sql = "select * from files where (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    return getConnection()
+        .then(conn => conn.query(sql, [count]))
+        .then(result => result.map(row => row as ToProcessElement));
+}
 
-export const updateLastScheduledForUrls: (urls: string[], callback: Callback) => void = (urls: string[], callback: Callback) => {
-    const conn = getConnection();
-    conn.connect(err => {
-        if (err) return callback(err);
-        console.log("updateLastScheduledForUrls connected");
-        if (urls.length == 0) {
-            callback(undefined, undefined);
-        } else if (urls.length == 1) {
-            const sql = "update files set last_scheduled = now() where url = ?";
-            conn.query(sql, urls, (err, result) => {
-                if (err) {
-                    console.log(err);
-                    return callback(err);
-                }
-                return callback(undefined, undefined);
-            });
-        } else {
-            const sql = "update files set last_scheduled = now() where url in ?";
-            conn.query(sql, [urls], (err, result) => {
-                if (err) return callback(err);
-                return callback(undefined, undefined);
-            });
-        }
-    });
-};
+export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
+    const sqlOne = "update files set last_scheduled = now() where url = ?";
+    const sqlMany = "update files set last_scheduled = now() where url in ?";
+    return getConnection()
+        .then(conn => {
+           if (urls.length == 0) {
+               return Promise.resolve(undefined);
+           } else if (urls.length == 1) {
+               return conn.query(sqlOne, urls);
+           } else {
+               return  conn.query(sqlMany, [urls]);
+           }
+        });
+}
 
 function getConnection(): Promise {
     const params = {

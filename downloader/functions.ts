@@ -1,4 +1,4 @@
-import {Callback, Handler} from "aws-lambda";
+import {Callback} from "aws-lambda";
 import {ToProcessList, ProcessUserInvocation, ProcessUserResult} from "./interfaces"
 import {between, invokelambdaAsync, makeAPIGetRequest} from "./library";
 
@@ -18,7 +18,7 @@ const FUNCTION_UPDATE_USER_LIST = "updateUserList";
 const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
-export const processUserList: Handler = (event, context, callback: Callback) => {
+export function processUserList(event, context, callback: Callback) {
     const usersFile = process.env["USERS_FILE"];
     request(usersFile)
         .then(data => invokelambdaAsync("processUserList", INSIDE_PREFIX + FUNCTION_UPDATE_USER_LIST, data))
@@ -27,10 +27,10 @@ export const processUserList: Handler = (event, context, callback: Callback) => 
             console.log(err);
             callback(err);
         });
-};
+}
 
 // Lambda to get files to be processed and invoke the lambdas to do that
-export const fireFileProcessing: Handler = (event, context, callback: Callback) => {
+export function fireFileProcessing(event, context, callback: Callback) {
     console.log("fireFileProcessing");
     const req = makeAPIGetRequest("/v1/toProcess?count=" + PROCESS_COUNT);
     console.log(req);
@@ -51,10 +51,10 @@ export const fireFileProcessing: Handler = (event, context, callback: Callback) 
             console.log(err);
             callback(err);
         });
-};
+}
 
 // Lambda to harvest data about a user
-export const processUser: Handler = (event, context, callback: Callback) => {
+export function processUser(event, context, callback: Callback) {
     console.log("processUser");
     console.log(event);
     const invocation = event as ProcessUserInvocation;
@@ -67,7 +67,7 @@ export const processUser: Handler = (event, context, callback: Callback) => {
             console.log(err);
             callback(err);
         });
-};
+}
 
 function extractUserDataFromPage(geek: string, url: string, pageContent: string): ProcessUserResult {
     const BEFORE_USER_IMAGE = "/images/user/";
