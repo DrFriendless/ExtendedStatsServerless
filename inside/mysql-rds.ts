@@ -4,7 +4,14 @@ import {ToProcessElement} from "./interfaces";
 export function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
     console.log("updateUserValues " + geek + " " + bggid + " " + country);
     const sql = "update geeks set country = ?, bggid = ? where username = ?";
-    return getConnection().then(conn => conn.query(sql, [country, bggid, geek]));
+    let connection;
+    return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
+        .then(conn => conn.query(sql, [country, bggid, geek]))
+        .then(() => connection.destroy());
 }
 
 // longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
@@ -14,16 +21,28 @@ const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '
 
 export function markUrlProcessed(processMethod: string, url: string): Promise<void> {
     console.log("markUrlProcessed " + url);
-    const sqlGet = "get * from files where processMethod = ? and url = ?";
     const delta = TILL_NEXT_UPDATE[processMethod];
     const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ?";
+    let connection;
     return getConnection()
-        .then(conn => conn.query(sqlSet, [delta, url]));
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
+        .then(conn => conn.query(sqlSet, [delta, url]))
+        .then(() => connection.destroy());
 }
 
-export const ensureUsers: (users: string[]) => Promise<void[]> = (users: string[]) => {
-    return getConnection().then(conn => doEnsureUsers(conn, users));
-};
+export function ensureUsers(users: string[]): Promise<void[]> {
+    let connection;
+    return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
+        .then(conn => doEnsureUsers(conn, users))
+        .then(() => connection.destroy());
+}
 
 function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void[]> {
     const countSql = "select username, count(*) from geeks where username = ?";
@@ -84,29 +103,64 @@ function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string): Pr
 export function listUsers(): Promise<[string]> {
     console.log("listUsers");
     const sql = "select username from geeks";
+    let connection;
+    let result: [string];
     return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
         .then(conn => conn.query(sql))
-        .then(result => result.map(row => row['username']));
+        .then(data => {
+            result = data.map(row => row['username']);
+        })
+        .then(() => connection.destroy())
+        .then(() => result);
 }
 
 export function listToProcess(count: number): Promise<[ToProcessElement]> {
     const sql = "select * from files where (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    let connection;
+    let result: [ToProcessElement];
     return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
         .then(conn => conn.query(sql, [count]))
-        .then(result => result.map(row => row as ToProcessElement));
+        .then(data => {
+            result = data.map(row => row as ToProcessElement)
+        })
+        .then(() => connection.destroy())
+        .then(() => result);
 }
 
 export function listToProcessByMethod(count: number, processMethod: string): Promise<[ToProcessElement]> {
     const sql = "select * from files where processMethod = ? and (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    let connection;
+    let result: [ToProcessElement];
     return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
         .then(conn => conn.query(sql, [processMethod, count]))
-        .then(result => result.map(row => row as ToProcessElement));
+        .then(data => {
+            result = data.map(row => row as ToProcessElement);
+        })
+        .then(() => connection.destroy())
+        .then(() => result);
 }
 
 export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
     const sqlOne = "update files set last_scheduled = now() where url = ?";
     const sqlMany = "update files set last_scheduled = now() where url in (?)";
+    let connection;
     return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
         .then(conn => {
            if (urls.length == 0) {
                return Promise.resolve(undefined);
@@ -115,7 +169,8 @@ export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
            } else {
                return conn.query(sqlMany, [urls]);
            }
-        });
+        })
+        .then(() => connection.destroy());
 }
 
 function getConnection(): Promise {
