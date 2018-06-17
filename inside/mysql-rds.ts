@@ -7,10 +7,18 @@ export function updateUserValues(geek: string, bggid: number, country: string): 
     return getConnection().then(conn => conn.query(sql, [country, bggid, geek]));
 }
 
-export function markUrlProcessed(url: string): Promise<void> {
+// longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
+const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '72:00:00', 'processPlayed' : '72:00:00',
+    'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00', "processUser": '838:00:00'  };
+
+
+export function markUrlProcessed(processMethod: string, url: string): Promise<void> {
     console.log("markUrlProcessed " + url);
-    const sql = "update files set lastUpdate = now() where url = ?";
-    return getConnection().then(conn => conn.query(sql, [url]));
+    const sqlGet = "get * from files where processMethod = ? and url = ?";
+    const delta = TILL_NEXT_UPDATE[processMethod];
+    const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ?";
+    return getConnection()
+        .then(conn => conn.query(sqlSet, [delta, url]));
 }
 
 export const ensureUsers: (users: string[]) => Promise<void[]> = (users: string[]) => {
@@ -58,10 +66,6 @@ function doRecordFile(conn: mysql.Connection, url: string, processMethod: string
         });
 }
 
-// longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
-const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '72:00:00', 'processPlayed' : '72:00:00',
-    'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00' };
-
 function doEnsureFileProcessUser(conn: mysql.Connection, geek: string): Promise<number> {
     const url = `https://boardgamegeek.com/user/${geek}`;
     return doRecordFile(conn, url, "processUser", geek, "User's profile");
@@ -94,7 +98,7 @@ export function listToProcess(count: number): Promise<[ToProcessElement]> {
 
 export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
     const sqlOne = "update files set last_scheduled = now() where url = ?";
-    const sqlMany = "update files set last_scheduled = now() where url in ?";
+    const sqlMany = "update files set last_scheduled = now() where url in (?)";
     return getConnection()
         .then(conn => {
            if (urls.length == 0) {
@@ -102,7 +106,7 @@ export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
            } else if (urls.length == 1) {
                return conn.query(sqlOne, urls);
            } else {
-               return  conn.query(sqlMany, [urls]);
+               return conn.query(sqlMany, [urls]);
            }
         });
 }

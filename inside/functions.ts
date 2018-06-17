@@ -13,7 +13,7 @@ export function processUserResult(event, context, callback: Callback) {
     console.log(event);
     const data = event as ProcessUserResult;
     updateUserValues(data.geek, data.bggid, data.country)
-        .then(() => markUrlProcessed(data.url))
+        .then(() => markUrlProcessed("processUser", data.url))
         .then(v => callback(undefined, v))
         .catch(err => callback(err));
 }
@@ -39,8 +39,8 @@ export function getUserList(event, context, callback: Callback) {
 
 // Lambda to retrieve some number of files that need processing
 export function getToProcessList(event, context, callback: Callback) {
-    // TODO - this needs to be true only when we are going to process these files.
-    const updateLastScheduled = true;
+    // updateLastScheduled cannot be set from the URL
+    const updateLastScheduled = event.updateLastScheduled;
     context.callbackWaitsForEmptyEventLoop = false;
     const countParam = (event.query && event.query.count) || event.count;
     let count = parseInt(countParam);

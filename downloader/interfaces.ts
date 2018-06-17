@@ -27,3 +27,8 @@ export interface ProcessUserResult {
     country: string;
     url: string;
 }
+
+export interface ProcessCollectionResult {
+    geek: string;
+    items: [string];
+}

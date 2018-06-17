@@ -13,6 +13,8 @@
     "request": "^2.87.0",
     "request-promise-native": "^1.0.5",
     "serverless": "^1.27.3",
-    "serverless-plugin-typescript": "^1.1.5"
+    "serverless-plugin-typescript": "^1.1.5",
+    "xml2js": "^0.4.19",
+    "xml2js-es6-promise": "^1.1.1"
   }
 }

@@ -20,6 +20,27 @@ export function invokelambdaAsync(context: string, func: string, payload: object
     return Promise.resolve(payload);
 }
 
+export function invokelambdaSync(context: string, func: string, payload: object): Promise<object> {
+    const params = {
+        ClientContext: undefined,
+        FunctionName: func,
+        InvocationType: "RequestResponse", // this is a synchronous invocation
+        LogType: "None",
+        Payload: JSON.stringify(payload),
+    };
+    const lambda = new Lambda();
+    return new Promise(function (fulfill, reject) {
+        lambda.invoke(params, function(err, data) {
+            if (err) {
+                reject(err);
+            } else {
+                console.log(data);
+                fulfill(JSON.parse(data.Payload.toString()));
+            }
+        });
+    });
+}
+
 export function makeAPIGetRequest(path: string): object {
     const apiServer = process.env["apiServer"];
     const apiKey = process.env["apiKey"];

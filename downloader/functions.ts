@@ -1,6 +1,7 @@
 import {Callback} from "aws-lambda";
 import {ToProcessList, ProcessUserInvocation, ProcessUserResult} from "./interfaces"
-import {between, invokelambdaAsync, makeAPIGetRequest} from "./library";
+import {between, invokelambdaAsync, invokelambdaSync, makeAPIGetRequest} from "./library";
+import {extractUserCollectionFromPage, extractUserDataFromPage} from "./extraction";
 
 const request = require('request-promise-native');
 // the max files to start processing for at once
@@ -10,12 +11,18 @@ const OUTSIDE_PREFIX = "downloader-dev-";
 
 // method names from the database - this is the type of thing we have to do.
 const METHOD_PROCESS_USER = "processUser";
+const METHOD_PROCESS_COLLECTION = "processCollection";
+const METHOD_PROCESS_PLAYED = "processPlayed";
 
 // lambda names we expect to see
-const FUNCTION_PROCESS_USER = "processUser";
+const FUNCTION_RETRIEVE_FILES = "getToProcessList";
 const FUNCTION_UPDATE_USER_LIST = "updateUserList";
-
+const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
+const FUNCTION_PROCESS_COLLECTION = "processCollection";
+const FUNCTION_PROCESS_COLLECTION_RESULT = "processCollectionResult";
+const FUNCTION_PROCESS_PLAYED = "processPlayed";
+const FUNCTION_PROCESS_PLAYED_RESULT = "processPlayedResult";
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export function processUserList(event, context, callback: Callback) {
@@ -33,18 +40,24 @@ export function processUserList(event, context, callback: Callback) {
 // Lambda to get files to be processed and invoke the lambdas to do that
 export function fireFileProcessing(event, context, callback: Callback) {
     console.log("fireFileProcessing");
-    const req = makeAPIGetRequest("/v1/toProcess?count=" + PROCESS_COUNT);
-    console.log(req);
-    request(req)
-        .then(json => JSON.parse(json) as ToProcessList)
+    console.log(event);
+    let count = PROCESS_COUNT;
+    if (event.hasOwnProperty("count")) count = event.count;
+    const payload = { count: count, updateLastScheduled: true };
+    return invokelambdaSync("{}", INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload)
         .then(data => {
+            console.log(data.body);
             data.body.forEach(element => {
+                const payload: ProcessUserInvocation = {
+                    geek: element.geek,
+                    url: element.url
+                };
                 if (element.processMethod == METHOD_PROCESS_USER) {
-                    const payload: ProcessUserInvocation = {
-                        geek: element.geek,
-                        url: element.url
-                    };
                     return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, payload);
+                } else if (element.processMethod == METHOD_PROCESS_COLLECTION) {
+                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, payload);
+                } else if (element.processMethod == METHOD_PROCESS_PLAYED) {
+                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, payload);
                 }
             })
         })
@@ -75,29 +88,27 @@ export function processUser(event, context, callback: Callback) {
         });
 }
 
-function extractUserDataFromPage(geek: string, url: string, pageContent: string): ProcessUserResult {
-    const BEFORE_USER_IMAGE = "/images/user/";
-    const BEFORE_COUNTRY = "/users?country=";
-    const AFTER_USER_IMAGE = "/";
-    const AFTER_COUNTRY = '"';
+// Lambda to harvest a user's collection
+export function processCollection(event, context, callback: Callback) {
+    console.log("processCollection");
+    console.log(event);
+    const invocation = event as ProcessUserInvocation;
 
-    let bggid = -1;
-    let country = "";
-    if (pageContent.indexOf(BEFORE_USER_IMAGE) >= 0) {
-        const bggids = between(pageContent, BEFORE_USER_IMAGE, AFTER_USER_IMAGE);
-        if (bggids) bggid = parseInt(bggids);
-    }
-    if (pageContent.indexOf(BEFORE_COUNTRY) >= 0) {
-        country = between(pageContent, BEFORE_COUNTRY, AFTER_COUNTRY);
-    }
-    const result: ProcessUserResult = {
-        geek: geek,
-        url: url,
-        country: country,
-        bggid: bggid
-    };
-    return result;
+    request(invocation.url)
+        .then(data => extractUserCollectionFromPage(invocation.geek, invocation.url, data.toString()))
+        .then(result => {
+            console.log(result);
+            return result;
+        })
+        .then(result => invokelambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_RESULT, result))
+        .then(v => callback(undefined, v))
+        .catch(err => {
+            console.log(err);
+            callback(err);
+        });
 }
+
+
 
 
 
