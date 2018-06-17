@@ -32,3 +32,8 @@ export interface ProcessCollectionResult {
     geek: string;
     items: [string];
 }
+
+export interface CollectionGame {
+    name: string;
+    gameId: number;
+}

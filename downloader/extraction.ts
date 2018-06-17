@@ -1,12 +1,30 @@
-import {ProcessUserResult, ProcessCollectionResult} from "./interfaces";
+import {ProcessUserResult, ProcessCollectionResult, CollectionGame} from "./interfaces";
 import {between} from "./library";
 const xml2js = require('xml2js-es6-promise');
 
 export function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): ProcessCollectionResult {
-    return xml2js.parseString(pageContent)
+    return xml2js(pageContent, {trim: true})
         .then(dom => {
-            console.log(dom);
-            return { geek: geek, items: [] };
+            if (dom.items.item.length == 0) {
+                throw new Error("Found no games in collection for " + geek);
+            }
+            const items = [];
+            dom.items.item.forEach(item => {
+                console.log(item);
+                if (item.$.subtype != 'boardgame') {
+                    console.log(item.$.subtype + " not a board game");
+                } else {
+                    const gameId = item.$.objectid;
+                    const name = item.name[0]._;
+                    const stats = item.stats[0];
+                    const status = item.status[0];
+                    console.log(stats);
+                    console.log(status);
+                    const gameItem = { name: name, gameId: gameId } as CollectionGame;
+                    items.push(gameItem);
+                }
+            });
+            return { geek: geek, items: items };
         });
 }
 

@@ -62,9 +62,10 @@ export function fireFileProcessing(event, context, callback: Callback) {
                 } else if (element.processMethod == METHOD_PROCESS_PLAYED) {
                     return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, payload);
                 }
-            })
+            });
+            return data.body.length;
         })
-        .then(v => callback(undefined, v))
+        .then(n => callback(undefined, n))
         .catch(err => {
             console.log(err);
             callback(err);
