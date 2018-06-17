@@ -1,6 +1,6 @@
 import {Lambda} from 'aws-sdk';
 
-export function invokelambdaAsync(context: string, func: string, payload: object): Promise {
+export function invokelambdaAsync(context: string, func: string, payload: object): Promise<object> {
     const params = {
         ClientContext: context,
         FunctionName: func,

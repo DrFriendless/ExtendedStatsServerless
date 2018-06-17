@@ -3,12 +3,17 @@ import {ToProcessElement} from "./interfaces";
 
 const PROFILE_URL = "https://boardgamegeek.com/user/";
 
-// function updateUserValues(geek: string, bggid: number, country: string): Promise {
-//     return getConnection()
-//         .then(conn => {
-//
-//         });
-// }
+export function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
+    console.log("updateUserValues " + geek + " " + bggid + " " + country);
+    const sql = "update geeks set country = ?, bggid = ? where username = ?";
+    return getConnection().then(conn => conn.query(sql, [country, bggid, geek]));
+}
+
+export function markUrlProcessed(url: string): Promise<void> {
+    console.log("markUrlProcessed " + url);
+    const sql = "update files set lastUpdate = now() where url = ?";
+    return getConnection().then(conn => conn.query(sql, [url]));
+}
 
 export const ensureUsers: (users: string[]) => Promise<void[]> = (users: string[]) => {
     return getConnection().then(conn => doEnsureUsers(conn, users));

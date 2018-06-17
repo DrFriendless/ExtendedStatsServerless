@@ -23,6 +23,7 @@ export function processUserList(event, context, callback: Callback) {
     request(usersFile)
         .then(data => invokelambdaAsync("processUserList", INSIDE_PREFIX + FUNCTION_UPDATE_USER_LIST, data))
         .then(data => console.log('Sent ' + data.split(/\r?\n/).length + ' users to ' + FUNCTION_UPDATE_USER_LIST))
+        .then(v => callback(undefined, v))
         .catch(err => {
             console.log(err);
             callback(err);
@@ -47,6 +48,7 @@ export function fireFileProcessing(event, context, callback: Callback) {
                 }
             })
         })
+        .then(v => callback(undefined, v))
         .catch(err => {
             console.log(err);
             callback(err);
@@ -61,8 +63,12 @@ export function processUser(event, context, callback: Callback) {
 
     request(invocation.url)
         .then(data => extractUserDataFromPage(invocation.geek, invocation.url, data.toString()))
-        .then(result => console.log(result))
+        .then(result => {
+            console.log(result);
+            return result;
+        })
         .then(result => invokelambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_USER_RESULT, result))
+        .then(v => callback(undefined, v))
         .catch(err => {
             console.log(err);
             callback(err);

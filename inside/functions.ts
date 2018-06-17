@@ -1,11 +1,22 @@
 import {Callback} from 'aws-lambda';
-import {ensureUsers, listToProcess, listUsers, updateLastScheduledForUrls} from "./mysql-rds";
+import {
+    ensureUsers,
+    listToProcess,
+    listUsers,
+    markUrlProcessed,
+    updateLastScheduledForUrls,
+    updateUserValues
+} from "./mysql-rds";
+import {ProcessUserResult} from "./interfaces";
 
-// export function updateUser(event, context, callback: Callback) {
-//     const data = event as ProcessUserResult;
-//     updateUserValues(data.geek, data.bggid, data.country);
-//     // TODO mark URL as processed
-// }
+export function processUserResult(event, context, callback: Callback) {
+    console.log(event);
+    const data = event as ProcessUserResult;
+    updateUserValues(data.geek, data.bggid, data.country)
+        .then(() => markUrlProcessed(data.url))
+        .then(v => callback(undefined, v))
+        .catch(err => callback(err));
+}
 
 // Lambda to receive the list of users from processUserList and make sure they are all in the database
 export function updateUserList(event, context, callback: Callback) {
