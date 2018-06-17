@@ -19,6 +19,15 @@ functions:
       USERS_FILE: ${self:custom.secret.usersFile}
     role:
       "invokeLambdas"
+    events:
+      - schedule:
+          name: lookForNewUsers
+          description: every hour, look to see if new users have been added
+          rate: rate(60 minutes)
+          enabled: true
+          input:
+            stageParams:
+              stage: dev
   fireFileProcessing:
     handler: functions.fireFileProcessing
     environment:
@@ -26,6 +35,16 @@ functions:
       apiServer: ${self:custom.secret.apiServer}
     role:
       "invokeLambdas"
+    events:
+      - schedule:
+          name: processFiles
+          description: every 10 minutes, look to see if there are files to process
+          rate: rate(10 minutes)
+          enabled: true
+          input:
+            count: 10
+            stageParams:
+              stage: dev
   processUser:
     handler: functions.processUser
     environment:
