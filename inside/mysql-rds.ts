@@ -1,8 +1,6 @@
 import mysql = require('promise-mysql');
 import {ToProcessElement} from "./interfaces";
 
-const PROFILE_URL = "https://boardgamegeek.com/user/";
-
 export function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
     console.log("updateUserValues " + geek + " " + bggid + " " + country);
     const sql = "update geeks set country = ?, bggid = ? where username = ?";
@@ -37,7 +35,9 @@ function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void[]>
                     return Promise.resolve(uc);
                 }
             })
-            .then(uc => doEnsureFileProcessUser(conn, uc.user))
+            .then(uc => doEnsureFileProcessUser(conn, uc.user).thenReturn(uc))
+            .then(uc => doEnsureFileProcessUserCollection(conn, uc.user).thenReturn(uc))
+            .then(uc => doEnsureFileProcessUserPlayed(conn, uc.user))
     }));
 }
 
@@ -62,8 +62,19 @@ function doRecordFile(conn: mysql.Connection, url: string, processMethod: string
 const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '72:00:00', 'processPlayed' : '72:00:00',
     'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00' };
 
-function doEnsureFileProcessUser(conn: mysql.Connection, user: string): Promise<number> {
-    return doRecordFile(conn, PROFILE_URL + user, "processUser", user, "User's profile");
+function doEnsureFileProcessUser(conn: mysql.Connection, geek: string): Promise<number> {
+    const url = `https://boardgamegeek.com/user/${geek}`;
+    return doRecordFile(conn, url, "processUser", geek, "User's profile");
+}
+
+function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: string): Promise<number> {
+    const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
+    return doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc");
+}
+
+function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string): Promise<number> {
+    const url = `https://boardgamegeek.com/plays/bymonth/user/${geek}/subtype/boardgame`;
+    return doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games");
 }
 
 export function listUsers(): Promise<[string]> {
