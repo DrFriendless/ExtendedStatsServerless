@@ -1,21 +1,21 @@
 import {Callback} from 'aws-lambda';
 import {
+    ensureGames,
     ensureUsers,
     listToProcess, listToProcessByMethod,
     listUsers,
-    markUrlProcessed,
+    markUrlProcessed, updateGamesForGeek,
     updateLastScheduledForUrls,
     updateUserValues
 } from "./mysql-rds";
-import {ProcessUserResult} from "./interfaces";
+import {FileToProcess, ProcessCollectionResult, ProcessUserResult} from "./interfaces";
 
 export function processUserResult(event, context, callback: Callback) {
     console.log(event);
     const data = event as ProcessUserResult;
-    updateUserValues(data.geek, data.bggid, data.country)
-        .then(() => markUrlProcessed("processUser", data.url))
-        .then(v => callback(undefined, v))
-        .catch(err => callback(err));
+    const promise = updateUserValues(data.geek, data.bggid, data.country)
+        .then(() => markUrlProcessed("processUser", data.url));
+    promiseToCallback(promise, callback);
 }
 
 // Lambda to receive the list of users from processUserList and make sure they are all in the database
@@ -23,18 +23,14 @@ export function updateUserList(event, context, callback: Callback) {
     const body = event;
     const usernames = body.split(/\r?\n/);
     console.log("checking for " + usernames.length + " users");
-    ensureUsers(usernames)
-        .then(v => callback(undefined, v))
-        .catch(err => callback(err));
+    promiseToCallback(ensureUsers(usernames), callback);
 }
 
 // Lambda to retrieve the list of users
 export function getUserList(event, context, callback: Callback) {
     console.log("getUserList");
     context.callbackWaitsForEmptyEventLoop = false;
-    listUsers()
-        .then(result => callback(undefined, {statusCode: 200, body: result}))
-        .catch(err => callback(err));
+    promiseToCallback(listUsers(), callback);
 }
 
 // Lambda to retrieve some number of files that need processing
@@ -50,7 +46,7 @@ export function getToProcessList(event, context, callback: Callback) {
     } else {
         query =  listToProcess(count);
     }
-    query
+    const promise = query
         .then(elements => {
             const urls = elements.map(row => row.url);
             if (event.updateLastScheduled) {
@@ -58,9 +54,8 @@ export function getToProcessList(event, context, callback: Callback) {
             } else {
                 return Promise.resolve(elements);
             }
-        })
-        .then(result => callback(undefined, {statusCode: 200, body: result}))
-        .catch(err => callback(err));
+        });
+    promiseToCallback(promise, callback);
 }
 
 export function processCollectionRestrictToIDs(event, context, callback: Callback) {
@@ -68,9 +63,24 @@ export function processCollectionRestrictToIDs(event, context, callback: Callbac
     const geek = params.geek;
     const ids = params.items;
     console.log(ids);
+    // TODO
 }
 
 export function processCollectionUpdateGames(event, context, callback: Callback) {
    const params = event as ProcessCollectionResult;
    console.log(params);
+   const promise = ensureGames(params.items)
+       .then(() => updateGamesForGeek(params.geek, params.items));
+   promiseToCallback(promise, callback);
+}
+
+export function updateUrlAsProcessed(event, context, callback: Callback) {
+    const params = event as FileToProcess;
+    promiseToCallback(markUrlProcessed(params.processMethod, params.url), callback);
+}
+
+function promiseToCallback<T>(promise: Promise<T>, callback: Callback) {
+    promise
+        .then(v => callback(undefined, v))
+        .catch(err => callback(err));
 }

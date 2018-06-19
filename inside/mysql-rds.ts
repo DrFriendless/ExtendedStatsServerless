@@ -1,5 +1,5 @@
 import mysql = require('promise-mysql');
-import {ToProcessElement} from "./interfaces";
+import {CollectionGame, ToProcessElement} from "./interfaces";
 
 export function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
     console.log("updateUserValues " + geek + " " + bggid + " " + country);
@@ -68,17 +68,68 @@ function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void[]>
     }));
 }
 
+export function updateGamesForGeek(geek: string, games: [CollectionGame]): Promise<void[]> {
+    let connection;
+    return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
+        .then(conn => doUpdateGamesForGeek(conn, geek, games))
+        .then(() => connection.destroy());
+}
+
+function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: [CollectionGame]): Promise<void[]> {
+    const countSql = "select count(*) from geekgames where geek = ? and game = ?";
+    const insertSql = "insert into geekgames (geek, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    const updateSql = "update geekgames (rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) where geek = ? and game = ?";
+    return Promise.all(games.map(game => {
+        return conn.query(countSql, [geek, game.gameId])
+            .then(count => {
+                if (count == 1) {
+                    return conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade,
+                        game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered, geek, game.gameId]);
+                } else {
+                    return conn.query(insertSql, [geek, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
+                    game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
+                }
+            });
+    }));
+}
+
+export function ensureGames(games: [CollectionGame]): Promise<void[]> {
+    let connection;
+    return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
+        .then(conn => doEnsureGames(conn, games))
+        .then(() => connection.destroy());
+}
+
+function doEnsureGames(conn: mysql.Connection, games: [CollectionGame]): Promise<void[]> {
+    const GAME_URL = "https://boardgamegeek.com/xmlapi/boardgame/%d&stats=1";
+    return Promise.all(games.map(game => {
+        const url = GAME_URL.replace("%d", game.gameId.toString());
+        return doRecordFile(conn, url, "processGame", null, "Game #" + game.gameId);
+    }));
+}
+
 // promise returns how many rows were inserted
 function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string, description: string): Promise<number> {
-    const countSql = "select count(*) from files where geek = ? and processMethod = ?";
+    const countSql = "select count(*) from files where url = ? and processMethod = ?";
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description) values (?, ?, ?, ?, ?, ?)";
-    return conn.query(countSql, [user, processMethod])
+    return conn.query(countSql, [url, processMethod])
         .then(result => {
             const count = result[0]["count(*)"];
             if (count === 0) {
                 const tillNext = TILL_NEXT_UPDATE[processMethod];
                 const insertParams = [url, processMethod, user, null, tillNext, description];
-                return conn.query(insertSql, insertParams).then(junk => console.log("added url " + url)).thenReturn(1);
+                return conn.query(insertSql, insertParams)
+                    .then(() => console.log("added url " + url))
+                    .catch(err => console.log(err))
+                    .thenReturn(1);
             } else {
                 return Promise.resolve(0);
             }

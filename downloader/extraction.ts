@@ -17,7 +17,7 @@ export function extractUserCollectionFromPage(geek: string, url: string, pageCon
                     const name = item.name[0]._;
                     const stats = item.stats[0];
                     const status = item.status[0];
-                    const gameItem = { name: name, gameId: gameId } as CollectionGame;
+                    const gameItem = { gameId: gameId } as CollectionGame;
                     if (stats) {
                         const rating = stats.rating;
                         // 2018-06-18T22:24:58.331Z	6b8e68a6-7346-11e8-87e6-1f927414bfa6	[ { '$': { value: '6' },
@@ -42,8 +42,9 @@ export function extractUserCollectionFromPage(geek: string, url: string, pageCon
                     //         preordered: '0',
                     //         lastmodified: '2013-03-19 06:59:47' } }
                     if (status) {
-                        gameItem.own = status.$.own === '1';
-                        gameItem.forTrade = status.$.prevowned === '1';
+                        gameItem.owned = status.$.own === '1';
+                        gameItem.prevOwned = status.$.prevowned === '1';
+                        gameItem.forTrade = status.$.fortrade === '1';
                         gameItem.want = status.$.want === '1';
                         gameItem.wantToPlay = status.$.wanttoplay === '1';
                         gameItem.wantToBuy = status.$.wanttobuy;
@@ -51,8 +52,6 @@ export function extractUserCollectionFromPage(geek: string, url: string, pageCon
                         gameItem.wishListPriority = onWishList ? parseInt(status.$.wishlist) : 0;
                         gameItem.preordered = status.$.preordered === '1';
                     }
-                    // haven't found this in the parsed XML yet
-                    gameItem.description = "";
                     // console.log(gameItem);
                     items.push(gameItem);
                 }

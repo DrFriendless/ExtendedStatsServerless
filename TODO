@@ -5,13 +5,7 @@ System dashboard is here: https://ap-southeast-2.console.aws.amazon.com/cloudwat
 TODO
 ----
 
-* need a lambda to periodically check the user list for updates - invoke processUserList
-
-* what's the accepted style for programming Node with all these callbacks?
-
-* Add an inside side of processUser.
-
-* Add an inside lambda which updates the time that a file was processed at. Maybe this just needs to be a library function.
+* index on geekgames by geek then game
 
 DONE
 ----
@@ -25,3 +19,7 @@ other outside lambdas.
 * files table needs a "last submitted for processing" column
 * API should be in the inside stack.
 * create a system health dashboard
+* need a lambda to periodically check the user list for updates - invoke processUserList
+* Add an inside side of processUser.
+* Add an inside lambda which updates the time that a file was processed at. Maybe this just needs to be a library function.
+* what's the accepted style for programming Node with all these callbacks?

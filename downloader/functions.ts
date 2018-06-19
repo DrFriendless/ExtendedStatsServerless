@@ -1,8 +1,6 @@
 import {Callback} from "aws-lambda";
 import {
-    ToProcessList,
     ProcessUserInvocation,
-    ProcessUserResult,
     ProcessCollectionResult,
     CollectionGame
 } from "./interfaces"
@@ -29,7 +27,7 @@ const FUNCTION_PROCESS_COLLECTION = "processCollection";
 const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
 const FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS = "processCollectionRestrictToIDs";
 const FUNCTION_PROCESS_PLAYED = "processPlayed";
-const FUNCTION_PROCESS_PLAYED_RESULT = "processPlayedResult";
+const FUNCTION_MARK_PROCESSED = "updateUrlAsProcessed";
 
 const MAX_GAMES_PER_CALL = 500;
 
@@ -58,21 +56,17 @@ export function fireFileProcessing(event, context, callback: Callback) {
     }
     return invokelambdaSync("{}", INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload)
         .then(data => {
-            console.log(data.body);
-            data.body.forEach(element => {
-                const payload: ProcessUserInvocation = {
-                    geek: element.geek,
-                    url: element.url
-                };
+            console.log(data);
+            data.forEach(element => {
                 if (element.processMethod == METHOD_PROCESS_USER) {
-                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, payload);
+                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
                 } else if (element.processMethod == METHOD_PROCESS_COLLECTION) {
-                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, payload);
+                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
                 } else if (element.processMethod == METHOD_PROCESS_PLAYED) {
-                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, payload);
+                    return invokelambdaAsync("invokeProcessUser", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
                 }
             });
-            return data.body.length;
+            return data.length;
         })
         .then(n => callback(undefined, n))
         .catch(err => {
@@ -115,6 +109,7 @@ export function processCollection(event, context, callback: Callback) {
         })
         .then(result => deleteGamesFromCollection(result))
         .then(result => addGamesToCollection(result))
+        .then(v => markAsProcessed("processCollection", invocation))
         .then(v => callback(undefined, v))
         .catch(err => {
             console.log(err);
@@ -127,6 +122,10 @@ function deleteGamesFromCollection(collection: ProcessCollectionResult): Promise
         INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS,
         { geek: collection.geek, items: collection.items.map(item => item.gameId) })
         .then(() => collection);
+}
+
+function markAsProcessed(context: string, fileDetails: ProcessUserInvocation): Promise<void> {
+    return invokelambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_PROCESSED, fileDetails);
 }
 
 function addGamesToCollection(collection: ProcessCollectionResult): Promise<any> {
