@@ -30,10 +30,10 @@ export interface ProcessUserResult {
 
 export interface ProcessCollectionResult {
     geek: string;
-    items: [string];
+    items: [CollectionGame];
 }
 
 export interface CollectionGame {
-    name: string;
+    // name: string;
     gameId: number;
 }

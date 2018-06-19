@@ -27,3 +27,13 @@ export interface ProcessUserResult {
     country: string;
     url: string;
 }
+
+export interface ProcessCollectionResult {
+    geek: string;
+    items: [CollectionGame];
+}
+
+export interface CollectionGame {
+    // name: string;
+    gameId: number;
+}

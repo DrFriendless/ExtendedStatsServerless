@@ -5,12 +5,11 @@ const xml2js = require('xml2js-es6-promise');
 export function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): ProcessCollectionResult {
     return xml2js(pageContent, {trim: true})
         .then(dom => {
-            if (dom.items.item.length == 0) {
+            if (!dom || !dom.items || dom.items.item.length == 0) {
                 throw new Error("Found no games in collection for " + geek);
             }
             const items = [];
             dom.items.item.forEach(item => {
-                console.log(item);
                 if (item.$.subtype != 'boardgame') {
                     console.log(item.$.subtype + " not a board game");
                 } else {
@@ -18,12 +17,47 @@ export function extractUserCollectionFromPage(geek: string, url: string, pageCon
                     const name = item.name[0]._;
                     const stats = item.stats[0];
                     const status = item.status[0];
-                    console.log(stats);
-                    console.log(status);
                     const gameItem = { name: name, gameId: gameId } as CollectionGame;
+                    if (stats) {
+                        const rating = stats.rating;
+                        // 2018-06-18T22:24:58.331Z	6b8e68a6-7346-11e8-87e6-1f927414bfa6	[ { '$': { value: '6' },
+                        //     average: [ [Object] ],
+                        //     bayesaverage: [ [Object] ] } ]
+                        if (rating && rating.length > 0) {
+                            gameItem.rating = parseFloat(rating[0].$.value);
+                        } else {
+                            gameItem.rating = -1;
+                        }
+                        if (gameItem.rating == null || Number.isNaN(gameItem.rating)) gameItem.rating = -1;
+                    }
+                    // 2018-06-18T21:37:27.269Z	c7f472a7-733f-11e8-9e07-831994274964	{ '$':
+                    //     { own: '0',
+                    //         prevowned: '0',
+                    //         fortrade: '0',
+                    //         want: '0',
+                    //         wanttoplay: '0',
+                    //         wanttobuy: '0',
+                    //         wishlist: '1',
+                    //         wishlistpriority: '5',
+                    //         preordered: '0',
+                    //         lastmodified: '2013-03-19 06:59:47' } }
+                    if (status) {
+                        gameItem.own = status.$.own === '1';
+                        gameItem.forTrade = status.$.prevowned === '1';
+                        gameItem.want = status.$.want === '1';
+                        gameItem.wantToPlay = status.$.wanttoplay === '1';
+                        gameItem.wantToBuy = status.$.wanttobuy;
+                        const onWishList =  status.$.wishlist === '1';
+                        gameItem.wishListPriority = onWishList ? parseInt(status.$.wishlist) : 0;
+                        gameItem.preordered = status.$.preordered === '1';
+                    }
+                    // haven't found this in the parsed XML yet
+                    gameItem.description = "";
+                    // console.log(gameItem);
                     items.push(gameItem);
                 }
             });
+            console.log("" + items.length + " items");
             return { geek: geek, items: items };
         });
 }

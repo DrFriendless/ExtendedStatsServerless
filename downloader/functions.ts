@@ -1,6 +1,12 @@
 import {Callback} from "aws-lambda";
-import {ToProcessList, ProcessUserInvocation, ProcessUserResult} from "./interfaces"
-import {between, invokelambdaAsync, invokelambdaSync, makeAPIGetRequest} from "./library";
+import {
+    ToProcessList,
+    ProcessUserInvocation,
+    ProcessUserResult,
+    ProcessCollectionResult,
+    CollectionGame
+} from "./interfaces"
+import {invokelambdaAsync, invokelambdaSync} from "./library";
 import {extractUserCollectionFromPage, extractUserDataFromPage} from "./extraction";
 
 const request = require('request-promise-native');
@@ -20,9 +26,12 @@ const FUNCTION_UPDATE_USER_LIST = "updateUserList";
 const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
-const FUNCTION_PROCESS_COLLECTION_RESULT = "processCollectionResult";
+const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
+const FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS = "processCollectionRestrictToIDs";
 const FUNCTION_PROCESS_PLAYED = "processPlayed";
 const FUNCTION_PROCESS_PLAYED_RESULT = "processPlayedResult";
+
+const MAX_GAMES_PER_CALL = 500;
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export function processUserList(event, context, callback: Callback) {
@@ -104,12 +113,45 @@ export function processCollection(event, context, callback: Callback) {
             console.log(result);
             return result;
         })
-        .then(result => invokelambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_RESULT, result))
+        .then(result => deleteGamesFromCollection(result))
+        .then(result => addGamesToCollection(result))
         .then(v => callback(undefined, v))
         .catch(err => {
             console.log(err);
             callback(err);
         });
+}
+
+function deleteGamesFromCollection(collection: ProcessCollectionResult): Promise<ProcessCollectionResult> {
+    return invokelambdaAsync("processCollection",
+        INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS,
+        { geek: collection.geek, items: collection.items.map(item => item.gameId) })
+        .then(() => collection);
+}
+
+function addGamesToCollection(collection: ProcessCollectionResult): Promise<any> {
+    return Promise.all(
+        splitCollection(collection)
+            .map(games => invokelambdaAsync("processCollection", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES, games))
+    );
+}
+
+function splitCollection(original: ProcessCollectionResult): [ProcessCollectionResult] {
+    const geek = original.geek;
+    const split = splitItems(original.items);
+    return split.map(items => { return {geek: geek, items: items } });
+}
+
+function splitItems(items: [CollectionGame]): [[CollectionGame]] {
+    if (items.length < MAX_GAMES_PER_CALL) {
+        return [items];
+    } else {
+        const result = [];
+        for (let i=0, j=items.length; i<j; i+=MAX_GAMES_PER_CALL) {
+            result.push(items.slice(i,i+MAX_GAMES_PER_CALL));
+        }
+        return result;
+    }
 }
 
 

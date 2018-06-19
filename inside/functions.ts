@@ -62,3 +62,15 @@ export function getToProcessList(event, context, callback: Callback) {
         .then(result => callback(undefined, {statusCode: 200, body: result}))
         .catch(err => callback(err));
 }
+
+export function processCollectionRestrictToIDs(event, context, callback: Callback) {
+    const params = event as { geek: string, items: [number] };
+    const geek = params.geek;
+    const ids = params.items;
+    console.log(ids);
+}
+
+export function processCollectionUpdateGames(event, context, callback: Callback) {
+   const params = event as ProcessCollectionResult;
+   console.log(params);
+}
