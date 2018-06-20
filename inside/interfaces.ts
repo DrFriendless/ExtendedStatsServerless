@@ -1,14 +1,11 @@
 export interface FileToProcess {
     processMethod: string,
-    url: string
+    url: string,
+    bggid: number,
+    geek: string
 }
 
-export interface ProcessUserInvocation {
-    geek: string,
-    url: string
-}
-
-export interface ToProcessElement extends ProcessUserInvocation, FileToProcess {
+export interface ToProcessElement extends FileToProcess {
     filename: string,
     lastUpdate: any,
     nextUpdate: any,
@@ -16,6 +13,7 @@ export interface ToProcessElement extends ProcessUserInvocation, FileToProcess {
     description: string,
     lastattempt: any,
     last_scheduled: any;
+    bggid: number;
 }
 
 export interface ProcessUserResult {
@@ -41,4 +39,27 @@ export interface CollectionGame {
     preordered: boolean;
     wishListPriority: number;
     prevOwned: boolean;
+}
+
+export interface ProcessGameResult {
+    gameId: number;
+    name: string;
+    average: number;
+    rank: number;
+    yearPublished: number;
+    minPlayers: number;
+    maxPlayers: number;
+    playTime: number;
+    usersRated: number;
+    usersTrading: number;
+    usersWanting: number;
+    usersWishing: number;
+    averageWeight: number;
+    bayesAverage: number;
+    stdDev: number;
+    median: number;
+    numComments: number;
+    expansion: number;
+    usersOwned: number;
+    subdomain: string;
 }

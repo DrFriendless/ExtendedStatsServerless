@@ -46,6 +46,10 @@ functions:
     handler: functions.processUser
     role:
       "invokeLambdas"
+  processGame:
+    handler: functions.processGame
+    role:
+      "invokeLambdas"
   processCollection:
     handler: functions.processCollection
     role:

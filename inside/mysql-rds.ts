@@ -112,20 +112,20 @@ function doEnsureGames(conn: mysql.Connection, games: [CollectionGame]): Promise
     const GAME_URL = "https://boardgamegeek.com/xmlapi/boardgame/%d&stats=1";
     return Promise.all(games.map(game => {
         const url = GAME_URL.replace("%d", game.gameId.toString());
-        return doRecordFile(conn, url, "processGame", null, "Game #" + game.gameId);
+        return doRecordFile(conn, url, "processGame", null, "Game #" + game.gameId, game.gameId);
     }));
 }
 
 // promise returns how many rows were inserted
-function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string, description: string): Promise<number> {
+function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string, description: string, bggid: int | null): Promise<number> {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
-    const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description) values (?, ?, ?, ?, ?, ?)";
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
     return conn.query(countSql, [url, processMethod])
         .then(result => {
             const count = result[0]["count(*)"];
             if (count === 0) {
                 const tillNext = TILL_NEXT_UPDATE[processMethod];
-                const insertParams = [url, processMethod, user, null, tillNext, description];
+                const insertParams = [url, processMethod, user, null, tillNext, description, bggid];
                 return conn.query(insertSql, insertParams)
                     .then(() => console.log("added url " + url))
                     .catch(err => console.log(err))
@@ -138,17 +138,17 @@ function doRecordFile(conn: mysql.Connection, url: string, processMethod: string
 
 function doEnsureFileProcessUser(conn: mysql.Connection, geek: string): Promise<number> {
     const url = `https://boardgamegeek.com/user/${geek}`;
-    return doRecordFile(conn, url, "processUser", geek, "User's profile");
+    return doRecordFile(conn, url, "processUser", geek, "User's profile", null);
 }
 
 function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: string): Promise<number> {
     const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
-    return doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc");
+    return doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", null);
 }
 
 function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string): Promise<number> {
     const url = `https://boardgamegeek.com/plays/bymonth/user/${geek}/subtype/boardgame`;
-    return doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games");
+    return doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", null);
 }
 
 export function listUsers(): Promise<[string]> {

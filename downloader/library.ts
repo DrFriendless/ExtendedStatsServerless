@@ -1,6 +1,7 @@
 import {Lambda} from 'aws-sdk';
+import {Callback} from "aws-lambda";
 
-export function invokelambdaAsync(context: string, func: string, payload: object): Promise<object> {
+export function invokelambdaAsync(context: string, func: string, payload: object): Promise<void> {
     const params = {
         ClientContext: context,
         FunctionName: func,
@@ -59,4 +60,10 @@ export function between(s: string, before: string, after: string): string {
     const j = s.indexOf(after);
     if (j < 0) return "";
     return s.substring(0, j);
+}
+
+export function promiseToCallback<T>(promise: Promise<T>, callback: Callback) {
+    promise
+        .then(v => callback(undefined, v))
+        .catch(err => callback(err));
 }
