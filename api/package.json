@@ -1,0 +1,22 @@
+{
+  "name": "ExtendedStatsAWS",
+  "description": "Extended Stats in the cloud, built with AWS CodeStar",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@types/aws-lambda": "0.0.17",
+    "aws-lambda": "^0.1.2",
+    "aws-lambda-typescript": "0.0.10",
+    "aws-sdk": "^2.259.1",
+    "graphql": "^0.12.3",
+    "graphql-tag": "^2.7.3",
+    "mysql": "^2.15.0",
+    "promise-mysql": "^3.2.1",
+    "serverless": "^1.27.3"
+  },
+  "devDependencies": {
+    "@types/node": "^8.5.2",
+    "serverless-domain-manager": "^2.4.0",
+    "serverless-plugin-typescript": "^1.1.5"
+  }
+}

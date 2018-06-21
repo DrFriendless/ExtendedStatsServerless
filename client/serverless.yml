@@ -1,0 +1,18 @@
+service: client
+
+plugins:
+  - serverless-plugin-typescript
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  stage: dev
+  timeout: 30
+  region: ap-southeast-2
+
+custom:
+  secret: ${file(../secrets.json)}
+
+resources:
+  Resources:
+

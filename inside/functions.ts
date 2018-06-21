@@ -1,12 +1,9 @@
 import {Callback} from 'aws-lambda';
 import {
-    ensureGames,
-    ensureUsers,
+    ensureGames, ensureUsers,
     listToProcess, listToProcessByMethod,
-    listUsers,
     markUrlProcessed, updateGamesForGeek,
-    updateLastScheduledForUrls,
-    updateUserValues
+    updateLastScheduledForUrls, updateUserValues
 } from "./mysql-rds";
 import {FileToProcess, ProcessCollectionResult, ProcessUserResult} from "./interfaces";
 
@@ -24,13 +21,6 @@ export function updateUserList(event, context, callback: Callback) {
     const usernames = body.split(/\r?\n/);
     console.log("checking for " + usernames.length + " users");
     promiseToCallback(ensureUsers(usernames), callback);
-}
-
-// Lambda to retrieve the list of users
-export function getUserList(event, context, callback: Callback) {
-    console.log("getUserList");
-    context.callbackWaitsForEmptyEventLoop = false;
-    promiseToCallback(listUsers(), callback);
 }
 
 // Lambda to retrieve some number of files that need processing

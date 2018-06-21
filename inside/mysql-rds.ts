@@ -62,8 +62,8 @@ function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void[]>
                     return Promise.resolve(uc);
                 }
             })
-            .then(uc => doEnsureFileProcessUser(conn, uc.user).thenReturn(uc))
-            .then(uc => doEnsureFileProcessUserCollection(conn, uc.user).thenReturn(uc))
+            .then(uc => doEnsureFileProcessUser(conn, uc.user).then(() => uc))
+            .then(uc => doEnsureFileProcessUserCollection(conn, uc.user).then(() => uc))
             .then(uc => doEnsureFileProcessUserPlayed(conn, uc.user))
     }));
 }
@@ -117,7 +117,7 @@ function doEnsureGames(conn: mysql.Connection, games: [CollectionGame]): Promise
 }
 
 // promise returns how many rows were inserted
-function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string, description: string, bggid: number | null): Promise<number> {
+function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string, bggid: number | null): Promise<number> {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
     return count(conn, countSql, [url, processMethod])
@@ -150,26 +150,8 @@ function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string): Pr
     return doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", null);
 }
 
-export function listUsers(): Promise<[string]> {
-    console.log("listUsers");
-    const sql = "select username from geeks";
-    let connection;
-    let result: [string];
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => conn.query(sql))
-        .then(data => {
-            result = data.map(row => row['username']);
-        })
-        .then(() => connection.destroy())
-        .then(() => result);
-}
-
 export function listToProcess(count: number): Promise<[ToProcessElement]> {
-    const sql = "select * from files where (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    const sql = "select * from files where (lastUpdate is null || nextUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
     let connection;
     let result: [ToProcessElement];
     return getConnection()
@@ -205,7 +187,7 @@ export function listToProcessByMethod(count: number, processMethod: string): Pro
 export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
     const sqlOne = "update files set last_scheduled = now() where url = ?";
     const sqlMany = "update files set last_scheduled = now() where url in (?)";
-    let connection;
+    let connection: mysql.Connection;
     return getConnection()
         .then(conn => {
             connection = conn;
@@ -223,7 +205,7 @@ export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
         .then(() => connection.destroy());
 }
 
-function getConnection(): Promise {
+function getConnection(): Promise<mysql.Connection> {
     const params = {
         host: process.env.mysqlHost,
         user: process.env.mysqlUsername,
