@@ -50,7 +50,7 @@ export function getToProcessList(event, context, callback: Callback) {
         .then(elements => {
             const urls = elements.map(row => row.url);
             if (event.updateLastScheduled) {
-                return updateLastScheduledForUrls(urls).thenReturn(elements);
+                return updateLastScheduledForUrls(urls).then(() => elements);
             } else {
                 return Promise.resolve(elements);
             }

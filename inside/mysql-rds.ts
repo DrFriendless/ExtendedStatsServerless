@@ -22,14 +22,14 @@ const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '
 export function markUrlProcessed(processMethod: string, url: string): Promise<void> {
     console.log("markUrlProcessed " + url);
     const delta = TILL_NEXT_UPDATE[processMethod];
-    const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ?";
+    const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
     let connection;
     return getConnection()
         .then(conn => {
             connection = conn;
             return conn;
         })
-        .then(conn => conn.query(sqlSet, [delta, url]))
+        .then(conn => conn.query(sqlSet, [delta, url, processMethod]))
         .then(() => connection.destroy());
 }
 
@@ -84,9 +84,9 @@ function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: [Coll
     const insertSql = "insert into geekgames (geek, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     const updateSql = "update geekgames (rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) where geek = ? and game = ?";
     return Promise.all(games.map(game => {
-        return conn.query(countSql, [geek, game.gameId])
+        return count(conn, countSql, [geek, game.gameId])
             .then(count => {
-                if (count == 1) {
+                if (count > 0) {
                     return conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade,
                         game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered, geek, game.gameId]);
                 } else {
@@ -117,12 +117,11 @@ function doEnsureGames(conn: mysql.Connection, games: [CollectionGame]): Promise
 }
 
 // promise returns how many rows were inserted
-function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string, description: string, bggid: int | null): Promise<number> {
+function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string, description: string, bggid: number | null): Promise<number> {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
-    return conn.query(countSql, [url, processMethod])
-        .then(result => {
-            const count = result[0]["count(*)"];
+    return count(conn, countSql, [url, processMethod])
+        .then(count => {
             if (count === 0) {
                 const tillNext = TILL_NEXT_UPDATE[processMethod];
                 const insertParams = [url, processMethod, user, null, tillNext, description, bggid];
@@ -233,3 +232,8 @@ function getConnection(): Promise {
     };
     return mysql.createConnection(params);
 }
+
+function count(conn: mysql.Connection, sql: string, params: [any]): Promise<number> {
+    return conn.query(sql, params).then(result => result[0]["count(*)"]);
+}
+
