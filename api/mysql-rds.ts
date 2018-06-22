@@ -43,7 +43,9 @@ export function gatherSystemStats(): Promise<SystemStats> {
 
 function gatherTypeCounts(stuff: any): [TypeCount] {
     console.log(stuff);
-    return [];
+    return stuff.map(row => {
+        return { type: row.processMethod, count: row["count(url)"] } as TypeCount;
+    });
 }
 
 export function listUsers(): Promise<[string]> {

@@ -28,7 +28,7 @@ custom:
     domainName: api.drfriendless.com
     basePath: 'v1'
     stage: ${self:provider.stage}
-    createRoute53Record: false
+    createRoute53Record: true
     certificateName: "api.drfriendless.com"
 
 functions:
