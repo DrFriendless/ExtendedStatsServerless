@@ -1,6 +1,6 @@
 {
-  "name": "ExtendedStatsServerlessDownloader",
-  "description": "The part of the downloader that lives outside the VPC.",
+  "name": "ExtendedStatsServerlessClient",
+  "description": "Client components for Extended Stats Serverless",
   "version": "0.0.1",
   "private": true,
   "dependencies": {
@@ -14,6 +14,7 @@
     "request-promise-native": "^1.0.5",
     "serverless": "^1.27.3",
     "serverless-plugin-typescript": "^1.1.5",
+    "serverless-s3-deploy": "^0.7.0",
     "xml2js": "^0.4.19",
     "xml2js-es6-promise": "^1.1.1"
   }

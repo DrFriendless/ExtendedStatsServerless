@@ -1,7 +1,7 @@
 service: client
 
 plugins:
-  - serverless-plugin-typescript
+    - serverless-s3-deploy
 
 provider:
   name: aws
@@ -11,8 +11,23 @@ provider:
   region: ap-southeast-2
 
 custom:
-  secret: ${file(../secrets.json)}
+  assets:
+    auto: true
+    targets:
+     - bucket:
+         Ref: StaticBucket
+       files:
+        - source: static/
+          globs: '**/*.*'
 
 resources:
   Resources:
+    StaticBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: extstats.drfriendless.com
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
 

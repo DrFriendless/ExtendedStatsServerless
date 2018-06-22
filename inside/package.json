@@ -1,6 +1,6 @@
 {
-  "name": "ExtendedStatsAWS",
-  "description": "Extended Stats in the cloud, built with AWS CodeStar",
+  "name": "ExtendedStatsServerlessInside",
+  "description": "Extended Stats Serverless components of the downloader inside the VPC.",
   "version": "0.0.1",
   "private": true,
   "dependencies": {
