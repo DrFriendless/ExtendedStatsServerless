@@ -1,11 +1,47 @@
 import mysql = require('promise-mysql');
 import {SystemStats, TypeCount} from "./admin-interfaces"
+import {GeekGame, GeekGameQuery} from "./collection-interfaces";
+
+export function listGeekGames(query: GeekGameQuery): Promise<[GeekGame]> {
+    // TODO
+    // return Promise.resolve([ { name: "Jeu de L'oie", average: 8.5, rating: 9, bggid: 15554 } ] as [GeekGame]);
+    let connection;
+    let result: [GeekGame];
+    return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
+        .then(conn => doListGeekGames(conn, query))
+        .then(data => {
+            result = data;
+            console.log("result");
+            console.log(result);
+        })
+        .then(() => connection.destroy())
+        .then(() => result);
+}
+
+function doListGeekGames(conn: mysql.Connection, query: GeekGameQuery): Promise<[GeekGame]> {
+    const sql = "select games.bggid, games.name, games.average, geekgames.rating from games,geekgames where games.bggid = geekgames.game and geekgames.geek = ? and geekgames.owned = 1";
+    return conn.query(sql, [query.geek])
+        .then(data => {
+            return data.map(row => {
+                return {
+                    bggid: row["bggid"],
+                    name: row["name"],
+                    rating: row["rating"],
+                    average: row["average"]
+                } as GeekGame;
+            })
+        });
+}
 
 export function gatherSystemStats(): Promise<SystemStats> {
     let userRows = 0;
     let gameRows = 0;
     let geekGamesRows = 0;
-    let fileRows: [TypeCount] = [];
+    let fileRows = [] as [TypeCount];
     let connection;
     const countUserRows = "select count(*) from geeks";
     const countGameRows = "select count(*) from games";
@@ -41,16 +77,15 @@ export function gatherSystemStats(): Promise<SystemStats> {
 
 function patch(fileRows: [TypeCount], patchKey: string, countRows: [any]) {
     countRows.forEach(row => {
-       const key = row["processMethod"];
-       const count = row["count(url)"];
-       fileRows.filter(row => row.type == key)[0][patchKey] = count;
+        const key = row["processMethod"];
+        const count = row["count(url)"];
+        fileRows.filter(row => row.type == key)[0][patchKey] = count;
     });
 }
 
 function gatherTypeCounts(stuff: any): [TypeCount] {
-    console.log(stuff);
     return stuff.map(row => {
-        return { type: row.processMethod, count: row["count(url)"] } as TypeCount;
+        return { type: row.processMethod, existing: row["count(url)"], unprocessed: 0, waiting: 0 } as TypeCount;
     });
 }
 

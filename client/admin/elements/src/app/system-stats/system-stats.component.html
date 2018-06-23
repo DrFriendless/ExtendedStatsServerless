@@ -8,7 +8,7 @@
     <thead><td>Method</td><td>Total</td><td>Waiting</td><td>Unprocessed</td></thead>
     <tr *ngFor="let row of stats.fileRows">
       <td>{{row.type}}</td>
-      <td>{{row.count}}</td>
+      <td>{{row.existing}}</td>
       <td>{{row.waiting}}</td>
       <td>{{row.unprocessed}}</td>
     </tr>

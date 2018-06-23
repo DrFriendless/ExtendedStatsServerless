@@ -42,17 +42,6 @@ export function invokelambdaSync(context: string, func: string, payload: object)
     });
 }
 
-export function makeAPIGetRequest(path: string): object {
-    const apiServer = process.env["apiServer"];
-    const apiKey = process.env["apiKey"];
-    return {
-        url: 'https://' + apiServer + path,
-        headers: {
-            "x-api-key": apiKey
-        }
-    };
-}
-
 export function between(s: string, before: string, after: string): string {
     const i = s.indexOf(before);
     if (i < 0) return "";
