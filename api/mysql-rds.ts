@@ -6,8 +6,6 @@ export function gatherSystemStats(): Promise<SystemStats> {
     let gameRows = 0;
     let geekGamesRows = 0;
     let fileRows: [TypeCount] = [];
-    let waitingFileRows: [TypeCount] = [];
-    let unprocessedFileRows: [TypeCount] = [];
     let connection;
     const countUserRows = "select count(*) from geeks";
     const countGameRows = "select count(*) from games";
@@ -25,8 +23,10 @@ export function gatherSystemStats(): Promise<SystemStats> {
             count(conn, countGameRows, []).then(count => gameRows = count),
             count(conn, countGeekGameRows, []).then(count => geekGamesRows = count),
             conn.query(countFileRows).then(rows => gatherTypeCounts(rows)).then(data => fileRows = data),
-            conn.query(countWaitingFileRows).then(rows => gatherTypeCounts(rows)).then(data => waitingFileRows = data),
-            conn.query(countUnprocessedFileRows).then(rows => gatherTypeCounts(rows)).then(data => unprocessedFileRows = data)
+        ]))
+        .then(() => Promise.all([
+            connection.query(countWaitingFileRows).then(rows => patch(fileRows, "waiting", rows)),
+            connection.query(countUnprocessedFileRows).then(rows => patch(fileRows, "unprocessed", rows))
         ]))
         .then(() => connection.destroy())
         .then(() => {
@@ -35,10 +35,16 @@ export function gatherSystemStats(): Promise<SystemStats> {
                 gameRows: gameRows,
                 geekGamesRows: geekGamesRows,
                 fileRows: fileRows,
-                waitingFileRows: waitingFileRows,
-                unprocessedFileRows: unprocessedFileRows
             };
         });
+}
+
+function patch(fileRows: [TypeCount], patchKey: string, countRows: [any]) {
+    countRows.forEach(row => {
+       const key = row["processMethod"];
+       const count = row["count(url)"];
+       fileRows.filter(row => row.type == key)[0][patchKey] = count;
+    });
 }
 
 function gatherTypeCounts(stuff: any): [TypeCount] {

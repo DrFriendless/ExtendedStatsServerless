@@ -1,6 +1,8 @@
 export interface TypeCount {
   type: string;
-  count: number;
+  existing: number;
+  waiting: number;
+  unprocessed: number;
 }
 
 export interface SystemStats {
@@ -8,6 +10,4 @@ export interface SystemStats {
   gameRows: number;
   geekGamesRows: number;
   fileRows: [TypeCount];
-  waitingFileRows: [TypeCount]; // due
-  unprocessedFileRows: [TypeCount]; // never processed
 }

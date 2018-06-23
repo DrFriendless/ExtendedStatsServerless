@@ -1,4 +1,11 @@
-import {AfterViewInit, Component, OnDestroy, ViewEncapsulation} from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  OnDestroy,
+  ViewEncapsulation
+} from '@angular/core';
 import {HttpClient, HttpHeaders} from '@angular/common/http';
 import {SystemStats, TypeCount} from '../admin-interfaces';
 import {Subscription} from "rxjs/internal/Subscription";
@@ -6,8 +13,9 @@ import {Subscription} from "rxjs/internal/Subscription";
 @Component({
   selector: 'extstats-system-stats',
   templateUrl: "./system-stats.component.html",
-  styles: [],
-  encapsulation: ViewEncapsulation.Native
+  styleUrls: ["./system-stats.component.css"],
+  encapsulation: ViewEncapsulation.Native,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SystemStatsComponent implements AfterViewInit, OnDestroy {
   public stats: SystemStats = {
@@ -15,13 +23,10 @@ export class SystemStatsComponent implements AfterViewInit, OnDestroy {
     gameRows: 0,
     geekGamesRows: 0,
     fileRows: [] as [TypeCount],
-    waitingFileRows: [] as [TypeCount],
-    unprocessedFileRows: [] as [TypeCount]
   };
   private subscription: Subscription = null;
-  public clickCount = 0;
 
-  constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient, private changeDetector: ChangeDetectorRef) { }
 
   public ngAfterViewInit(): void {
     const headers = new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ");
@@ -29,15 +34,11 @@ export class SystemStatsComponent implements AfterViewInit, OnDestroy {
       .subscribe(value => {
         console.log(value);
         this.stats = value as SystemStats;
+        this.changeDetector.detectChanges();
       });
   }
 
   public ngOnDestroy(): void {
     if (this.subscription) this.subscription.unsubscribe();
-  }
-
-  public click() {
-    this.clickCount++;
-    console.log(this.clickCount);
   }
 }

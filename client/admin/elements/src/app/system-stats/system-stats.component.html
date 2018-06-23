@@ -3,7 +3,14 @@
       <li>There are {{stats.userRows}} users in the database.</li>
       <li>There are {{stats.gameRows}} games in the database.</li>
       <li>There are {{stats.geekGamesRows}} games in collections.</li>
-      <li>There are {{clickCount}} clicks.</li>
     </ul>
-  <button (click)="click()">Click Me</button>
+  <table>
+    <thead><td>Method</td><td>Total</td><td>Waiting</td><td>Unprocessed</td></thead>
+    <tr *ngFor="let row of stats.fileRows">
+      <td>{{row.type}}</td>
+      <td>{{row.count}}</td>
+      <td>{{row.waiting}}</td>
+      <td>{{row.unprocessed}}</td>
+    </tr>
+  </table>
 </div>
