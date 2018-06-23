@@ -2,10 +2,19 @@ import {Callback} from 'aws-lambda';
 import {
     ensureGames, ensureUsers,
     listToProcess, listToProcessByMethod,
-    markUrlProcessed, updateGamesForGeek,
+    markUrlProcessed, updateGame, updateGamesForGeek,
     updateLastScheduledForUrls, updateUserValues
 } from "./mysql-rds";
-import {FileToProcess, ProcessCollectionResult, ProcessUserResult} from "./interfaces";
+import {FileToProcess, ProcessCollectionResult, ProcessGameResult, ProcessUserResult} from "./interfaces";
+
+
+export function processGameResult(event, context, callback: Callback) {
+    console.log(event);
+    const data = event as ProcessGameResult;
+    const promise = updateGame(data)
+        .then(() => markUrlProcessed("processGame", data.url));
+    promiseToCallback(promise, callback);
+}
 
 export function processUserResult(event, context, callback: Callback) {
     console.log(event);

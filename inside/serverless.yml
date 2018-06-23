@@ -40,6 +40,15 @@ functions:
       mysqlDatabase: ${self:custom.database.mysqlDatabase}
     role:
         "doStuffFromInsideVPC"
+  processGameResult:
+    handler: functions.processGameResult
+    environment:
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
+    role:
+        "doStuffFromInsideVPC"
   processCollectionRestrictToIDs:
     handler: functions.processCollectionRestrictToIDs
     environment:

@@ -56,10 +56,10 @@ export interface ProcessGameResult {
     usersWishing: number;
     averageWeight: number;
     bayesAverage: number;
-    stdDev: number;
-    median: number;
     numComments: number;
     expansion: number;
     usersOwned: number;
     subdomain: string;
+    expands: [number];
+    url: string;
 }

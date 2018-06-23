@@ -1,5 +1,61 @@
 import mysql = require('promise-mysql');
-import {CollectionGame, ToProcessElement} from "./interfaces";
+import {CollectionGame, ProcessGameResult, ToProcessElement} from "./interfaces";
+
+export function updateGame(data: ProcessGameResult): Promise<void> {
+    console.log("updateGame");
+    console.log(data);
+    let connection;
+    return getConnection()
+        .then(conn => {
+            connection = conn;
+            return conn;
+        })
+        .then(conn => doUpdateGame(conn, data))
+        .then(() => connection.destroy());
+}
+
+export interface ProcessGameResult {
+    gameId: number;
+    name: string;
+    average: number;
+    rank: number;
+    yearPublished: number;
+    minPlayers: number;
+    maxPlayers: number;
+    playTime: number;
+    usersRated: number;
+    usersTrading: number;
+    usersWanting: number;
+    usersWishing: number;
+    averageWeight: number;
+    bayesAverage: number;
+    numComments: number;
+    expansion: number;
+    usersOwned: number;
+    subdomain: string;
+    expands: [number];
+    url: string;
+}
+function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult): Promise<void> {
+    const countSql = "select count(*) from games where bggid = ?";
+    const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
+        "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    const updateSql = "updates games set (name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
+        "averageWeight, bayesAverage, numComments, usersOwned, subdomain) = (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) where bggid = ?";
+    return count(conn, countSql, [data.gameId])
+        .then(count => {
+           if (count == 0) {
+               return conn.query(insertSql, [data.gameId, data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
+               data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
+               data.numComments, data.usersOwned, data.subdomain]);
+           } else {
+               return conn.query(updateSql, [data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
+                   data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
+                   data.numComments, data.usersOwned, data.subdomain, data.gameId]);
+           }
+        });
+}
+
 
 export function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
     console.log("updateUserValues " + geek + " " + bggid + " " + country);

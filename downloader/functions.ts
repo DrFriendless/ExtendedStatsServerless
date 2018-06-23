@@ -33,7 +33,7 @@ const MAX_GAMES_PER_CALL = 500;
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export function processUserList(event, context, callback: Callback) {
     const usersFile = process.env["USERS_FILE"];
-    promiseToCallback(request(usersFile)
+    promiseToCallback(request(usersFile, resolveWithFullResponse = false)
             .then(data => invokelambdaAsync("processUserList", INSIDE_PREFIX + FUNCTION_UPDATE_USER_LIST, data))
             .then(data => console.log('Sent ' + data.split(/\r?\n/).length + ' users to ' + FUNCTION_UPDATE_USER_LIST)),
         callback);
@@ -104,20 +104,28 @@ export function processUser(event, context, callback: Callback) {
 
 // Lambda to harvest a user's collection
 export function processCollection(event, context, callback: Callback) {
-    console.log("processCollection");
     console.log(event);
     const invocation = event as FileToProcess;
 
+    const options = { uri: invocation.url, resolveWithFullResponse: true };
+    let collection;
+    let retry = false;
     promiseToCallback(
-        request(invocation.url)
-            .then(data => extractUserCollectionFromPage(invocation.geek, invocation.url, data.toString()))
-            .then(result => {
-                console.log(result);
-                return result;
+        request.get(options)
+            .then(response => {
+                console.log(response.statusCode);
+                if (response.statusCode == 202) {
+                    // TODO - record this in the DB
+                    this.retry = true;
+                    throw new Error("BGG says to wait a bit.");
+                }
+                return response.body;
             })
-            .then(result => deleteGamesFromCollection(result))
-            .then(result => addGamesToCollection(result))
-            .then(v => markAsProcessed("processCollection", invocation)),
+            .then(data => extractUserCollectionFromPage(invocation.geek, invocation.url, data.toString()))
+            .then(result => { collection = result; console.log(collection); })
+            .then(() => deleteGamesFromCollection(collection))
+            .then(() => addGamesToCollection(collection))
+            .then(() => markAsProcessed("processCollection", invocation)),
         callback);
 }
 
