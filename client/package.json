@@ -6,16 +6,13 @@
   "dependencies": {
     "@types/aws-lambda": "0.0.17",
     "@types/node": "^8.0.34",
-    "aws-lambda": "^0.1.2",
-    "aws-lambda-typescript": "0.0.10",
     "aws-sdk": "^2.259.1",
     "npm": "^6.1.0",
-    "request": "^2.87.0",
-    "request-promise-native": "^1.0.5",
-    "serverless": "^1.27.3",
-    "serverless-plugin-typescript": "^1.1.5",
+    "serverless": "^1.27.3"
+  },
+  "devDependencies": {
+    "@types/node": "^8.5.2",
     "serverless-s3-deploy": "^0.7.0",
-    "xml2js": "^0.4.19",
-    "xml2js-es6-promise": "^1.1.1"
+    "serverless-plugin-typescript": "^1.1.5"
   }
 }

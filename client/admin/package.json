@@ -1,0 +1,11 @@
+{
+  "name": "ExtendedStatsServerlessClientElements",
+  "description": "Angular Elements components for Extended Stats Serverless",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@angular/cli": "^6.0.8"
+  },
+  "devDependencies": {
+  }
+}
