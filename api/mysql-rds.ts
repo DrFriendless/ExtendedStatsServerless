@@ -36,8 +36,8 @@ export function gatherSystemStats(): Promise<SystemStats> {
                 geekGamesRows: geekGamesRows,
                 fileRows: fileRows,
                 waitingFileRows: waitingFileRows,
-                unprocessedFilesRows: unprocessedFileRows
-            } as SystemStats;
+                unprocessedFileRows: unprocessedFileRows
+            };
         });
 }
 

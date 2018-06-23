@@ -1,4 +1,9 @@
-<p>
-  system-stats works!
-  Some stuff goes here.
-</p>
+<div class="system-stats">
+    <ul>
+      <li>There are {{stats.userRows}} users in the database.</li>
+      <li>There are {{stats.gameRows}} games in the database.</li>
+      <li>There are {{stats.geekGamesRows}} games in collections.</li>
+      <li>There are {{clickCount}} clicks.</li>
+    </ul>
+  <button (click)="click()">Click Me</button>
+</div>

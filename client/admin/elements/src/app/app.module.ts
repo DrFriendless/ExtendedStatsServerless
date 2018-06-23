@@ -4,10 +4,11 @@ import { createCustomElement } from '@angular/elements';
 
 import { SystemStatsComponent } from './system-stats/system-stats.component';
 import {AppComponent} from "./app.component";
+import {HttpClientModule} from "@angular/common/http";
 
 @NgModule({
   declarations: [SystemStatsComponent, AppComponent],
-  imports: [BrowserModule],
+  imports: [BrowserModule, HttpClientModule],
   entryComponents: [SystemStatsComponent]
 })
 export class AppModule {

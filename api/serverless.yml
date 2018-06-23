@@ -46,12 +46,18 @@ functions:
           cors: true
           integration: lambda
           private: true
+          response:
+            headers:
+              Access-Control-Allow-Origin: "*.drfriendless.com"
       - http:
           path: systemStats
           method: get
           cors: true
           integration: lambda
           private: true
+          response:
+            headers:
+              Access-Control-Allow-Origin: "*.drfriendless.com"
     role:
         "doStuffFromInsideVPC"
   getUserList:
@@ -68,12 +74,18 @@ functions:
           cors: true
           integration: lambda
           private: true
+          response:
+            headers:
+              Access-Control-Allow-Origin: "*.drfriendless.com"
       - http:
           path: users
           method: get
           cors: true
           integration: lambda
           private: true
+          response:
+            headers:
+              Access-Control-Allow-Origin: "*.drfriendless.com"
     role:
         "doStuffFromInsideVPC"
 
