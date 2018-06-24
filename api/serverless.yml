@@ -78,6 +78,12 @@ functions:
           cors: true
           integration: lambda
           private: true
+      - http:
+          path: geekgames
+          method: get
+          cors: true
+          integration: lambda
+          private: true
     role:
         "doStuffFromInsideVPC"
 

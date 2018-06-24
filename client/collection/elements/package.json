@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "package": "ng build --prod --output-hashing none && node elements-build.js",
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e"
@@ -21,10 +22,12 @@
     "@angular/platform-browser": "^6.0.3",
     "@angular/platform-browser-dynamic": "^6.0.3",
     "@angular/router": "^6.0.3",
+    "concat": "^1.0.3",
     "core-js": "^2.5.4",
+    "document-register-element": "^1.7.2",
+    "fs": "0.0.1-security",
     "rxjs": "^6.0.0",
-    "zone.js": "^0.8.26",
-    "document-register-element": "^1.7.2"
+    "zone.js": "^0.8.26"
   },
   "devDependencies": {
     "@angular/compiler-cli": "^6.0.3",

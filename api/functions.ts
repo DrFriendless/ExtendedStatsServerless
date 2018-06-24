@@ -19,8 +19,12 @@ export function getGeekGames(event, context, callback: Callback) {
     console.log("getGeekGames");
     console.log(event);
     context.callbackWaitsForEmptyEventLoop = false;
-    const query = event.body as GeekGameQuery;
-    promiseToCallback(listGeekGames(query), callback);
+    if (event && event.body) {
+        const query = event.body as GeekGameQuery;
+        promiseToCallback(listGeekGames(query), callback);
+    } else {
+        callback(null, null);
+    }
 }
 
 function promiseToCallback<T>(promise: Promise<T>, callback: Callback) {
