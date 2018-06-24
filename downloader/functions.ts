@@ -92,7 +92,7 @@ export function processUser(event, context, callback: Callback) {
     const invocation = event as FileToProcess;
 
     promiseToCallback(
-        request(invocation.url)
+        request(encodeURI(invocation.url))
             .then(data => extractUserDataFromPage(invocation.geek, invocation.url, data.toString()))
             .then(result => {
                 console.log(result);
