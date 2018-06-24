@@ -4,26 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Extended Stats Collection</title>
-    <script src="collection-elements.js" type="text/javascript"></script>
-    <script>
-        function getParameterByName(name, url) {
-            if (!url) url = window.location.href;
-            name = name.replace(/[\[\]]/g, "\\$&");
-            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
-                results = regex.exec(url);
-            if (!results) return null;
-            if (!results[2]) return '';
-            return decodeURIComponent(results[2].replace(/\+/g, " "));
-        }
-    </script>
 </head>
 
 <body>
-<h1>Extended Stats Test Page</h1>
-<script>
-    console.log("geek parameter is " + getParameterByName('geek'));
-</script>
-<extstats-user-collection [geek]="getParameterByName('geek')"></extstats-user-collection>
+<h1>Extended Stats User Test Page</h1>
+<user-collection></user-collection>
 </body>
 
+<script src="userCollection/user-collection.js" type="text/javascript"></script>
 </html>

@@ -1,0 +1,10 @@
+<div class="user-collection">
+  <table *ngIf="!!data">
+    <thead><td>Game</td><td>Average</td><td>Rating</td></thead>
+    <tr *ngFor="let row of data">
+      <td>{{row.name}}</td>
+      <td>{{row.average}}</td>
+      <td>{{row.rating}}</td>
+    </tr>
+  </table>
+</div>
