@@ -27,15 +27,21 @@ const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
 const FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS = "processCollectionRestrictToIDs";
 const FUNCTION_PROCESS_PLAYED = "processPlayed";
 const FUNCTION_MARK_PROCESSED = "updateUrlAsProcessed";
+const FUNCTION_MARK_UNPROCESSED = "updateUrlAsUnprocessed";
 
 const MAX_GAMES_PER_CALL = 500;
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export function processUserList(event, context, callback: Callback) {
     const usersFile = process.env["USERS_FILE"];
-    promiseToCallback(request(usersFile, resolveWithFullResponse = false)
+    let count;
+    promiseToCallback(request(encodeURI(usersFile))
+            .then(data => {
+                count = data.split(/\r?\n/).length;
+                return data;
+            })
             .then(data => invokelambdaAsync("processUserList", INSIDE_PREFIX + FUNCTION_UPDATE_USER_LIST, data))
-            .then(data => console.log('Sent ' + data.split(/\r?\n/).length + ' users to ' + FUNCTION_UPDATE_USER_LIST)),
+            .then(() => console.log('Sent ' + count + ' users to ' + FUNCTION_UPDATE_USER_LIST)),
         callback);
 }
 
@@ -51,6 +57,7 @@ export function fireFileProcessing(event, context, callback: Callback) {
     }
     const promise = invokelambdaSync("{}", INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload)
         .then(data => {
+            console.log(data);
             const files = data as [ToProcessElement];
             files.forEach(element => {
                 if (element.processMethod == METHOD_PROCESS_USER) {
@@ -75,7 +82,7 @@ export function processGame(event, context, callback: Callback) {
     const invocation = event as FileToProcess;
 
     promiseToCallback(
-        request(invocation.url)
+        request(encodeURI(invocation.url))
             .then(data => extractGameDataFromPage(invocation.bggid, invocation.url, data.toString()))
             .then(result => {
                 console.log(result);
@@ -106,27 +113,44 @@ export function processUser(event, context, callback: Callback) {
 export function processCollection(event, context, callback: Callback) {
     console.log(event);
     const invocation = event as FileToProcess;
+    return tryToProcessCollection(invocation)
+        .then(success => {
+            if (success) {
+                return markAsUnprocessed("processCollection", invocation)
+                    .then(() => callback(undefined, undefined));
+            } else {
+                callback(undefined, undefined);
+            }
+        })
+        .catch(err => callback(err));
+}
 
-    const options = { uri: invocation.url, resolveWithFullResponse: true };
-    let collection;
+
+// return success
+function tryToProcessCollection(invocation: FileToProcess): Promise<Boolean> {
     let retry = false;
-    promiseToCallback(
-        request.get(options)
-            .then(response => {
-                console.log(response.statusCode);
-                if (response.statusCode == 202) {
-                    // TODO - record this in the DB
-                    this.retry = true;
-                    throw new Error("BGG says to wait a bit.");
-                }
-                return response.body;
-            })
-            .then(data => extractUserCollectionFromPage(invocation.geek, invocation.url, data.toString()))
-            .then(result => { collection = result; console.log(collection); })
-            .then(() => deleteGamesFromCollection(collection))
-            .then(() => addGamesToCollection(collection))
-            .then(() => markAsProcessed("processCollection", invocation)),
-        callback);
+    const options = { uri: encodeURI(invocation.url), resolveWithFullResponse: true };
+    let collection;
+    return request.get(options)
+        .then(response => {
+            console.log(response.statusCode);
+            if (response.statusCode == 202) {
+                // TODO - record this in the DB
+                retry = true;
+                throw new Error("BGG says to wait a bit.");
+            }
+            return response.body;
+        })
+        .then(data => extractUserCollectionFromPage(invocation.geek, invocation.url, data.toString()))
+        .then(result => { collection = result; console.log(collection); })
+        .then(() => deleteGamesFromCollection(collection))
+        .then(() => addGamesToCollection(collection))
+        .then(() => markAsProcessed("processCollection", invocation))
+        .then(() => true)
+        .catch(err => {
+            if (retry) return Promise.resolve(false);
+            throw err;
+        });
 }
 
 function deleteGamesFromCollection(collection: ProcessCollectionResult): Promise<ProcessCollectionResult> {
@@ -138,6 +162,10 @@ function deleteGamesFromCollection(collection: ProcessCollectionResult): Promise
 
 function markAsProcessed(context: string, fileDetails: FileToProcess): Promise<void> {
     return invokelambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_PROCESSED, fileDetails);
+}
+
+function markAsUnprocessed(context: string, fileDetails: FileToProcess): Promise<void> {
+    return invokelambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_UNPROCESSED, fileDetails);
 }
 
 function addGamesToCollection(collection: ProcessCollectionResult): Promise<any> {

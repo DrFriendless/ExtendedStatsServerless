@@ -1,7 +1,7 @@
 import {Lambda} from 'aws-sdk';
 import {Callback} from "aws-lambda";
 
-export function invokelambdaAsync(context: string, func: string, payload: object): Promise<void> {
+export function invokelambdaAsync(context: string, func: string, payload: object): Promise<object> {
     const params = {
         ClientContext: context,
         FunctionName: func,
@@ -10,15 +10,16 @@ export function invokelambdaAsync(context: string, func: string, payload: object
         Payload: JSON.stringify(payload),
     };
     const lambda = new Lambda();
-    lambda.invoke(params, function(err, data) {
-        if (err) {
-            console.log(err, err.stack);
-        } else {
-            console.log(func + " invoked apparently successfully");
-            console.log(data);
-        }
+    return new Promise(function (fulfill, reject) {
+        lambda.invoke(params, function (err, data) {
+            if (err) {
+                reject(err);
+            } else {
+                console.log(func + " invoked apparently successfully");
+                fulfill(data);
+            }
+        });
     });
-    return Promise.resolve(payload);
 }
 
 export function invokelambdaSync(context: string, func: string, payload: object): Promise<object> {
@@ -35,7 +36,6 @@ export function invokelambdaSync(context: string, func: string, payload: object)
             if (err) {
                 reject(err);
             } else {
-                console.log(data);
                 fulfill(JSON.parse(data.Payload.toString()));
             }
         });

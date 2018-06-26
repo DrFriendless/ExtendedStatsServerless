@@ -2,13 +2,14 @@ import {Callback} from 'aws-lambda';
 import {
     ensureGames, ensureUsers,
     listToProcess, listToProcessByMethod,
-    markUrlProcessed, updateGame, updateGamesForGeek,
+    markUrlProcessed, markUrlUnprocessed, restrictCollectionToGames, updateGame, updateGamesForGeek,
     updateLastScheduledForUrls, updateUserValues
 } from "./mysql-rds";
 import {FileToProcess, ProcessCollectionResult, ProcessGameResult, ProcessUserResult} from "./interfaces";
 
 
 export function processGameResult(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
     console.log(event);
     const data = event as ProcessGameResult;
     const promise = updateGame(data)
@@ -17,6 +18,7 @@ export function processGameResult(event, context, callback: Callback) {
 }
 
 export function processUserResult(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
     console.log(event);
     const data = event as ProcessUserResult;
     const promise = updateUserValues(data.geek, data.bggid, data.country)
@@ -26,6 +28,7 @@ export function processUserResult(event, context, callback: Callback) {
 
 // Lambda to receive the list of users from processUserList and make sure they are all in the database
 export function updateUserList(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
     const body = event;
     const usernames = body.split(/\r?\n/);
     console.log("checking for " + usernames.length + " users");
@@ -58,14 +61,17 @@ export function getToProcessList(event, context, callback: Callback) {
 }
 
 export function processCollectionRestrictToIDs(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
     const params = event as { geek: string, items: [number] };
     const geek = params.geek;
     const ids = params.items;
     console.log(ids);
-    // TODO
+    const promise = restrictCollectionToGames(geek, ids);
+    promiseToCallback(promise, callback);
 }
 
 export function processCollectionUpdateGames(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
    const params = event as ProcessCollectionResult;
    console.log(params);
    const promise = ensureGames(params.items)
@@ -74,8 +80,15 @@ export function processCollectionUpdateGames(event, context, callback: Callback)
 }
 
 export function updateUrlAsProcessed(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
     promiseToCallback(markUrlProcessed(params.processMethod, params.url), callback);
+}
+
+export function updateUrlAsUnprocessed(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    const params = event as FileToProcess;
+    promiseToCallback(markUrlUnprocessed(params.processMethod, params.url), callback);
 }
 
 function promiseToCallback<T>(promise: Promise<T>, callback: Callback) {

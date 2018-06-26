@@ -2,17 +2,20 @@ import {ProcessUserResult, ProcessCollectionResult, CollectionGame, ProcessGameR
 import {between} from "./library";
 const xml2js = require('xml2js-es6-promise');
 
-export function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): ProcessCollectionResult {
+export function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
     console.log("extractUserCollectionFromPage from " + url);
     return xml2js(pageContent, {trim: true})
         .then(dom => {
+            console.log("Finished parsing DOM");
             if (dom && dom.message) {
+                console.log("BGG says come back later");
                 throw new Error("BGG says come back later to get collection for " + geek);
             }
             if (!dom || !dom.items || dom.items.item.length == 0) {
+                console.log("Found no games in collection");
                 throw new Error("Found no games in collection for " + geek);
             }
-            const items = [];
+            const items: [CollectionGame] = [];
             dom.items.item.forEach(item => {
                 if (item.$.subtype != 'boardgame') {
                     console.log(item.$.subtype + " not a board game");
@@ -21,7 +24,7 @@ export function extractUserCollectionFromPage(geek: string, url: string, pageCon
                     // const name = item.name[0]._;
                     const stats = item.stats[0];
                     const status = item.status[0];
-                    const gameItem = { gameId: gameId } as CollectionGame;
+                    const gameItem: CollectionGame = { gameId: gameId };
                     if (stats) {
                         const rating = stats.rating;
                         if (rating && rating.length > 0) {
@@ -42,7 +45,6 @@ export function extractUserCollectionFromPage(geek: string, url: string, pageCon
                         gameItem.wishListPriority = onWishList ? parseInt(status.$.wishlist) : 0;
                         gameItem.preordered = status.$.preordered === '1';
                     }
-                    // console.log(gameItem);
                     items.push(gameItem);
                 }
             });
@@ -98,20 +100,6 @@ export function extractUserDataFromPage(geek: string, url: string, pageContent: 
     return result;
 }
 
-// export interface ProcessGameResult {
-//     average: number;
-//     rank: number;
-//     usersRated: number;
-//     usersTrading: number;
-//     usersWanting: number;
-//     usersWishing: number;
-//     averageWeight: number;
-//     bayesAverage: number;
-//     numComments: number;
-//     expansion: number;
-//     usersOwned: number;
-//     subdomain: string;
-// }
 export function extractGameDataFromPage(bggid: number, url: string, pageContent: string): ProcessGameResult {
     return xml2js(pageContent, {trim: true})
         .then(dom => {
