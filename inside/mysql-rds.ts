@@ -117,14 +117,42 @@ export function ensureUsers(users: string[]): Promise<void> {
             uniques.push(users[i]);
         }
     }
-    return withConnection(conn => doEnsureUsers(conn, uniques));
+    return withConnection(conn => doEnsureExactlyUsers(conn, uniques));
+}
+
+function doEnsureExactlyUsers(conn: mysql.Connection, users: string[]): Promise<void> {
+    let extraUsers;
+    const extraSql = "select username from geeks where username not in (?)";
+    return conn.query(extraSql, [users])
+        .then(xus => {
+            console.log(xus);
+            extraUsers = xus.map(it => it.username);
+        })
+        .then(() => doEnsureUsers(conn, users))
+        .then(() => deleteExtraUsers(conn, extraUsers));
+}
+
+function deleteExtraUsers(conn: mysql.Connection, extraUsers: string[]): Promise<void> {
+    const deleteOneFile = "delete from files where geek = ?";
+    const deleteOneGeek = "delete from geeks where username = ?";
+    const deleteSomeFiles = "delete from files where geek in (?)";
+    const deleteSomeGeeks = "delete from geeks where username in (?)";
+    if (extraUsers.length === 0) {
+        return Promise.resolve();
+    } else if (extraUsers.length === 1) {
+        return conn.query(deleteOneFile, extraUsers)
+            .then(() => conn.query(deleteOneGeek, extraUsers));
+    } else {
+        return conn.query(deleteSomeFiles, [extraUsers])
+            .then(() => conn.query(deleteSomeGeeks, [extraUsers]));
+    }
 }
 
 function doEnsureUser(conn: mysql.Connection, user: string): Promise<void> {
     const insertSql = "insert into geeks (username) values (?)";
     return conn.query(insertSql, [user])
         .then(() => console.log("added user " + user))
-        .catch(Error, err => console.log("user " + user + " already present"))
+        .catch(Error, err => {})
         .then(() => doEnsureFileProcessUser(conn, user))
         .then(() => doEnsureFileProcessUserCollection(conn, user))
         .then(() => doEnsureFileProcessUserPlayed(conn, user));
