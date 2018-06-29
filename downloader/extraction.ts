@@ -11,7 +11,7 @@ export function extractUserCollectionFromPage(geek: string, url: string, pageCon
                 console.log("BGG says come back later");
                 throw new Error("BGG says come back later to get collection for " + geek);
             }
-            if (!dom || !dom.items || dom.items.item.length == 0) {
+            if (!dom || !dom.items || !dom.items.item || dom.items.item.length == 0) {
                 console.log("Found no games in collection");
                 throw new Error("Found no games in collection for " + geek);
             }
