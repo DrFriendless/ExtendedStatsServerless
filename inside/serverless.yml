@@ -8,6 +8,7 @@ provider:
   runtime: nodejs6.10
   stage: dev
   timeout: 30
+  memorySize: 128
   region: ap-southeast-2
   vpc:
     securityGroupIds:
@@ -24,6 +25,7 @@ custom:
 functions:
   updateUserList:
     handler: functions.updateUserList
+    timeout: 120
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}

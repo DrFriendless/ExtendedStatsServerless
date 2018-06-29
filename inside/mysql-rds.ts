@@ -117,7 +117,8 @@ export function ensureUsers(users: string[]): Promise<void> {
             uniques.push(users[i]);
         }
     }
-    return withConnection(conn => doEnsureExactlyUsers(conn, uniques));
+    return withConnection(conn => doEnsureExactlyUsers(conn, uniques))
+        .then(() => console.log("All users processed."));
 }
 
 function doEnsureExactlyUsers(conn: mysql.Connection, users: string[]): Promise<void> {
@@ -133,6 +134,7 @@ function doEnsureExactlyUsers(conn: mysql.Connection, users: string[]): Promise<
 }
 
 function deleteExtraUsers(conn: mysql.Connection, extraUsers: string[]): Promise<void> {
+    console.log("Deleting " + extraUsers.length + " unwanted users.");
     const deleteOneFile = "delete from files where geek = ?";
     const deleteOneGeek = "delete from geeks where username = ?";
     const deleteSomeFiles = "delete from files where geek in (?)";
@@ -167,21 +169,21 @@ export function updateGamesForGeek(geek: string, games: [CollectionGame]): Promi
 }
 
 function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: [CollectionGame]): Promise<void> {
-    const countSql = "select count(*) from geekgames where geek = ? and game = ?";
+    return Promise.all(games.map(game => insertOrUpdateGeekgame(conn, geek, game)));
+}
+
+function insertOrUpdateGeekgame(conn: mysql.Connection, geek: string, game: CollectionGame): Promise<void> {
     const insertSql = "insert into geekgames (geek, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    const updateSql = "update geekgames set (rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) where geek = ? and game = ?";
-    return Promise.all(games.map(game => {
-        return count(conn, countSql, [geek, game.gameId])
-            .then(count => {
-                if (count > 0) {
-                    return conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade,
-                        game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered, geek, game.gameId]);
-                } else {
-                    return conn.query(insertSql, [geek, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
-                        game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
-                }
-            });
-    }));
+    const updateSql = "update geekgames set rating = ?, owned = ?, want = ?, wish = ?, trade = ?, prevowned = ?, wanttobuy = ?, wanttoplay = ?, preordered = ? where geek = ? and game = ?";
+    return conn.query(insertSql, [geek, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
+        game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered])
+        .catch(Error, err => {
+            return conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade,
+                game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered, geek, game.gameId])
+                .then(() => {
+                    console.log("Added game " + game.gameId + " for " + geek);
+                });
+        });
 }
 
 export function ensureGames(games: [CollectionGame]): Promise<void> {
@@ -276,7 +278,7 @@ export function listToProcess(count: number): Promise<[ToProcessElement]> {
 }
 
 export function listToProcessByMethod(count: number, processMethod: string): Promise<[ToProcessElement]> {
-    const sql = "select * from files where processMethod = ? and (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    const sql = "select * from files where processMethod = ? and (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 15) limit ?";
     let connection;
     let result: [ToProcessElement];
     return getConnection()

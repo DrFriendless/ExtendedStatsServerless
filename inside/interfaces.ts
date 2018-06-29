@@ -6,7 +6,6 @@ export interface FileToProcess {
 }
 
 export interface ToProcessElement extends FileToProcess {
-    filename: string,
     lastUpdate: any,
     nextUpdate: any,
     tillNextUpdate: any,

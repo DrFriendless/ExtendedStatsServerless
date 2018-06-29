@@ -28,7 +28,7 @@ export function processUserResult(event, context, callback: Callback) {
 
 // Lambda to receive the list of users from processUserList and make sure they are all in the database
 export function updateUserList(event, context, callback: Callback) {
-    context.callbackWaitsForEmptyEventLoop = true;
+    context.callbackWaitsForEmptyEventLoop = false;
     const body = event as string;
     const usernames = body.split(/\r?\n/);
     console.log("checking for " + usernames.length + " users");
