@@ -1,7 +1,7 @@
 import {Lambda} from 'aws-sdk';
 import {Callback} from "aws-lambda";
 
-export function invokelambdaAsync(context: string, func: string, payload: object): Promise<object> {
+export function invokeLambdaAsync(context: string, func: string, payload: object): Promise<void> {
     const params = {
         ClientContext: context,
         FunctionName: func,
@@ -16,13 +16,14 @@ export function invokelambdaAsync(context: string, func: string, payload: object
                 reject(err);
             } else {
                 console.log(func + " invoked apparently successfully");
-                fulfill(data);
+                console.log(data);
+                fulfill();
             }
         });
     });
 }
 
-export function invokelambdaSync(context: string, func: string, payload: object): Promise<object> {
+export function invokeLambdaSync(context: string, func: string, payload: object): Promise<object> {
     const params = {
         ClientContext: undefined,
         FunctionName: func,

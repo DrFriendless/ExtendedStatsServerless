@@ -1,7 +1,8 @@
 import {Callback} from "aws-lambda";
-import {ProcessCollectionResult, CollectionGame, FileToProcess, ToProcessElement} from "./interfaces"
-import {invokelambdaAsync, invokelambdaSync, promiseToCallback} from "./library";
+import {ProcessCollectionResult, FileToProcess, ToProcessElement} from "./interfaces"
+import {invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
 import {extractGameDataFromPage, extractUserCollectionFromPage, extractUserDataFromPage} from "./extraction";
+import * as _ from "lodash";
 
 const request = require('request-promise-native');
 // the max files to start processing for at once
@@ -40,7 +41,7 @@ export function processUserList(event, context, callback: Callback) {
                 count = data.split(/\r?\n/).length;
                 return data;
             })
-            .then(data => invokelambdaAsync("processUserList", INSIDE_PREFIX + FUNCTION_UPDATE_USER_LIST, data))
+            .then(data => invokeLambdaAsync("processUserList", INSIDE_PREFIX + FUNCTION_UPDATE_USER_LIST, data))
             .then(() => console.log('Sent ' + count + ' users to ' + FUNCTION_UPDATE_USER_LIST)),
         callback);
 }
@@ -55,19 +56,19 @@ export function fireFileProcessing(event, context, callback: Callback) {
     if (event.hasOwnProperty("processMethod")) {
         Object.assign(payload, {processMethod: event.processMethod});
     }
-    const promise = invokelambdaSync("{}", INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload)
+    const promise = invokeLambdaSync("{}", INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload)
         .then(data => {
             console.log(data);
             const files = data as [ToProcessElement];
             files.forEach(element => {
                 if (element.processMethod == METHOD_PROCESS_USER) {
-                    return invokelambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
+                    return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
                 } else if (element.processMethod == METHOD_PROCESS_COLLECTION) {
-                    return invokelambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
+                    return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
                 } else if (element.processMethod == METHOD_PROCESS_PLAYED) {
-                    return invokelambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
+                    return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
                 } else if (element.processMethod == METHOD_PROCESS_GAME) {
-                    return invokelambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
+                    return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
                 }
             });
             return files.length;
@@ -88,7 +89,7 @@ export function processGame(event, context, callback: Callback) {
                 console.log(result);
                 return result;
             })
-            .then(result => invokelambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result)),
+            .then(result => invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result)),
         callback);
 }
 
@@ -105,7 +106,7 @@ export function processUser(event, context, callback: Callback) {
                 console.log(result);
                 return result;
             })
-            .then(result => invokelambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_USER_RESULT, result)),
+            .then(result => invokeLambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_USER_RESULT, result)),
         callback);
 }
 
@@ -114,20 +115,15 @@ export function processCollection(event, context, callback: Callback) {
     console.log(event);
     const invocation = event as FileToProcess;
     return tryToProcessCollection(invocation)
-        .then(success => {
-            if (success) {
-                return markAsUnprocessed("processCollection", invocation)
-                    .then(() => callback(undefined, undefined));
-            } else {
-                callback(undefined, undefined);
-            }
-        })
-        .catch(err => callback(err));
+        .then(() => callback(null, null))
+        .catch(err => {
+            console.log(err);
+            promiseToCallback(markAsUnprocessed("processCollection", invocation), callback);
+        });
 }
 
-
 // return success
-function tryToProcessCollection(invocation: FileToProcess): Promise<Boolean> {
+function tryToProcessCollection(invocation: FileToProcess): Promise<void> {
     let retry = false;
     const options = { uri: encodeURI(invocation.url), resolveWithFullResponse: true };
     let collection;
@@ -154,43 +150,30 @@ function tryToProcessCollection(invocation: FileToProcess): Promise<Boolean> {
 }
 
 function deleteGamesFromCollection(collection: ProcessCollectionResult): Promise<ProcessCollectionResult> {
-    return invokelambdaAsync("processCollection",
+    return invokeLambdaAsync("processCollection",
         INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS,
         { geek: collection.geek, items: collection.items.map(item => item.gameId) })
         .then(() => collection);
 }
 
 function markAsProcessed(context: string, fileDetails: FileToProcess): Promise<void> {
-    return invokelambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_PROCESSED, fileDetails);
+    return invokeLambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_PROCESSED, fileDetails);
 }
 
 function markAsUnprocessed(context: string, fileDetails: FileToProcess): Promise<void> {
-    return invokelambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_UNPROCESSED, fileDetails);
+    return invokeLambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_UNPROCESSED, fileDetails);
 }
 
 function addGamesToCollection(collection: ProcessCollectionResult): Promise<any> {
     return Promise.all(
         splitCollection(collection)
-            .map(games => invokelambdaAsync("processCollection", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES, games))
+            .map(games => invokeLambdaAsync("processCollection", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES, games))
     );
 }
 
-function splitCollection(original: ProcessCollectionResult): [ProcessCollectionResult] {
-    const geek = original.geek;
-    const split = splitItems(original.items);
-    return split.map(items => { return { geek: geek, items: items } as ProcessCollectionResult});
-}
-
-function splitItems(items: [CollectionGame]): [[CollectionGame]] {
-    if (items.length < MAX_GAMES_PER_CALL) {
-        return [items];
-    } else {
-        const result = [];
-        for (let i=0, j=items.length; i<j; i+=MAX_GAMES_PER_CALL) {
-            result.push(items.slice(i,i+MAX_GAMES_PER_CALL));
-        }
-        return result;
-    }
+function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {
+    return _.chunk(original.items, MAX_GAMES_PER_CALL)
+        .map(items => { return { geek: original.geek, items: items } as ProcessCollectionResult});
 }
 
 

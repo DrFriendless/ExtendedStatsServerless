@@ -5,10 +5,12 @@
   "private": true,
   "dependencies": {
     "@types/aws-lambda": "0.0.17",
+    "@types/lodash": "^4.14.110",
     "@types/node": "^8.0.34",
     "aws-lambda": "^0.1.2",
     "aws-lambda-typescript": "0.0.10",
     "aws-sdk": "^2.259.1",
+    "lodash": "^4.17.10",
     "npm": "^6.1.0",
     "request": "^2.87.0",
     "request-promise-native": "^1.0.5",
