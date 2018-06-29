@@ -108,36 +108,30 @@ export function markUrlUnprocessed(processMethod: string, url: string): Promise<
     return withConnection(conn => conn.query(sqlSet, [url, processMethod]));
 }
 
-export function ensureUsers(users: string[]): Promise<void[]> {
-    return withConnection(conn => doEnsureUsers(conn, users));
+export function ensureUsers(users: string[]): Promise<void> {
+    const uniques: string[] = [];
+    for (let i=0; i<users.length; i++) {
+        if (uniques.indexOf(users[i]) >= 0) {
+            console.log("User " + users[i] + " is duplicated in the users list.");
+        } else {
+            uniques.push(users[i]);
+        }
+    }
+    return withConnection(conn => doEnsureUsers(conn, uniques));
+}
+
+function doEnsureUser(conn: mysql.Connection, user: string): Promise<void> {
+    const insertSql = "insert into geeks (username) values (?)";
+    return conn.query(insertSql, [user])
+        .then(() => console.log("added user " + user))
+        .catch(Error, err => console.log("user " + user + " already present"))
+        .then(() => doEnsureFileProcessUser(conn, user))
+        .then(() => doEnsureFileProcessUserCollection(conn, user))
+        .then(() => doEnsureFileProcessUserPlayed(conn, user));
 }
 
 function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void> {
-    const countSql = "select username, count(*) from geeks where username = ?";
-    const insertSql = "insert into geeks (username) values (?)";
-    for (let i=0; i<users.length; i++) {
-        if (users.indexOf(users[i]) != i) console.log("User " + users[i] + " is duplicated in the users list.");
-    }
-    return Promise.all(users.map(user => {
-        conn.query(countSql, [user])
-            .then(result => {
-                console.log("" + user + " " + result);
-                return result[0]["count(*)"];
-            })
-            .then(count => {
-                if (count == 0) {
-                    return conn.query(insertSql, [user]).then(() => console.log("added user " + user));
-                } else {
-                    return Promise.resolve();
-                }
-            })
-            .then(() => Promise.all(
-                doEnsureFileProcessUser(conn, user),
-                doEnsureFileProcessUserCollection(conn, user),
-                doEnsureFileProcessUserPlayed(conn, user)
-            ))
-            .catch(err => console.log(err));
-    }));
+    return Promise.all(users.map(user => doEnsureUser(conn, user)));
 }
 
 export function updateGamesForGeek(geek: string, games: [CollectionGame]): Promise<void> {
@@ -167,7 +161,7 @@ export function ensureGames(games: [CollectionGame]): Promise<void> {
 }
 
 function doEnsureGames(conn: mysql.Connection, games: [CollectionGame]): Promise<void> {
-    if (games.length == 0) return Promise.resolve();
+    if (games.length === 0) return Promise.resolve();
     const ids = games.map(cg => parseInt(cg.gameId));
 
     const sqlSome = "select bggid from files where bggid in (?) and processMethod = 'processGame'";
