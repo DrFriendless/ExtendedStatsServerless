@@ -9,6 +9,7 @@ provider:
   stage: dev
   region: ap-southeast-2
   timeout: 30
+  memorySize: 128
 
 custom:
   secret: ${file(../secrets.json)}
