@@ -41,7 +41,7 @@ functions:
           rate: rate(10 minutes)
           enabled: true
           input:
-            count: 10
+            count: 50
             stageParams:
               stage: dev
   processUser:
@@ -54,6 +54,7 @@ functions:
       "invokeLambdas"
   processCollection:
     handler: functions.processCollection
+    timeout: 60
     role:
       "invokeLambdas"
 

@@ -106,8 +106,8 @@ export function extractGameDataFromPage(bggid: number, url: string, pageContent:
             if (!dom) {
                 throw new Error("Found no game data for game " + bggid);
             }
-            if (!dom || !dom.boardgames || dom.boardgames.boardgame.length == 0) {
-                throw new Error("Found no game for ID " + bggid);
+            if (!dom || !dom.boardgames || dom.boardgames.boardgame.length == 0 || dom.boardgames.boardgame.error) {
+                throw new NoSuchGameError(bggid);
             }
             const result: ProcessGameResult = {};
             dom.boardgames.boardgame.forEach(boardgame => {
@@ -147,4 +147,14 @@ export function extractGameDataFromPage(bggid: number, url: string, pageContent:
             console.log(result);
             return result;
         });
+}
+
+export class NoSuchGameError extends Error {
+    constructor(private id: number) {
+        super("No such game " + id);
+    }
+
+    public getId(): number {
+        return this.id;
+    }
 }

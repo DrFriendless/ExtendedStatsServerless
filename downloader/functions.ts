@@ -1,7 +1,12 @@
 import {Callback} from "aws-lambda";
 import {ProcessCollectionResult, FileToProcess, ToProcessElement} from "./interfaces"
 import {invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
-import {extractGameDataFromPage, extractUserCollectionFromPage, extractUserDataFromPage} from "./extraction";
+import {
+    extractGameDataFromPage,
+    extractUserCollectionFromPage,
+    extractUserDataFromPage,
+    NoSuchGameError
+} from "./extraction";
 import * as _ from "lodash";
 
 const request = require('request-promise-native');
@@ -24,6 +29,7 @@ const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
 const FUNCTION_PROCESS_GAME = "processGame";
 const FUNCTION_PROCESS_GAME_RESULT = "processGameResult";
+const FUNCTION_NO_SUCH_GAME = "updateGameAsDoesNotExist";
 const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
 const FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS = "processCollectionRestrictToIDs";
 const FUNCTION_PROCESS_PLAYED = "processPlayed";
@@ -89,7 +95,11 @@ export function processGame(event, context, callback: Callback) {
                 console.log(result);
                 return result;
             })
-            .then(result => invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result)),
+            .then(result => invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result))
+            .catch(NoSuchGameError, err => {
+                console.log(err);
+                invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_NO_SUCH_GAME, { bggid: err.bggid });
+            }),
         callback);
 }
 

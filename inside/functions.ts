@@ -1,7 +1,7 @@
 import {Callback} from 'aws-lambda';
 import {
     ensureGames, ensureUsers,
-    listToProcess, listToProcessByMethod,
+    listToProcess, listToProcessByMethod, markGameDoesNotExist,
     markUrlProcessed, markUrlUnprocessed, restrictCollectionToGames, updateGame, updateGamesForGeek,
     updateLastScheduledForUrls, updateUserValues
 } from "./mysql-rds";
@@ -89,6 +89,13 @@ export function updateUrlAsUnprocessed(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
     promiseToCallback(markUrlUnprocessed(params.processMethod, params.url), callback);
+}
+
+export function updateGameAsDoesNotExist(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    console.log(event);
+    const bggid = event.bggid;
+    promiseToCallback(markGameDoesNotExist(bggid), callback);
 }
 
 function promiseToCallback<T>(promise: Promise<T>, callback: Callback) {
