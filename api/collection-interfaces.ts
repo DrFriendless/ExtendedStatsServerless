@@ -7,4 +7,9 @@ export interface GeekGame {
     name: string;
     rating: number;
     average:  number;
+    owned: boolean;
+    wantToBuy: boolean;
+    wantToPlay: boolean;
+    preordered: boolean;
+    prevOwned: boolean;
 }
