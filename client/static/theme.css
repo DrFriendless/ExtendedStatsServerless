@@ -1,0 +1,13 @@
+body {
+    background-color: #f5e39d;
+    padding-top: 3.5rem;
+}
+
+.btn-secondary {
+    background-color: #d10d17;
+    border-color: #d10d17;
+}
+.btn-secondary:hover {
+    background-color: #f5b119;
+    border-color: #f5b119;
+}
