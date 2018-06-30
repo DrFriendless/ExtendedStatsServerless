@@ -1,22 +1,24 @@
 import {
   AfterViewInit,
   Component,
-  Input, OnDestroy,
+  Input, OnDestroy, ViewEncapsulation,
 } from '@angular/core';
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
 import {GeekGame, GeekGameQuery} from "../collection-interfaces";
+import {Subject} from "rxjs/Subject";
 
 @Component({
   selector: 'user-collection',
   templateUrl: "./user-collection.component.html",
-  styleUrls: ["./user-collection.component.css"]
+  styleUrls: ["./user-collection.component.css"],
+  encapsulation: ViewEncapsulation.None
 })
 export class UserCollectionComponent implements OnDestroy, AfterViewInit {
   // remember @Inputs don't get populated on the root component
   @Input('geek') geek: string;
   private loadData$;
-  public data: [GeekGame] = [] as [GeekGame];
+  public rows: [GeekGame] = [] as [GeekGame];
   private subscription: Subscription;
 
   constructor(private http: HttpClient) {
@@ -35,7 +37,8 @@ export class UserCollectionComponent implements OnDestroy, AfterViewInit {
     console.log(body);
     this.loadData$ = this.http.post("https://api.drfriendless.com/v1/geekgames", body, options);
     this.subscription = this.loadData$.subscribe(result => {
-      this.data = result;
+      this.rows = result;
+      console.log(this.rows);
     })
   }
 

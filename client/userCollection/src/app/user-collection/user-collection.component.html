@@ -1,10 +1,31 @@
-<div class="user-collection">
-  <table *ngIf="!!data">
-    <thead><td>Game</td><td>Average</td><td>Rating</td></thead>
-    <tr *ngFor="let row of data">
+<div class="user-collection" *ngIf="!!rows">
+  <table class="table table-striped" [mfData]="rows" #mf="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'name'" [mfSortOrder]="'asc'">
+    <thead>
+    <tr>
+      <th>
+        <mfDefaultSorter by="name">Name</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="average">Average</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="rating">Rating</mfDefaultSorter>
+      </th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let row of mf.data">
       <td>{{row.name}}</td>
       <td>{{row.average}}</td>
       <td>{{row.rating}}</td>
     </tr>
+    </tbody>
+    <tfoot>
+    <tr>
+      <td colspan="4">
+        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]"></mfBootstrapPaginator>
+      </td>
+    </tr>
+    </tfoot>
   </table>
 </div>
