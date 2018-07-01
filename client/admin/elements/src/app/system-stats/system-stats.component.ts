@@ -22,6 +22,11 @@ export class SystemStatsComponent implements AfterViewInit, OnDestroy {
     userRows: 0,
     gameRows: 0,
     geekGamesRows: 0,
+    mechanics: 0,
+    categories: 0,
+    gameMechanics: 0,
+    gameCategories: 0,
+    notGames: 0,
     fileRows: [] as [TypeCount],
   };
   private subscription: Subscription = null;

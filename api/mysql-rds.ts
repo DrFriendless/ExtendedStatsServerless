@@ -44,40 +44,56 @@ function extractGeekGame(row: object): GeekGame {
 }
 
 export function gatherSystemStats(): Promise<SystemStats> {
-    let userRows = 0;
-    let gameRows = 0;
-    let geekGamesRows = 0;
-    let fileRows = [] as [TypeCount];
-    let connection;
+    return returnWithConnection(doGatherSystemStats);
+}
+
+function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats> {
     const countUserRows = "select count(*) from geeks";
     const countGameRows = "select count(*) from games";
     const countGeekGameRows = "select count(*) from geekgames";
+    const countNotGames = "select count(*) from not_games";
+    const countCategories = "select count(*) from categories";
+    const countMechanics = "select count(*) from mechanics";
+    const countGameMechanics = "select count(*) from game_mechanics";
+    const countGameCategories = "select count(*) from game_categories";
     const countFileRows = "select processMethod, count(url) from files group by processMethod";
     const countWaitingFileRows = "select processMethod, count(url) from files where lastUpdate is null or nextUpdate is null or nextUpdate < now() group by processMethod";
     const countUnprocessedFileRows = "select processMethod, count(url) from files where lastUpdate is null or nextUpdate is null group by processMethod";
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => Promise.all([
-            count(conn, countUserRows, []).then(count => userRows = count),
-            count(conn, countGameRows, []).then(count => gameRows = count),
-            count(conn, countGeekGameRows, []).then(count => geekGamesRows = count),
-            conn.query(countFileRows).then(rows => gatherTypeCounts(rows)).then(data => fileRows = data),
-        ]))
-        .then(() => Promise.all([
-            connection.query(countWaitingFileRows).then(rows => patch(fileRows, "waiting", rows)),
-            connection.query(countUnprocessedFileRows).then(rows => patch(fileRows, "unprocessed", rows))
-        ]))
-        .then(() => connection.destroy())
+    let userRows = 0;
+    let gameRows = 0;
+    let geekGamesRows = 0;
+    let notGames = 0;
+    let mechanics = 0;
+    let categories = 0;
+    let gameMechanics = 0;
+    let gameCategories = 0;
+    let fileRows = [] as [TypeCount];
+
+    return Promise.all([
+        count(conn, countUserRows, []).then(count => userRows = count),
+        count(conn, countGameRows, []).then(count => gameRows = count),
+        count(conn, countGeekGameRows, []).then(count => geekGamesRows = count),
+        count(conn, countNotGames, []).then(count => notGames = count),
+        count(conn, countCategories, []).then(count => categories = count),
+        count(conn, countMechanics, []).then(count => mechanics = count),
+        count(conn, countGameMechanics, []).then(count => gameMechanics = count),
+        count(conn, countGameCategories, []).then(count => gameCategories = count),
+        conn.query(countFileRows).then(rows => gatherTypeCounts(rows)).then(data => fileRows = data),
+        conn.query(countWaitingFileRows).then(rows => patch(fileRows, "waiting", rows)),
+        conn.query(countUnprocessedFileRows).then(rows => patch(fileRows, "unprocessed", rows))
+    ])
         .then(() => {
             return {
                 userRows: userRows,
                 gameRows: gameRows,
                 geekGamesRows: geekGamesRows,
                 fileRows: fileRows,
-            };
+                notGames: notGames,
+                categories: categories,
+                mechanics: mechanics,
+                gameCategories: gameCategories,
+                gameMechanics: gameMechanics
+            } as SystemStats;
         });
 }
 
