@@ -15,24 +15,85 @@ export function updateGame(data: ProcessGameResult): Promise<void> {
         .then(() => connection.destroy());
 }
 
-function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult): Promise<void> {
+async function doEnsureCategory(conn: mysql.Connection, name: string) {
+    const insertSql = "insert into categories (name) values (?)";
+    console.log("doEnsureCategory " + name);
+    // very likely already there so ignore any error
+    await conn.query(insertSql, [name]).catch(err => {});
+}
+
+async function doEnsureMechanic(conn: mysql.Connection, name: string) {
+    const insertSql = "insert into mechanics (name) values (?)";
+    // very likely already there so ignore any error
+    await conn.query(insertSql, [name]).catch(err => {});
+}
+
+async function setCategoriesForGame(conn: mysql.Connection, game: number, categories: string[]) {
+    console.log("setCategoriesForGame");
+    const getCatsSqlOne = "select id from categories where name = ?";
+    const getCatsSqlMany = "select id from categories where name in (?)";
+    const deleteAllGameCatsSql = "delete from game_categories where game = ?";
+    const insertSql = "insert into game_categories (game, category) values (?,?)";
+    let getCatsSql;
+    let getCatsParams;
+    if (categories.length === 1) {
+        getCatsSql = getCatsSqlOne;
+        getCatsParams = categories;
+    } else if (categories.length > 1) {
+        getCatsSql = getCatsSqlMany;
+        getCatsParams = [categories];
+    } else {
+        await conn.query(deleteAllGameCatsSql, [game]);
+        return;
+    }
+    categories.forEach(async cat => await doEnsureCategory(conn, cat));
+    const catIds = (await conn.query(getCatsSql, getCatsParams)).map(row => row.id);
+    await conn.query(deleteAllGameCatsSql, [game]);
+    catIds.forEach(async id => await conn.query(insertSql, [game, id]));
+}
+
+async function setMechanicsForGame(conn: mysql.Connection, game: number, mechanics: string[]) {
+    console.log("setMechanicsForGame");
+    const getMecsSqlOne = "select id from mechanics where name = ?";
+    const getMecsSqlMany = "select id from mechanics where name in (?)";
+    const deleteAllGameMecsSql = "delete from game_mechanics where game = ?";
+    const insertSql = "insert into game_mechanics (game, mechanic) values (?,?)";
+    let getMecsSql;
+    let getMecsParams;
+    if (mechanics.length === 1) {
+        getMecsSql = getMecsSqlOne;
+        getMecsParams = mechanics;
+    } else if (mechanics.length > 1) {
+        getMecsSql = getMecsSqlMany;
+        getMecsParams = [mechanics];
+    } else {
+        await conn.query(deleteAllGameMecsSql, [game]);
+        return;
+    }
+    mechanics.forEach(async mec => await doEnsureMechanic(conn, mec));
+    const mecIds = (await conn.query(getMecsSql, getMecsParams)).map(row => row.id);
+    await conn.query(deleteAllGameMecsSql, [game]);
+    mecIds.map(async id => await conn.query(insertSql, [game, id]));
+}
+
+async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
     const countSql = "select count(*) from games where bggid = ?";
     const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
         "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "updates games set (name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
         "averageWeight, bayesAverage, numComments, usersOwned, subdomain) = (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) where bggid = ?";
-    return count(conn, countSql, [data.gameId])
-        .then(count => {
-            if (count == 0) {
-                return conn.query(insertSql, [data.gameId, data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
-                    data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
-                    data.numComments, data.usersOwned, data.subdomain]);
-            } else {
-                return conn.query(updateSql, [data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
-                    data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
-                    data.numComments, data.usersOwned, data.subdomain, data.gameId]);
-            }
-        });
+    const c = await count(conn, countSql, [data.gameId]);
+    if (c == 0) {
+        await conn.query(insertSql, [data.gameId, data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
+            data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
+            data.numComments, data.usersOwned, data.subdomain]);
+    } else {
+        await conn.query(updateSql, [data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
+            data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
+            data.numComments, data.usersOwned, data.subdomain, data.gameId]));
+    }
+    await setCategoriesForGame(conn, data.gameId, data.categories);
+    await setMechanicsForGame(conn, data.gameId, data.mechanics);
 }
 
 
@@ -260,13 +321,13 @@ export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
     const sqlOne = "update files set last_scheduled = now() where url = ?";
     const sqlMany = "update files set last_scheduled = now() where url in (?)";
     return withConnection(conn => {
-            if (urls.length == 0) {
-                return Promise.resolve(undefined);
-            } else if (urls.length == 1) {
-                return conn.query(sqlOne, urls);
-            } else {
-                return conn.query(sqlMany, [urls]);
-            }
-        });
+        if (urls.length == 0) {
+            return Promise.resolve(undefined);
+        } else if (urls.length == 1) {
+            return conn.query(sqlOne, urls);
+        } else {
+            return conn.query(sqlMany, [urls]);
+        }
+    });
 }
 

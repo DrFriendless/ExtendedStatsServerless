@@ -113,6 +113,8 @@ export function extractGameDataFromPage(bggid: number, url: string, pageContent:
             dom.boardgames.boardgame.forEach(boardgame => {
                 const names = boardgame.name;
                 // TODO
+                console.log(boardgame);
+                // TODO - publishers
                 const expansions = boardgame.boardgameexpansion;
                 const categories = boardgame.boardgamecategory;
                 const mechanics = boardgame.boardgamemechanic;
@@ -121,10 +123,9 @@ export function extractGameDataFromPage(bggid: number, url: string, pageContent:
                 const statistics = boardgame.statistics;
                 const ratings = statistics[0].ratings;
                 const ranks = ratings[0].ranks[0].rank;
-                console.log(ratings);
-                console.log(ranks);
-                console.log(subdomains);
-                console.log(boardgame);
+                console.log(categories);
+                console.log(mechanics);
+                console.log(designers);
                 // [ { _: 'Dispatcher', '$': { primary: 'true', sortindex: '1' } } ]
                 const name = names.filter(it => it.$.primary == 'true')[0]._;
                 result.gameId = parseInt(boardgame.$.objectid);
@@ -143,6 +144,9 @@ export function extractGameDataFromPage(bggid: number, url: string, pageContent:
                 result.usersRated = parseInt(ratings[0].usersrated);
                 result.name = name;
                 result.url = url;
+                result.categories = categories ? categories.map(c => c._) : [];
+                result.mechanics = mechanics ? mechanics.map(c => c._) : [];
+                result.designers = designers ? designers.map(c => c.$.objectid) : [];
             });
             console.log(result);
             return result;

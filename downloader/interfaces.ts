@@ -59,6 +59,10 @@ export interface ProcessGameResult {
     expansion: number;
     usersOwned: number;
     subdomain: string;
-    expands: [number];
+    expands: number[];
     url: string;
+    categories: string[];
+    mechanics: string[];
+    designers: number[];
+    publishers: number[];
 }
