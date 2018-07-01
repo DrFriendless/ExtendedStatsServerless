@@ -1,18 +1,11 @@
 import mysql = require('promise-mysql');
-import {CollectionGame, ProcessGameResult, ToProcessElement} from "./interfaces";
+import {CollectionGame, ProcessGameResult, RankingTableRow, ToProcessElement} from "./interfaces";
 import {count, getConnection, returnWithConnection, withConnection} from "./library";
 
 export function updateGame(data: ProcessGameResult): Promise<void> {
     console.log("updateGame");
     console.log(data);
-    let connection;
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => doUpdateGame(conn, data))
-        .then(() => connection.destroy());
+    return withConnection(conn => doUpdateGame(conn, data));
 }
 
 async function doEnsureCategory(conn: mysql.Connection, name: string) {
@@ -80,8 +73,8 @@ async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
     const countSql = "select count(*) from games where bggid = ?";
     const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
         "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-    const updateSql = "updates games set (name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
-        "averageWeight, bayesAverage, numComments, usersOwned, subdomain) = (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) where bggid = ?";
+    const updateSql = "updates games set name = ?, average = ?, rank = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
+        "averageWeight = ?, bayesAverage = ?, numComments = ?, usersOwned = ?, subdomain = ? where bggid = ?";
     const c = await count(conn, countSql, [data.gameId]);
     if (c == 0) {
         await conn.query(insertSql, [data.gameId, data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
@@ -94,8 +87,32 @@ async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
     }
     await setCategoriesForGame(conn, data.gameId, data.categories);
     await setMechanicsForGame(conn, data.gameId, data.mechanics);
+    await updateRankingTableStatsForGame(conn, data.gameId, data);
 }
 
+async function updateRankingTableStatsForGame(conn: mysql.Connection, game: number, data: ProcessGameResult) {
+    const ratingSql = "select sum(rating), count(rating) from geekgames where game = ? and rating > 0";
+    const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays) values (?,?,?,?,?,?,?,?)";
+    const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ? where game = ?";
+    const ratings = await conn.query(ratingSql, [game]);
+    console.log(ratings);
+    const row: RankingTableRow = {
+        game: game,
+        game_name: data.name,
+        bgg_ranking: data.rank || 1000000,
+        bgg_rating: data.average || 0,
+        normalised_ranking: 0, // TODO
+        total_plays: 0, // TODO
+        total_ratings: 0, // TODO
+        num_ratings: 0 // TODO
+    };
+    try {
+        await conn.query(insertSql, [row.game, row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays]);
+    } catch (e) {
+        console.log(e);
+        await conn.query(updateSql, [row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.game]);
+    }
+}
 
 export function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
     console.log("updateUserValues " + geek + " " + bggid + " " + country);
@@ -152,7 +169,7 @@ export function markGameDoesNotExist(bggid: number): Promise<void> {
     console.log("markGameDoesNotExist " + bggid);
     const sql = "insert into not_games (bggid) values ?";
     // ignore insert error
-    return withConnection(conn => conn.query(sql, [bgdid]).catch(err => {}));
+    return withConnection(conn => conn.query(sql, [bggid]).catch(err => {}));
 }
 
 export function ensureUsers(users: string[]): Promise<void> {
