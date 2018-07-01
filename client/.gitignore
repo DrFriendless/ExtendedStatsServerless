@@ -7,4 +7,5 @@ jspm_packages
 env.yml
 
 static/userCollection/*.*
+static/rankingTable/*.*
 static/*.js

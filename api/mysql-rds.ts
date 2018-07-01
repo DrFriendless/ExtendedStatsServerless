@@ -2,6 +2,7 @@ import mysql = require('promise-mysql');
 import {SystemStats, TypeCount} from "./admin-interfaces"
 import {GeekGame, GeekGameQuery} from "./collection-interfaces";
 import {count, getConnection, returnWithConnection, withConnection} from "./library";
+import {RankingTableRow} from "./ranking-interfaces";
 
 export function listGeekGames(query: GeekGameQuery): Promise<[GeekGame]> {
     // TODO
@@ -21,6 +22,21 @@ export function listGeekGames(query: GeekGameQuery): Promise<[GeekGame]> {
         })
         .then(() => connection.destroy())
         .then(() => result);
+}
+
+export function rankGames(query: object): Promise<RankingTableRow[]> {
+    return returnWithConnection(async conn => doRankGames(conn, query));
+}
+
+async function doRankGames(conn: mysql.Connection, query: object): RankingTableRow[] {
+    const sql = "select game, game_name, total_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays from ranking_table order by total_ratings desc limit 1000";
+    const rows = await conn.query(sql);
+    let ranking = 1;
+    rows.forEach(row => {
+        row.ranking = ranking;
+        ranking++;
+    });
+    return rows;
 }
 
 function doListGeekGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {

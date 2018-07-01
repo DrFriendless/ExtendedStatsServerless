@@ -6,7 +6,6 @@ import {
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
 import {GeekGame, GeekGameQuery} from "../collection-interfaces";
-import {Subject} from "rxjs/Subject";
 
 @Component({
   selector: 'user-collection',

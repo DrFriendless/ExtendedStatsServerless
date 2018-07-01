@@ -1,5 +1,5 @@
 import {Callback} from 'aws-lambda';
-import {gatherSystemStats, listGeekGames, listUsers} from "./mysql-rds";
+import {gatherSystemStats, listGeekGames, listUsers, rankGames} from "./mysql-rds";
 import {GeekGameQuery} from "./collection-interfaces";
 
 export function adminGatherSystemStats(event, context, callback: Callback) {
@@ -22,6 +22,19 @@ export function getGeekGames(event, context, callback: Callback) {
     if (event && event.body) {
         const query = event.body as GeekGameQuery;
         promiseToCallback(listGeekGames(query), callback);
+    } else {
+        callback(null, null);
+    }
+}
+
+// Lambda to retrieve the list of users
+export function getRankings(event, context, callback: Callback) {
+    console.log("getRankings");
+    console.log(event);
+    context.callbackWaitsForEmptyEventLoop = false;
+    if (event && event.body) {
+        const query = {}; // TODO
+        promiseToCallback(rankGames(query), callback);
     } else {
         callback(null, null);
     }

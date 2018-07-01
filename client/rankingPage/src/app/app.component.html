@@ -1,0 +1,52 @@
+<div class="ranking-table" *ngIf="!!rows">
+  <table class="table table-striped" [mfData]="rows" #mf="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'name'" [mfSortOrder]="'asc'">
+    <thead>
+    <tr>
+      <th>
+        <mfDefaultSorter by="ranking">Ranking</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="game_name">Name</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="total_ratings">Score</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="num_ratings">Num. Ratings</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="bgg_ranking">BGG Ranking</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="bgg_rating">BGG Rating</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="normalised_ranking">Normalised Ranking</mfDefaultSorter>
+      </th>
+      <th>
+        <mfDefaultSorter by="total_plays">Total Plays</mfDefaultSorter>
+      </th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let row of mf.data">
+      <td>{{row.ranking}}</td>
+      <td><a href="https://boardgamegeek.com/boardgame/{{row.game}}">{{row.game_name}}</a></td>
+      <td>{{row.total_ratings}}</td>
+      <td>{{row.num_ratings}}</td>
+      <td>{{row.bgg_ranking}}</td>
+      <td>{{row.bgg_rating}}</td>
+      <td>{{row.normalised_ranking}}</td>
+      <td>{{row.total_plays}}</td>
+    </tr>
+    </tbody>
+    <tfoot>
+    <tr>
+      <td colspan="4">
+        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]"></mfBootstrapPaginator>
+      </td>
+    </tr>
+    </tfoot>
+  </table>
+</div>
+
