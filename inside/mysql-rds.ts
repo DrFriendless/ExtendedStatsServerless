@@ -10,7 +10,6 @@ export function updateGame(data: ProcessGameResult): Promise<void> {
 
 async function doEnsureCategory(conn: mysql.Connection, name: string) {
     const insertSql = "insert into categories (name) values (?)";
-    console.log("doEnsureCategory " + name);
     // very likely already there so ignore any error
     await conn.query(insertSql, [name]).catch(err => {});
 }
@@ -22,7 +21,6 @@ async function doEnsureMechanic(conn: mysql.Connection, name: string) {
 }
 
 async function setCategoriesForGame(conn: mysql.Connection, game: number, categories: string[]) {
-    console.log("setCategoriesForGame");
     const getCatsSqlOne = "select id from categories where name = ?";
     const getCatsSqlMany = "select id from categories where name in (?)";
     const deleteAllGameCatsSql = "delete from game_categories where game = ?";
@@ -46,7 +44,6 @@ async function setCategoriesForGame(conn: mysql.Connection, game: number, catego
 }
 
 async function setMechanicsForGame(conn: mysql.Connection, game: number, mechanics: string[]) {
-    console.log("setMechanicsForGame");
     const getMecsSqlOne = "select id from mechanics where name = ?";
     const getMecsSqlMany = "select id from mechanics where name in (?)";
     const deleteAllGameMecsSql = "delete from game_mechanics where game = ?";
@@ -73,7 +70,7 @@ async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
     const countSql = "select count(*) from games where bggid = ?";
     const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
         "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-    const updateSql = "updates games set name = ?, average = ?, rank = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
+    const updateSql = "update games set name = ?, average = ?, rank = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
         "averageWeight = ?, bayesAverage = ?, numComments = ?, usersOwned = ?, subdomain = ? where bggid = ?";
     const c = await count(conn, countSql, [data.gameId]);
     if (c == 0) {
@@ -83,7 +80,7 @@ async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
     } else {
         await conn.query(updateSql, [data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
             data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
-            data.numComments, data.usersOwned, data.subdomain, data.gameId]));
+            data.numComments, data.usersOwned, data.subdomain, data.gameId]);
     }
     await setCategoriesForGame(conn, data.gameId, data.categories);
     await setMechanicsForGame(conn, data.gameId, data.mechanics);
@@ -95,7 +92,8 @@ async function updateRankingTableStatsForGame(conn: mysql.Connection, game: numb
     const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays) values (?,?,?,?,?,?,?,?)";
     const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ? where game = ?";
     const ratings = await conn.query(ratingSql, [game]);
-    console.log(ratings);
+    const total = ratings[0]['sum(rating)'];
+    const count = ratings[0]['count(rating)'];
     const row: RankingTableRow = {
         game: game,
         game_name: data.name,
@@ -103,13 +101,12 @@ async function updateRankingTableStatsForGame(conn: mysql.Connection, game: numb
         bgg_rating: data.average || 0,
         normalised_ranking: 0, // TODO
         total_plays: 0, // TODO
-        total_ratings: 0, // TODO
-        num_ratings: 0 // TODO
+        total_ratings: total || 0,
+        num_ratings: count
     };
     try {
         await conn.query(insertSql, [row.game, row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays]);
     } catch (e) {
-        console.log(e);
         await conn.query(updateSql, [row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.game]);
     }
 }
@@ -190,7 +187,6 @@ function doEnsureExactlyUsers(conn: mysql.Connection, users: string[]): Promise<
     const extraSql = "select username from geeks where username not in (?)";
     return conn.query(extraSql, [users])
         .then(xus => {
-            console.log(xus);
             extraUsers = xus.map(it => it.username);
         })
         .then(() => doEnsureUsers(conn, users))
@@ -335,16 +331,18 @@ export function listToProcessByMethod(count: number, processMethod: string): Pro
 }
 
 export function updateLastScheduledForUrls(urls: string[]): Promise<void> {
+    return withConnection(conn => doUpdateLastScheduledForUrls(conn, urls));
+}
+
+async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string[]) {
     const sqlOne = "update files set last_scheduled = now() where url = ?";
     const sqlMany = "update files set last_scheduled = now() where url in (?)";
-    return withConnection(conn => {
-        if (urls.length == 0) {
-            return Promise.resolve(undefined);
-        } else if (urls.length == 1) {
-            return conn.query(sqlOne, urls);
-        } else {
-            return conn.query(sqlMany, [urls]);
-        }
-    });
+    if (urls.length == 0) {
+        return;
+    } else if (urls.length == 1) {
+        await conn.query(sqlOne, urls);
+    } else {
+        await conn.query(sqlMany, [urls]);
+    }
 }
 

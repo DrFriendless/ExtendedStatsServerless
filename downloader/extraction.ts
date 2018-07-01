@@ -113,20 +113,30 @@ export function extractGameDataFromPage(bggid: number, url: string, pageContent:
             dom.boardgames.boardgame.forEach(boardgame => {
                 const names = boardgame.name;
                 // TODO
-                console.log(boardgame);
-                // TODO - publishers
+                // console.log(boardgame);
                 const expansions = boardgame.boardgameexpansion;
                 const categories = boardgame.boardgamecategory;
                 const mechanics = boardgame.boardgamemechanic;
                 const designers = boardgame.boardgamedesigner;
+                const publishers = boardgame.boardgamepublisher;
                 const subdomains = boardgame.boardgamesubdomain;
                 const statistics = boardgame.statistics;
                 const ratings = statistics[0].ratings;
                 const ranks = ratings[0].ranks[0].rank;
-                console.log(categories);
-                console.log(mechanics);
-                console.log(designers);
-                // [ { _: 'Dispatcher', '$': { primary: 'true', sortindex: '1' } } ]
+                let ranking = 0;
+                console.log(ranks);
+                if (ranks) {
+                    const bgRank = ranks.filter(r => r.$.name = 'boardgame');
+                    if (bgRank.length > 0) {
+                        const rankingValue = bgRank[0].value;
+                        try {
+                            ranking = parseInt(rankingValue);
+                        } catch (e) {
+                        }
+                    }
+                }
+                console.log(designers); // TODO
+                console.log(publishers); // TODO
                 const name = names.filter(it => it.$.primary == 'true')[0]._;
                 result.gameId = parseInt(boardgame.$.objectid);
                 result.yearPublished = parseInt(boardgame.yearpublished[0]);
@@ -147,6 +157,7 @@ export function extractGameDataFromPage(bggid: number, url: string, pageContent:
                 result.categories = categories ? categories.map(c => c._) : [];
                 result.mechanics = mechanics ? mechanics.map(c => c._) : [];
                 result.designers = designers ? designers.map(c => c.$.objectid) : [];
+                result.rank = ranking; // TODO
             });
             console.log(result);
             return result;
