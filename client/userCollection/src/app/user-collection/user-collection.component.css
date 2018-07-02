@@ -1,1 +1,24 @@
+/* Styles for user-collection */
 
+user-collection .table.table-striped.extstats-table .pagination li:not(.active) a:hover {
+  background-color: #ddd;
+}
+user-collection .table.table-striped.extstats-table .pagination li.active {
+  background-color: #159588;
+  border-color: #159588;
+  color: white;
+}
+
+user-collection .table.extstats-table td,
+.table.extstats-table tbody,
+.table.extstats-table thead,
+.table.extstats-table.table thead th {
+  border-color: #1fbcd2;
+}
+/* border colour modified to 16 saturation */
+user-collection .table.table-striped.extstats-table tbody tr:nth-child(odd){
+  background-color: #b0ced2;
+}
+user-collection .table.table-striped.extstats-table tbody tr:nth-child(even){
+  background-color: white;
+}

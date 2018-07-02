@@ -1,0 +1,24 @@
+/* Styles for ranking-table */
+
+ranking-table .table.table-striped.extstats-table .pagination li:not(.active) a:hover {
+  background-color: #ddd;
+}
+ranking-table .table.table-striped.extstats-table .pagination li.active {
+  background-color: #e62565;
+  background-color: #e62565;
+  color: white;
+}
+
+ranking-table .table.extstats-table td,
+.table.extstats-table tbody,
+.table.extstats-table thead,
+.table.extstats-table.table thead th {
+  border-color: #673fb4;
+}
+/* border colour modified to 16 saturation */
+ranking-table .table.table-striped.extstats-table tbody tr:nth-child(odd){
+  background-color: #aa92ae;
+}
+ranking-table .table.table-striped.extstats-table tbody tr:nth-child(even){
+  background-color: white;
+}

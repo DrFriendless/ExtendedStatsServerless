@@ -1,13 +1,52 @@
 body {
-    background-color: #f5e39d;
+    background-color: #fff;
     padding-top: 3.5rem;
 }
 
-.btn-secondary {
-    background-color: #d10d17;
-    border-color: #d10d17;
+/* tables */
+
+.table.extstats-table td, .table.extstats-table th {
+    padding: 0 4px;
+    border-top: 0;
 }
-.btn-secondary:hover {
-    background-color: #f5b119;
-    border-color: #f5b119;
+.table.extstats-table {
+    margin-left: 1rem;
+    margin-right: 1rem;
+    width: 95%;
+    border: none;
 }
+.table.extstats-table thead td,
+.table.extstats-table tbody td,
+.table.extstats-table tbody,
+.table.extstats-table thead,
+.table.extstats-table thead th {
+    border-width: 1px;
+    border-style: solid;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+.table.extstats-table tfoot {
+    border: 0;
+}
+.table.extstats-table tfoot td {
+    padding-top: 1rem;
+}
+
+/* pagination */
+
+ul.pagination {
+    list-style: none;
+    display: inline-block;
+}
+
+.pagination li {
+    display: inline-block;
+}
+
+.pagination a {
+    text-align: center;
+    border-radius: 5px;
+    padding: 8px 16px;
+    text-decoration: none;
+}
+
