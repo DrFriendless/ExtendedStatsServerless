@@ -29,7 +29,7 @@ export function rankGames(query: object): Promise<RankingTableRow[]> {
 }
 
 async function doRankGames(conn: mysql.Connection, query: object): RankingTableRow[] {
-    const sql = "select game, game_name, total_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays from ranking_table order by total_ratings desc limit 1000";
+    const sql = "select game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays from ranking_table order by total_ratings desc limit 1000";
     const rows = await conn.query(sql);
     let ranking = 1;
     rows.forEach(row => {

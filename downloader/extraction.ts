@@ -125,10 +125,24 @@ export function extractGameDataFromPage(bggid: number, url: string, pageContent:
                 const ranks = ratings[0].ranks[0].rank;
                 let ranking = 0;
                 console.log(ranks);
+                // [ { '$':
+                //         { type: 'subtype',
+                //             id: '1',
+                //             name: 'boardgame',
+                //             friendlyname: 'Board Game Rank',
+                //             value: '11362',
+                //             bayesaverage: '5.5151' } },
+                //     { '$':
+                //             { type: 'family',
+                //                 id: '4667',
+                //                 name: 'cgs',
+                //                 friendlyname: 'Customizable Rank',
+                //                 value: '199',
+                //                 bayesaverage: '5.51481' } } ]
                 if (ranks) {
                     const bgRank = ranks.filter(r => r.$.name = 'boardgame');
                     if (bgRank.length > 0) {
-                        const rankingValue = bgRank[0].value;
+                        const rankingValue = bgRank[0].$.value;
                         try {
                             ranking = parseInt(rankingValue);
                         } catch (e) {
