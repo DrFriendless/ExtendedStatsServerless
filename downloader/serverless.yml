@@ -55,6 +55,7 @@ functions:
   processCollection:
     handler: functions.processCollection
     timeout: 300
+    memorySize: 256
     role:
       "invokeLambdas"
 
