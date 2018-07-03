@@ -17,7 +17,7 @@ ranking-table .table.extstats-table td,
 }
 /* border colour modified to 16 saturation */
 ranking-table .table.table-striped.extstats-table tbody tr:nth-child(odd){
-  background-color: #aa92ae;
+  background-color: rgba(170, 146, 174, 0.5);
 }
 ranking-table .table.table-striped.extstats-table tbody tr:nth-child(even){
   background-color: white;

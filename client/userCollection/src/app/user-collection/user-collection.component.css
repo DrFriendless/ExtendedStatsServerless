@@ -15,9 +15,9 @@ user-collection .table.extstats-table td,
 .table.extstats-table.table thead th {
   border-color: #1fbcd2;
 }
-/* border colour modified to 16 saturation */
+/* border colour modified to 16 saturation & 50% alpha */
 user-collection .table.table-striped.extstats-table tbody tr:nth-child(odd){
-  background-color: #b0ced2;
+  background-color: rgba(176, 206, 210, 0.5);
 }
 user-collection .table.table-striped.extstats-table tbody tr:nth-child(even){
   background-color: white;
