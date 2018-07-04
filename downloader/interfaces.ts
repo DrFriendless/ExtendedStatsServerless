@@ -24,7 +24,7 @@ export interface ProcessUserResult {
 
 export interface ProcessCollectionResult {
     geek: string;
-    items: [CollectionGame];
+    items: CollectionGame[];
 }
 
 export interface CollectionGame {
@@ -65,4 +65,10 @@ export interface ProcessGameResult {
     mechanics: string[];
     designers: number[];
     publishers: number[];
+}
+
+export interface CleanUpCollectionResult {
+    geek: string;
+    url: string;
+    items: number[];
 }

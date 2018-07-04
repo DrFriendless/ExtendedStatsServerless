@@ -5,7 +5,14 @@ import {
     markUrlProcessed, markUrlUnprocessed, restrictCollectionToGames, updateGame, updateGamesForGeek,
     updateLastScheduledForUrls, updateUserValues
 } from "./mysql-rds";
-import {FileToProcess, ProcessCollectionResult, ProcessGameResult, ProcessUserResult} from "./interfaces";
+import {
+    CleanUpCollectionResult,
+    FileToProcess,
+    ProcessCollectionResult,
+    ProcessGameResult,
+    ProcessUserResult
+} from "./interfaces";
+import {promiseToCallback} from "./library";
 
 
 export function processGameResult(event, context, callback: Callback) {
@@ -60,14 +67,19 @@ export function getToProcessList(event, context, callback: Callback) {
     promiseToCallback(promise, callback);
 }
 
-export function processCollectionRestrictToIDs(event, context, callback: Callback) {
+export async function processCollectionCleanup(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    const params = event as { geek: string, items: [number] };
-    const geek = params.geek;
-    const ids = params.items;
-    console.log(ids);
-    const promise = restrictCollectionToGames(geek, ids);
-    promiseToCallback(promise, callback);
+    const params = event as CleanUpCollectionResult;
+    console.log("processCollectionCleanup");
+    console.log(params);
+    try {
+        await restrictCollectionToGames(params.geek, params.items);
+        await markUrlProcessed("processCollection", params.url);
+        // TODO front page geek
+        callback(null, null);
+    } catch (e) {
+        callback(e);
+    }
 }
 
 export function processCollectionUpdateGames(event, context, callback: Callback) {
@@ -77,6 +89,12 @@ export function processCollectionUpdateGames(event, context, callback: Callback)
    const promise = ensureGames(params.items)
        .then(() => updateGamesForGeek(params.geek, params.items));
    promiseToCallback(promise, callback);
+}
+
+export function updateUrlAsProcessed(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    const params = event as FileToProcess;
+    promiseToCallback(markUrlProcessed(params.processMethod, params.url), callback);
 }
 
 export function updateUrlAsProcessed(event, context, callback: Callback) {
@@ -96,10 +114,4 @@ export function updateGameAsDoesNotExist(event, context, callback: Callback) {
     console.log(event);
     const bggid = event.bggid;
     promiseToCallback(markGameDoesNotExist(bggid), callback);
-}
-
-function promiseToCallback<T>(promise: Promise<T>, callback: Callback) {
-    promise
-        .then(v => callback(undefined, v))
-        .catch(err => callback(err));
 }

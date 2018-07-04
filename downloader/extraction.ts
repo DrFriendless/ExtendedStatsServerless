@@ -2,55 +2,53 @@ import {ProcessUserResult, ProcessCollectionResult, CollectionGame, ProcessGameR
 import {between} from "./library";
 const xml2js = require('xml2js-es6-promise');
 
-export function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
+export async function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
     console.log("extractUserCollectionFromPage from " + url);
-    return xml2js(pageContent, {trim: true})
-        .then(dom => {
-            console.log("Finished parsing DOM");
-            if (dom && dom.message) {
-                console.log("BGG says come back later");
-                throw new Error("BGG says come back later to get collection for " + geek);
-            }
-            if (!dom || !dom.items || !dom.items.item || dom.items.item.length == 0) {
-                console.log("Found no games in collection");
-                throw new Error("Found no games in collection for " + geek);
-            }
-            const items: [CollectionGame] = [];
-            dom.items.item.forEach(item => {
-                if (item.$.subtype != 'boardgame') {
-                    console.log(item.$.subtype + " not a board game");
+    const dom = await xml2js(pageContent, {trim: true});
+    console.log("Finished parsing DOM");
+    if (dom && dom.message) {
+        console.log("BGG says come back later");
+        throw new Error("BGG says come back later to get collection for " + geek);
+    }
+    if (!dom || !dom.items || !dom.items.item || dom.items.item.length == 0) {
+        console.log("Found no games in collection");
+        throw new Error("Found no games in collection for " + geek);
+    }
+    const items: CollectionGame[] = [];
+    dom.items.item.forEach(item => {
+        if (item.$.subtype != 'boardgame') {
+            console.log(item.$.subtype + " not a board game");
+        } else {
+            const gameId = item.$.objectid;
+            // const name = item.name[0]._;
+            const stats = item.stats[0];
+            const status = item.status[0];
+            const gameItem: CollectionGame = { gameId: gameId };
+            if (stats) {
+                const rating = stats.rating;
+                if (rating && rating.length > 0) {
+                    gameItem.rating = parseFloat(rating[0].$.value);
                 } else {
-                    const gameId = item.$.objectid;
-                    // const name = item.name[0]._;
-                    const stats = item.stats[0];
-                    const status = item.status[0];
-                    const gameItem: CollectionGame = { gameId: gameId };
-                    if (stats) {
-                        const rating = stats.rating;
-                        if (rating && rating.length > 0) {
-                            gameItem.rating = parseFloat(rating[0].$.value);
-                        } else {
-                            gameItem.rating = -1;
-                        }
-                        if (gameItem.rating == null || Number.isNaN(gameItem.rating)) gameItem.rating = -1;
-                    }
-                    if (status) {
-                        gameItem.owned = status.$.own === '1';
-                        gameItem.prevOwned = status.$.prevowned === '1';
-                        gameItem.forTrade = status.$.fortrade === '1';
-                        gameItem.want = status.$.want === '1';
-                        gameItem.wantToPlay = status.$.wanttoplay === '1';
-                        gameItem.wantToBuy = status.$.wanttobuy;
-                        const onWishList =  status.$.wishlist === '1';
-                        gameItem.wishListPriority = onWishList ? parseInt(status.$.wishlist) : 0;
-                        gameItem.preordered = status.$.preordered === '1';
-                    }
-                    items.push(gameItem);
+                    gameItem.rating = -1;
                 }
-            });
-            console.log("" + items.length + " items");
-            return { geek: geek, items: items };
-        });
+                if (gameItem.rating == null || Number.isNaN(gameItem.rating)) gameItem.rating = -1;
+            }
+            if (status) {
+                gameItem.owned = status.$.own === '1';
+                gameItem.prevOwned = status.$.prevowned === '1';
+                gameItem.forTrade = status.$.fortrade === '1';
+                gameItem.want = status.$.want === '1';
+                gameItem.wantToPlay = status.$.wanttoplay === '1';
+                gameItem.wantToBuy = status.$.wanttobuy;
+                const onWishList =  status.$.wishlist === '1';
+                gameItem.wishListPriority = onWishList ? parseInt(status.$.wishlist) : 0;
+                gameItem.preordered = status.$.preordered === '1';
+            }
+            items.push(gameItem);
+        }
+    });
+    console.log("" + items.length + " items");
+    return { geek: geek, items: items };
 }
 
 // TODO - update front page data

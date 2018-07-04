@@ -15,8 +15,6 @@ export function invokeLambdaAsync(context: string, func: string, payload: object
             if (err) {
                 reject(err);
             } else {
-                console.log(func + " invoked apparently successfully");
-                console.log(data);
                 fulfill();
             }
         });
@@ -52,7 +50,7 @@ export function between(s: string, before: string, after: string): string {
     return s.substring(0, j);
 }
 
-export function promiseToCallback<T>(promise: Promise<T>, callback: Callback) {
+export function promiseToCallback<T extends object>(promise: Promise<T>, callback: Callback) {
     promise
         .then(v => callback(undefined, v))
         .catch(err => callback(err));

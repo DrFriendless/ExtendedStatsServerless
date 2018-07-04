@@ -24,7 +24,7 @@ export interface ProcessUserResult {
 
 export interface ProcessCollectionResult {
     geek: string;
-    items: [CollectionGame];
+    items: CollectionGame[];
 }
 
 export interface CollectionGame {
@@ -76,4 +76,32 @@ export interface RankingTableRow {
     bgg_rating: number;
     normalised_ranking: number;
     total_plays: number;
+}
+
+export interface WarTableRow {
+    geek: number;
+    geekName: string;
+    total_plays: number;
+    distinct_games: number;
+    top50: number;
+    sdj: number;
+    owned: number;
+    want: number;
+    wish: number;
+    forTrade: number;
+    prevOwned: number;
+    friendless: number;
+    cfm: number;
+    utilisation: number;
+    tens: number;
+    zeros: number;
+    mostVoters: number;
+    top100: number;
+    hindex: number;
+}
+
+export interface CleanUpCollectionResult {
+    geek: string;
+    url: string;
+    items: number[];
 }

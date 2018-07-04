@@ -1,5 +1,5 @@
 import {Callback} from "aws-lambda";
-import {ProcessCollectionResult, FileToProcess, ToProcessElement} from "./interfaces"
+import {ProcessCollectionResult, FileToProcess, ToProcessElement, CleanUpCollectionResult} from "./interfaces"
 import {invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
 import {
     extractGameDataFromPage,
@@ -31,7 +31,7 @@ const FUNCTION_PROCESS_GAME = "processGame";
 const FUNCTION_PROCESS_GAME_RESULT = "processGameResult";
 const FUNCTION_NO_SUCH_GAME = "updateGameAsDoesNotExist";
 const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
-const FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS = "processCollectionRestrictToIDs";
+const FUNCTION_PROCESS_COLLECTION_CLEANUP = "processCollectionCleanup";
 const FUNCTION_PROCESS_PLAYED = "processPlayed";
 const FUNCTION_MARK_PROCESSED = "updateUrlAsProcessed";
 const FUNCTION_MARK_UNPROCESSED = "updateUrlAsUnprocessed";
@@ -121,64 +121,51 @@ export function processUser(event, context, callback: Callback) {
 }
 
 // Lambda to harvest a user's collection
-export function processCollection(event, context, callback: Callback) {
+export async function processCollection(event, context, callback: Callback) {
     console.log(event);
     const invocation = event as FileToProcess;
-    return tryToProcessCollection(invocation)
-        .then(() => callback(null, null))
-        .catch(err => {
-            console.log(err);
-            promiseToCallback(markAsUnprocessed("processCollection", invocation), callback);
-        });
+    try {
+        await tryToProcessCollection(invocation);
+        callback(null, null);
+    } catch (e) {
+        console.log(e);
+        await markAsUnprocessed("processCollection", invocation);
+        callback(null, e);
+    }
 }
 
 // return success
-function tryToProcessCollection(invocation: FileToProcess): Promise<void> {
-    let retry = false;
+async function tryToProcessCollection(invocation: FileToProcess) {
     const options = { uri: encodeURI(invocation.url), resolveWithFullResponse: true };
-    let collection;
-    return request.get(options)
-        .then(response => {
-            console.log(response.statusCode);
-            if (response.statusCode == 202) {
-                // TODO - record this in the DB
-                retry = true;
-                throw new Error("BGG says to wait a bit.");
-            }
-            return response.body;
-        })
-        .then(data => extractUserCollectionFromPage(invocation.geek, invocation.url, data.toString()))
-        .then(result => { collection = result; console.log(collection); })
-        .then(() => deleteGamesFromCollection(collection))
-        .then(() => addGamesToCollection(collection))
-        .then(() => markAsProcessed("processCollection", invocation))
-        .then(() => true)
-        .catch(err => {
-            if (retry) return Promise.resolve(false);
-            throw err;
-        });
+    let response = await request.get(options);
+    if (response.statusCode == 202) {
+        throw new Error("BGG says to wait a bit.");
+    }
+    const collection = await extractUserCollectionFromPage(invocation.geek, invocation.url, response.body.toString());
+    console.log(collection);
+    for (const games of splitCollection(collection)) {
+        await invokeLambdaAsync("processCollection", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES, games);
+        console.log("invoked " + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES + " for " + games.items.length + " games.");
+    }
+    await cleanupCollection(collection, invocation.url);
+    console.log("cleaned up collection");
 }
 
-function deleteGamesFromCollection(collection: ProcessCollectionResult): Promise<ProcessCollectionResult> {
-    return invokeLambdaAsync("processCollection",
-        INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_RESTRICT_IDS,
-        { geek: collection.geek, items: collection.items.map(item => item.gameId) })
-        .then(() => collection);
+async function cleanupCollection(collection: ProcessCollectionResult, url: string) {
+    const params: CleanUpCollectionResult = {
+        geek: collection.geek,
+        items: collection.items.map(item => item.gameId),
+        url: url
+    };
+    await invokeLambdaAsync("processCollection", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_CLEANUP, params);
 }
 
 function markAsProcessed(context: string, fileDetails: FileToProcess): Promise<void> {
     return invokeLambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_PROCESSED, fileDetails);
 }
 
-function markAsUnprocessed(context: string, fileDetails: FileToProcess): Promise<void> {
+async function markAsUnprocessed(context: string, fileDetails: FileToProcess) {
     return invokeLambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_UNPROCESSED, fileDetails);
-}
-
-function addGamesToCollection(collection: ProcessCollectionResult): Promise<any> {
-    return Promise.all(
-        splitCollection(collection)
-            .map(games => invokeLambdaAsync("processCollection", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES, games))
-    );
 }
 
 function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {

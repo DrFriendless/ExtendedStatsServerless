@@ -1,4 +1,5 @@
 import mysql = require('promise-mysql');
+import {Callback} from 'aws-lambda';
 
 export function withConnection(func: (conn: mysql.Connection) => Promise<void>): Promise<void> {
     let connection;
@@ -46,3 +47,8 @@ export function count(conn: mysql.Connection, sql: string, params: [any]): Promi
     return conn.query(sql, params).then(result => result[0]["count(*)"]);
 }
 
+export function promiseToCallback<T extends object>(promise: Promise<T>, callback: Callback) {
+    promise
+        .then(v => callback(undefined, v))
+        .catch(err => callback(err));
+}

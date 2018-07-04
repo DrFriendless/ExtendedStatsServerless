@@ -224,11 +224,11 @@ function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void> {
     return Promise.all(users.map(user => doEnsureUser(conn, user)));
 }
 
-export function updateGamesForGeek(geek: string, games: [CollectionGame]): Promise<void> {
+export function updateGamesForGeek(geek: string, games: CollectionGame[]): Promise<void> {
     return withConnection(conn => doUpdateGamesForGeek(conn, geek, games));
 }
 
-function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: [CollectionGame]): Promise<void> {
+function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: CollectionGame[]): Promise<void> {
     return Promise.all(games.map(game => insertOrUpdateGeekgame(conn, geek, game)));
 }
 
