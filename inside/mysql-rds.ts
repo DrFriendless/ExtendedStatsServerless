@@ -1,6 +1,6 @@
 import mysql = require('promise-mysql');
-import {CollectionGame, ProcessGameResult, RankingTableRow, ToProcessElement} from "./interfaces";
-import {count, getConnection, returnWithConnection, withConnection} from "./library";
+import {CollectionGame, ProcessGameResult, RankingTableRow, ToProcessElement, WarTableRow} from "./interfaces";
+import {count, getConnection, returnWithConnection, withConnection, withConnectionAsync} from "./library";
 
 export function updateGame(data: ProcessGameResult): Promise<void> {
     console.log("updateGame");
@@ -37,10 +37,14 @@ async function setCategoriesForGame(conn: mysql.Connection, game: number, catego
         await conn.query(deleteAllGameCatsSql, [game]);
         return;
     }
-    categories.forEach(async cat => await doEnsureCategory(conn, cat));
+    for (const cat of categories) {
+        await doEnsureCategory(conn, cat);
+    }
     const catIds = (await conn.query(getCatsSql, getCatsParams)).map(row => row.id);
     await conn.query(deleteAllGameCatsSql, [game]);
-    catIds.forEach(async id => await conn.query(insertSql, [game, id]));
+    for (const id of catIds) {
+        await conn.query(insertSql, [game, id]);
+    }
 }
 
 async function setMechanicsForGame(conn: mysql.Connection, game: number, mechanics: string[]) {
@@ -60,10 +64,14 @@ async function setMechanicsForGame(conn: mysql.Connection, game: number, mechani
         await conn.query(deleteAllGameMecsSql, [game]);
         return;
     }
-    mechanics.forEach(async mec => await doEnsureMechanic(conn, mec));
+    for (const mec of mechanics) {
+        await doEnsureMechanic(conn, mec);
+    }
     const mecIds = (await conn.query(getMecsSql, getMecsParams)).map(row => row.id);
     await conn.query(deleteAllGameMecsSql, [game]);
-    mecIds.map(async id => await conn.query(insertSql, [game, id]));
+    for (const id of mecIds) {
+        await conn.query(insertSql, [game, id]);
+    }
 }
 
 async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
@@ -117,14 +125,14 @@ export function updateUserValues(geek: string, bggid: number, country: string): 
     return withConnection(conn => conn.query(sql, [country, bggid, geek]));
 }
 
-export function restrictCollectionToGames(geek: string, items: [number]): Promise<void> {
+export async function restrictCollectionToGames(geek: string, items: number[]) {
     console.log("restrictCollectionToGames " + geek);
     const deleteStatementSome = "delete from geekgames where geek = ? and game not in (?)";
     const deleteStatementOne = "delete from geekgames where geek = ? and game != ?";
     const deleteStatementNone = "delete from geekgames where geek = ?";
     let deleteStatement;
     let params;
-    if (items.length == 0) {
+    if (items.length === 0) {
         deleteStatement = deleteStatementNone;
         params = [geek];
     } else if (items.length == 1) {
@@ -134,14 +142,9 @@ export function restrictCollectionToGames(geek: string, items: [number]): Promis
         deleteStatement = deleteStatementSome;
         params = [geek, items];
     }
-    let connection;
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => conn.query(deleteStatement, params))
-        .then(() => connection.destroy());
+    console.log(deleteStatement);
+    console.log(params);
+    await withConnectionAsync(async conn => await conn.query(deleteStatement, params));
 }
 
 // longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
@@ -149,17 +152,17 @@ const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '
     'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00', "processUser": '838:00:00'  };
 
 
-export function markUrlProcessed(processMethod: string, url: string): Promise<void> {
+export async function markUrlProcessed(processMethod: string, url: string) {
     console.log("markUrlProcessed " + url);
     const delta = TILL_NEXT_UPDATE[processMethod];
     const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
-    return withConnection(conn => conn.query(sqlSet, [delta, url, processMethod]))
+    await withConnectionAsync(async conn => await conn.query(sqlSet, [delta, url, processMethod]));
 }
 
-export function markUrlUnprocessed(processMethod: string, url: string): Promise<void> {
+export async function markUrlUnprocessed(processMethod: string, url: string) {
     console.log("markUrlUnprocessed " + url);
     const sqlSet = "update files set last_scheduled = null where url = ? and processMethod = ?";
-    return withConnection(conn => conn.query(sqlSet, [url, processMethod]));
+    await withConnectionAsync(async conn => await conn.query(sqlSet, [url, processMethod]));
 }
 
 export function markGameDoesNotExist(bggid: number): Promise<void> {
@@ -224,36 +227,38 @@ function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void> {
     return Promise.all(users.map(user => doEnsureUser(conn, user)));
 }
 
-export function updateGamesForGeek(geek: string, games: CollectionGame[]): Promise<void> {
+export async function updateGamesForGeek(geek: string, games: CollectionGame[]) {
     return withConnection(conn => doUpdateGamesForGeek(conn, geek, games));
 }
 
-function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: CollectionGame[]): Promise<void> {
-    return Promise.all(games.map(game => insertOrUpdateGeekgame(conn, geek, game)));
+async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: CollectionGame[]) {
+    const geekId = await getGeekId(conn, geek);
+    for (const game of games) {
+        await insertOrUpdateGeekgame(conn, geek, geekId, game);
+    }
 }
 
-function insertOrUpdateGeekgame(conn: mysql.Connection, geek: string, game: CollectionGame): Promise<void> {
-    const insertSql = "insert into geekgames (geek, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    const updateSql = "update geekgames set rating = ?, owned = ?, want = ?, wish = ?, trade = ?, prevowned = ?, wanttobuy = ?, wanttoplay = ?, preordered = ? where geek = ? and game = ?";
-    return conn.query(insertSql, [geek, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
-        game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered])
-        .catch(Error, err => {
-            return conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade,
-                game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered, geek, game.gameId])
-                .then(() => {
-                    console.log("Added game " + game.gameId + " for " + geek);
-                });
-        });
+async function insertOrUpdateGeekgame(conn: mysql.Connection, geek: string, geekId: number, game: CollectionGame) {
+    const insertSql = "insert into geekgames (geek, geekId, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    // TODO when no geekIds are zero, change this
+    const updateSql = "update geekgames set geekId = ?, rating = ?, owned = ?, want = ?, wish = ?, trade = ?, prevowned = ?, wanttobuy = ?, wanttoplay = ?, preordered = ? where geek = ? and game = ?";
+    try {
+        await conn.query(insertSql, [geek, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
+            game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
+        console.log("Added game " + game.gameId + " for " + geek);
+    } catch (e) {
+        await conn.query(updateSql, [geekId, game.rating, game.owned, game.want, game.wishListPriority, game.forTrade,
+            game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered, geek, game.gameId]);
+    }
 }
 
-export function ensureGames(games: [CollectionGame]): Promise<void> {
-    return withConnection(conn => doEnsureGames(conn, games));
+export async function ensureGames(games: CollectionGame[]) {
+    await withConnection(conn => doEnsureGames(conn, games));
 }
 
-function doEnsureGames(conn: mysql.Connection, games: [CollectionGame]): Promise<void> {
-    if (games.length === 0) return Promise.resolve();
-    const ids = games.map(cg => parseInt(cg.gameId));
-
+async function doEnsureGames(conn: mysql.Connection, games: CollectionGame[]) {
+    if (games.length === 0) return;
+    const ids = games.map(cg => cg.gameId);
     const sqlSome = "select bggid from files where bggid in (?) and processMethod = 'processGame'";
     const sqlOne = "select bggid from files where bggid = ? and processMethod = 'processGame'";
     let params;
@@ -265,12 +270,10 @@ function doEnsureGames(conn: mysql.Connection, games: [CollectionGame]): Promise
         sql = sqlSome;
         params = [ids];
     }
-    return conn.query(sql, params)
-        .then(result => result.map(row => row.bggid))
-        .then((found: number[]) => listMinus(ids, found))
-        .then(todo => Promise.all(todo.map(id => {
-            return doRecordGame(conn, id);
-        })));
+    const found = (await conn.query(sql, params)).map(row => row.bggid);
+    for (const id of listMinus(ids, found)) {
+        await doRecordGame(conn, id);
+    }
 }
 
 function listMinus(ints: number[], takeaway: number[]): number[] {
@@ -346,3 +349,69 @@ async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string
     }
 }
 
+export async function updateFrontPageGeek(geekName: string) {
+    await withConnectionAsync(async conn => await doUpdateFrontPageGeek(conn, geekName));
+}
+
+async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
+    console.log("doUpdateFrontPageGeek " + geekName);
+    const geekId = await getGeekId(conn, geekName);
+    const owned = await countWhere(conn, "geekgames where geekId = ? and owned > 0", [geekId]);
+    const want = await countWhere(conn, "geekgames where geekId = ? and want > 0", [geekId]);
+    const wish = await countWhere(conn, "geekgames where geekId = ? and wish > 0", [geekId]);
+    const forTrade = await countWhere(conn, "geekgames where geekId = ? and trade > 0", [geekId]);
+    const prevOwned = await countWhere(conn, "geekgames where geekId = ? and prevowned > 0", [geekId]);
+    const preordered = await countWhere(conn, "geekgames where geekId = ? and preordered > 0", [geekId]);
+    const fpg: WarTableRow = {
+        geek: geekId,
+        geekName: geekName,
+        total_plays: 0, // TODO
+        distinct_games: 0, // TODO
+        top50: 0, // TODO
+        sdj: 0, // TODO
+        owned: owned,
+        want: want,
+        wish: wish,
+        forTrade: forTrade,
+        prevOwned: prevOwned,
+        friendless: 0, // TODO
+        cfm: 0.0, // TODO
+        utilisation: 0.0, // TODO
+        tens: 0, //TODO
+        zeros: 0, // TODO
+        mostVoters: 0, // TODO
+        top100: 0, // TODO
+        hindex: 0, // TODO
+        preordered: preordered
+    };
+    console.log(fpg);
+    const insertSql = "insert into war_table (geek, geekName, totalPlays, distinctGames, top50, sdj, owned, want, wish, " +
+        "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, mv, ext100, hindex, preordered) values " +
+        "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    const updateSql = "update war_table set geekName = ?, totalPlays = ?, distinctGames = ?, top50 = ?, sdj = ?, owned = ?, "
+    + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, mv = ?, "
+    + "ext100 = ?, hindex = ?, preordered = ? where geek = ?";
+    try {
+        console.log("insert");
+        await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.total_plays, fpg.distinct_games, fpg.top50, fpg.sdj, fpg.owned,
+        fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
+        fpg.top100, fpg.hindex, fpg.preordered]);
+    } catch (e) {
+        console.log("update");
+        console.log(e);
+        await conn.query(updateSql, [fpg.geekName, fpg.total_plays, fpg.distinct_games, fpg.top50, fpg.sdj, fpg.owned,
+            fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
+            fpg.top100, fpg.hindex, fpg.preordered, fpg.geek]);
+    }
+}
+
+async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {
+    const getIdSql = "select id from geeks where geeks.username = ?";
+    return (await conn.query(getIdSql, [geek]))[0]['id'];
+}
+
+async function countWhere(conn: mysql.Connection, where: string, params: any[]) {
+    const sql = "select count(*) from " + where;
+    const result = await conn.query(sql, params);
+    return result[0]["count(*)"];
+}

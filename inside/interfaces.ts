@@ -98,6 +98,7 @@ export interface WarTableRow {
     mostVoters: number;
     top100: number;
     hindex: number;
+    preordered: number;
 }
 
 export interface CleanUpCollectionResult {

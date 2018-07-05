@@ -16,6 +16,17 @@ export function withConnection(func: (conn: mysql.Connection) => Promise<void>):
         });
 }
 
+export async function withConnectionAsync(func: (conn: mysql.Connection) => Promise<void>) {
+    let connection = await getConnection();
+    try {
+        await func(connection);
+        connection.destroy();
+    } catch (e) {
+        connection.destroy();
+        throw e;
+    }
+}
+
 export function returnWithConnection<T>(func: (conn: mysql.Connection) => Promise<T>): Promise<T> {
     let connection;
     let result;
@@ -43,7 +54,7 @@ export function getConnection(): Promise<mysql.Connection> {
     return mysql.createConnection(params);
 }
 
-export function count(conn: mysql.Connection, sql: string, params: [any]): Promise<number> {
+export function count(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
     return conn.query(sql, params).then(result => result[0]["count(*)"]);
 }
 

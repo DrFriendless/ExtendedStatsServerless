@@ -1,16 +1,25 @@
 import {Callback} from 'aws-lambda';
 import {
-    ensureGames, ensureUsers,
-    listToProcess, listToProcessByMethod, markGameDoesNotExist,
-    markUrlProcessed, markUrlUnprocessed, restrictCollectionToGames, updateGame, updateGamesForGeek,
-    updateLastScheduledForUrls, updateUserValues
+    ensureGames,
+    ensureUsers,
+    listToProcess,
+    listToProcessByMethod,
+    markGameDoesNotExist,
+    markUrlProcessed,
+    markUrlUnprocessed,
+    restrictCollectionToGames,
+    updateFrontPageGeek,
+    updateGame,
+    updateGamesForGeek,
+    updateLastScheduledForUrls,
+    updateUserValues
 } from "./mysql-rds";
 import {
     CleanUpCollectionResult,
     FileToProcess,
     ProcessCollectionResult,
     ProcessGameResult,
-    ProcessUserResult
+    ProcessUserResult, WarTableRow
 } from "./interfaces";
 import {promiseToCallback} from "./library";
 
@@ -75,32 +84,36 @@ export async function processCollectionCleanup(event, context, callback: Callbac
     try {
         await restrictCollectionToGames(params.geek, params.items);
         await markUrlProcessed("processCollection", params.url);
-        // TODO front page geek
+        await updateFrontPageGeek(params.geek);
         callback(null, null);
     } catch (e) {
+        console.log(e);
         callback(e);
     }
 }
 
-export function processCollectionUpdateGames(event, context, callback: Callback) {
+export async function processCollectionUpdateGames(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
    const params = event as ProcessCollectionResult;
    console.log(params);
-   const promise = ensureGames(params.items)
-       .then(() => updateGamesForGeek(params.geek, params.items));
-   promiseToCallback(promise, callback);
+   try {
+       await ensureGames(params.items);
+       await updateGamesForGeek(params.geek, params.items);
+       callback(null, null);
+   } catch (e) {
+       console.log(e);
+       callback(e);
+   }
 }
 
-export function updateUrlAsProcessed(event, context, callback: Callback) {
+export async function updateUrlAsProcessed(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
-    promiseToCallback(markUrlProcessed(params.processMethod, params.url), callback);
-}
-
-export function updateUrlAsProcessed(event, context, callback: Callback) {
-    context.callbackWaitsForEmptyEventLoop = false;
-    const params = event as FileToProcess;
-    promiseToCallback(markUrlProcessed(params.processMethod, params.url), callback);
+    try {
+        await markUrlProcessed(params.processMethod, params.url);
+    } catch (e) {
+        callback(e);
+    }
 }
 
 export function updateUrlAsUnprocessed(event, context, callback: Callback) {
