@@ -52,6 +52,10 @@ functions:
     handler: functions.processGame
     role:
       "invokeLambdas"
+  processPlayed:
+    handler: functions.processPlayed
+    role:
+      "invokeLambdas"
   processCollection:
     handler: functions.processCollection
     timeout: 300

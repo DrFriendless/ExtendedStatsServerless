@@ -1,6 +1,12 @@
 import {Callback} from "aws-lambda";
-import {ProcessCollectionResult, FileToProcess, ToProcessElement, CleanUpCollectionResult} from "./interfaces"
-import {invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
+import {
+    ProcessCollectionResult,
+    FileToProcess,
+    ToProcessElement,
+    CleanUpCollectionResult,
+    MonthPlayed, ProcessMonthsPlayedResult
+} from "./interfaces"
+import {between, invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
@@ -175,10 +181,94 @@ function splitCollection(original: ProcessCollectionResult): ProcessCollectionRe
         .map(items => { return { geek: original.geek, items: items } as ProcessCollectionResult});
 }
 
+export async function processPlayed(event, context, callback: Callback) {
+    console.log(event);
+    const invocation = event as FileToProcess;
+    const data = await request(encodeURI(invocation.url)) as string;
+    console.log(data);
+    const toAdd = [] as MonthPlayed[];
+    data.split("\n")
+        .filter(line => line.indexOf(">By date<") >= 0)
+        .forEach(line => {
+            const s = between(line, '/end/', '"');
+            const fields = s.split('-');
+            const data = { month: parseInt(fields[1]), year: parseInt(fields[0]) } as MonthPlayed;
+            console.log(data);
+            toAdd.push(data);
+        });
+    const monthsData = { geek: invocation.geek, monthsPlayed: toAdd } as ProcessMonthsPlayedResult;
+    console.log(monthsData);
+}
 
 
 
 
 
-
-
+// def processPlayed(db, filename, geek, url):
+// import calendar, plays, datetime, library, logging
+// existing = db.execute("select count(*) from monthsplayed where geek = '%s'" % geek)
+// noneBefore = existing[0][0] == 0l
+// toAdd = []
+// for line in file(filename).readlines():
+// if line.find(">By date<") >= 0:
+// s = library.between(line, '/end/', '"')
+// fields = s.split("-")
+// data = [geek, fields[1], fields[0]]
+// toAdd.append(data)
+// if len(toAdd) > 0:
+// ensureGeek(db, geek)
+// db.execute("delete from monthsplayed where geek = '%s'" % geek)
+// luData = {}
+// lastUpdateTimes = db.execute("select url, lastupdate from files where geek = '%s' and processMethod = 'processPlays'" % geek)
+// for (url, lu) in lastUpdateTimes:
+//     luData[url] = lu
+// db.execute("delete from files where geek = '%s' and processMethod = 'processPlays'" % geek)
+// for data in toAdd:
+// m = int(data[1])
+// y = int(data[2])
+// db.execute("insert into monthsplayed (geek, month, year) values ('%s', %s, %s)" % tuple(data))
+// playsFile = "played_%s_%02d_%d.xml" % (geek, m, y)
+// url = plays.NEW_PLAYED_URL % (urllib.quote(geek), y, m, y, m)
+// if m == 0 and y == 0:
+// daysSince = 10000
+// url = "https://boardgamegeek.com/xmlapi2/plays?username=%s&mindate=0000-00-00&maxdate=0000-00-00&subtype=boardgame" % urllib.quote(geek)
+// else:
+// try:
+// pd = datetime.date(y, m, calendar.monthrange(y,m)[1])
+// except calendar.IllegalMonthError:
+// logging.error("IllegalMonthError %d %d %s" % (y, m, `data`))
+// daysSince = (datetime.date.today() - pd).days
+// if daysSince <= 3:
+// tillNext = '24:00:00'
+// elif daysSince <= 30:
+// tillNext = '72:00:00'
+// elif daysSince <= 60:
+// tillNext = '168:00:00'
+// else:
+// tillNext = None
+// description = "Plays for %d/%s" % (y,m)
+// lu = luData.get(url)
+// if tillNext is not None:
+//     if lu is not None:
+//     mtime = lu.strftime('%Y-%m-%d %H:%M:%S')
+// sql2 = "insert into files (filename, url, processMethod, geek, lastupdate, tillNextUpdate, description) values ('%s', '%s', 'processPlays', '%s', '%s', '%s', '%s')" % (playsFile, url, geek, mtime, tillNext, description)
+// else:
+// sql2 = "insert into files (filename, url, processMethod, geek, tillNextUpdate, description) values ('%s', '%s', 'processPlays', '%s', '%s', '%s')" % (playsFile, url, geek, tillNext, description)
+// else:
+// # no automatic next update - manual only
+// if lu is not None:
+//     mtime = lu.strftime('%Y-%m-%d %H:%M:%S')
+// sql2 = "insert into files (filename, url, processMethod, geek, lastupdate, description) values ('% s', '%s', 'processPlays', '%s', '%s', '%s')" % (playsFile, url, geek, mtime, description)
+// else:
+// sql2 = "insert into files (filename, url, processMethod, geek, description) values ('%s', '%s', 'processPlays', '%s', '%s')" % (playsFile, url, geek, description)
+// db.execute(sql2)
+// sql3 = "update files set nextUpdate = addtime(lastUpdate, tillNextUpdate) where processMethod = 'processPlays' and geek = '%s'" % geek
+// db.execute(sql3)
+// sql4 = "delete from plays where geek = '%s' and date_format(playDate, '%%Y-%%m') not in (select distinct concat(right(concat('000',year), 4), '-', right(concat('0',month), 2)) from monthsplayed where geek = '%s')" % (geek, geek)
+// db.execute(sql4)
+// return 1
+// elif noneBefore:
+//     return 1
+// else:
+// print "nothing to add, check %s" % filename
+// return 1

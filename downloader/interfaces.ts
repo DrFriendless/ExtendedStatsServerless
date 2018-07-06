@@ -72,3 +72,13 @@ export interface CleanUpCollectionResult {
     url: string;
     items: number[];
 }
+
+export interface MonthPlayed {
+    month: number;
+    year: number;
+}
+
+export interface ProcessMonthsPlayedResult {
+    geek: string;
+    monthsPlayed: MonthPlayed[];
+}
