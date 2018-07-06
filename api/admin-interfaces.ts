@@ -14,5 +14,7 @@ export interface SystemStats {
     gameMechanics: number;
     gameCategories: number;
     notGames: number;
-    fileRows: [TypeCount];
+    fileRows: TypeCount[];
+    ggForZero: number;
+    distinctGGOwners: number;
 }

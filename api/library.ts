@@ -42,7 +42,7 @@ export function getConnection(): Promise<mysql.Connection> {
     return mysql.createConnection(params);
 }
 
-export function count(conn: mysql.Connection, sql: string, params: [any]): Promise<number> {
-    return conn.query(sql, params).then(result => result[0]["count(*)"]);
+export async function count(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
+    return (await conn.query(sql, params))[0]["count(*)"];
 }
 

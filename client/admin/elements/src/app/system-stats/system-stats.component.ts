@@ -27,7 +27,9 @@ export class SystemStatsComponent implements AfterViewInit, OnDestroy {
     gameMechanics: 0,
     gameCategories: 0,
     notGames: 0,
-    fileRows: [] as [TypeCount],
+    fileRows: [] as TypeCount[],
+    distinctGGOwners: 0,
+    ggForZero: 0
   };
   private subscription: Subscription = null;
 
