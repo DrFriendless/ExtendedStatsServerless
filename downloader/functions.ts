@@ -82,25 +82,27 @@ export function fireFileProcessing(event, context, callback: Callback) {
     promiseToCallback(promise, callback);
 }
 
-// Lambda to harvest data about a user
-export function processGame(event, context, callback: Callback) {
+// Lambda to harvest data about a game
+export async function processGame(event, context, callback: Callback) {
     console.log("processGame");
     console.log(event);
     const invocation = event as FileToProcess;
-
-    promiseToCallback(
-        request(encodeURI(invocation.url))
-            .then(data => extractGameDataFromPage(invocation.bggid, invocation.url, data.toString()))
-            .then(result => {
-                console.log(result);
-                return result;
-            })
-            .then(result => invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result))
-            .catch(NoSuchGameError, err => {
-                console.log(err);
-                invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_NO_SUCH_GAME, { bggid: err.bggid });
-            }),
-        callback);
+    const data = await request(encodeURI(invocation.url));
+    try {
+        const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data.toString());
+        console.log(result);
+        await invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result);
+        callback(null, null);
+    } catch (err) {
+        console.log(err);
+        if (err instanceof NoSuchGameError) {
+            await invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_NO_SUCH_GAME, {bggid: err.getId()});
+            callback(null, null);
+        } else {
+            console.log(err);
+            callback(err);
+        }
+    }
 }
 
 // Lambda to harvest data about a user

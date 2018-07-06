@@ -98,88 +98,69 @@ export function extractUserDataFromPage(geek: string, url: string, pageContent: 
     return result;
 }
 
-export function extractGameDataFromPage(bggid: number, url: string, pageContent: string): ProcessGameResult {
-    return xml2js(pageContent, {trim: true})
-        .then(dom => {
-            if (!dom) {
-                throw new Error("Found no game data for game " + bggid);
-            }
-            if (!dom || !dom.boardgames || dom.boardgames.boardgame.length == 0 || dom.boardgames.boardgame.error) {
-                throw new NoSuchGameError(bggid);
-            }
-            const result: ProcessGameResult = {};
-            dom.boardgames.boardgame.forEach(boardgame => {
-                const names = boardgame.name;
-                // TODO
-                // console.log(boardgame);
-                const expansions = boardgame.boardgameexpansion;
-                const categories = boardgame.boardgamecategory;
-                const mechanics = boardgame.boardgamemechanic;
-                const designers = boardgame.boardgamedesigner;
-                const publishers = boardgame.boardgamepublisher;
-                const subdomains = boardgame.boardgamesubdomain;
-                const statistics = boardgame.statistics;
-                const ratings = statistics[0].ratings;
-                const ranks = ratings[0].ranks[0].rank;
-                let ranking = 0;
-                console.log(ranks);
-                // [ { '$':
-                //         { type: 'subtype',
-                //             id: '1',
-                //             name: 'boardgame',
-                //             friendlyname: 'Board Game Rank',
-                //             value: '11362',
-                //             bayesaverage: '5.5151' } },
-                //     { '$':
-                //             { type: 'family',
-                //                 id: '4667',
-                //                 name: 'cgs',
-                //                 friendlyname: 'Customizable Rank',
-                //                 value: '199',
-                //                 bayesaverage: '5.51481' } } ]
-                if (ranks) {
-                    const bgRank = ranks.filter(r => r.$.name = 'boardgame');
-                    if (bgRank.length > 0) {
-                        const rankingValue = bgRank[0].$.value;
-                        try {
-                            ranking = parseInt(rankingValue);
-                        } catch (e) {
-                        }
-                    }
+export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string): Promise<ProcessGameResult> {
+    const dom = await xml2js(pageContent, {trim: true});
+    if (!dom || !dom.boardgames || dom.boardgames.boardgame.length == 0 || dom.boardgames.boardgame.error) {
+        throw new NoSuchGameError(bggid);
+    }
+    const result = {} as ProcessGameResult;
+    for (const boardgame of dom.boardgames.boardgame) {
+        const names = boardgame.name;
+        // TODO
+        // console.log(boardgame);
+        if (boardgame.error) throw new NoSuchGameError(bggid);
+        const expansions = boardgame.boardgameexpansion;
+        console.log(expansions);
+        const categories = boardgame.boardgamecategory;
+        const mechanics = boardgame.boardgamemechanic;
+        const designers = boardgame.boardgamedesigner;
+        const publishers = boardgame.boardgamepublisher;
+        const subdomains = boardgame.boardgamesubdomain;
+        const statistics = boardgame.statistics;
+        const ratings = statistics[0].ratings;
+        const ranks = ratings[0].ranks[0].rank;
+        let ranking = 0;
+        console.log(ranks);
+        if (ranks) {
+            const bgRank = ranks.filter(r => r.$.name = 'boardgame');
+            if (bgRank.length > 0) {
+                const rankingValue = bgRank[0].$.value;
+                try {
+                    ranking = parseInt(rankingValue);
+                } catch (e) {
                 }
-                console.log(designers); // TODO
-                console.log(publishers); // TODO
-                const name = names.filter(it => it.$.primary == 'true')[0]._;
-                result.gameId = parseInt(boardgame.$.objectid);
-                result.yearPublished = parseInt(boardgame.yearpublished[0]);
-                result.minPlayers = parseInt(boardgame.minplayers[0]);
-                result.maxPlayers = parseInt(boardgame.maxplayers[0]);
-                result.playTime = parseInt(boardgame.playingtime[0]);
-                result.usersRated = parseInt(ratings[0].usersrated);
-                result.average = parseFloat(ratings[0].average);
-                result.bayesAverage = parseFloat(ratings[0].bayesaverage);
-                result.subdomain = subdomains ? subdomains[0]._ : "Unknown";
-                result.usersTrading = parseInt(ratings[0].trading);
-                result.usersWanting = parseInt(ratings[0].wanting);
-                result.usersWishing = parseInt(ratings[0].wishing);
-                result.usersOwned = parseInt(ratings[0].owned);
-                result.usersRated = parseInt(ratings[0].usersrated);
-                result.name = name;
-                result.url = url;
-                result.categories = categories ? categories.map(c => c._) : [];
-                result.mechanics = mechanics ? mechanics.map(c => c._) : [];
-                result.designers = designers ? designers.map(c => c.$.objectid) : [];
-                result.rank = ranking; // TODO
-            });
-            console.log(result);
-            return result;
-        });
+            }
+        }
+        console.log(designers); // TODO
+        console.log(publishers); // TODO
+        const name = names.filter(it => it.$.primary == 'true')[0]._;
+        result.gameId = parseInt(boardgame.$.objectid);
+        result.yearPublished = parseInt(boardgame.yearpublished[0]);
+        result.minPlayers = parseInt(boardgame.minplayers[0]);
+        result.maxPlayers = parseInt(boardgame.maxplayers[0]);
+        result.playTime = parseInt(boardgame.playingtime[0]);
+        result.usersRated = parseInt(ratings[0].usersrated);
+        result.average = parseFloat(ratings[0].average);
+        result.bayesAverage = parseFloat(ratings[0].bayesaverage);
+        result.subdomain = subdomains ? subdomains[0]._ : "Unknown";
+        result.usersTrading = parseInt(ratings[0].trading);
+        result.usersWanting = parseInt(ratings[0].wanting);
+        result.usersWishing = parseInt(ratings[0].wishing);
+        result.usersOwned = parseInt(ratings[0].owned);
+        result.usersRated = parseInt(ratings[0].usersrated);
+        result.name = name;
+        result.url = url;
+        result.categories = categories ? categories.map(c => c._) : [];
+        result.mechanics = mechanics ? mechanics.map(c => c._) : [];
+        result.designers = designers ? designers.map(c => c.$.objectid) : [];
+        result.rank = ranking; // TODO
+    }
+    console.log(result);
+    return result;
 }
 
-export class NoSuchGameError extends Error {
-    constructor(private id: number) {
-        super("No such game " + id);
-    }
+export class NoSuchGameError {
+    constructor(private id: number) { }
 
     public getId(): number {
         return this.id;
