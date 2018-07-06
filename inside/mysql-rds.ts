@@ -167,7 +167,7 @@ export async function markUrlUnprocessed(processMethod: string, url: string) {
 
 export function markGameDoesNotExist(bggid: number): Promise<void> {
     console.log("markGameDoesNotExist " + bggid);
-    const sql = "insert into not_games (bggid) values ?";
+    const sql = "insert into not_games (bggid) values (?)";
     // ignore insert error
     return withConnection(conn => conn.query(sql, [bggid]).catch(err => {}));
 }
