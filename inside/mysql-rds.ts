@@ -165,11 +165,22 @@ export async function markUrlUnprocessed(processMethod: string, url: string) {
     await withConnectionAsync(async conn => await conn.query(sqlSet, [url, processMethod]));
 }
 
-export function markGameDoesNotExist(bggid: number): Promise<void> {
+export async function markGameDoesNotExist(bggid: number) {
     console.log("markGameDoesNotExist " + bggid);
-    const sql = "insert into not_games (bggid) values (?)";
-    // ignore insert error
-    return withConnection(conn => conn.query(sql, [bggid]).catch(err => {}));
+    return withConnection(conn => doMarkGameDoesNotExist(conn, bggid));
+}
+
+async function doMarkGameDoesNotExist(conn: mysql.Connection, bggid: number) {
+    const insertSql = "insert into not_games (bggid) values (?)";
+    const deleteSql1 = "delete from files where processMethod = 'processGame' and bggid = ?";
+    const deleteSql2 = "delete from geekgames where game = ?";
+    try {
+        await conn.query(insertSql, [bggid]);
+    } catch (e) {
+        // ignore error if it's already there
+    }
+    await conn.query(deleteSql1, [bggid]);
+    await conn.query(deleteSql2, [bggid]);
 }
 
 export function ensureUsers(users: string[]): Promise<void> {
@@ -233,7 +244,9 @@ export async function updateGamesForGeek(geek: string, games: CollectionGame[]) 
 
 async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: CollectionGame[]) {
     const geekId = await getGeekId(conn, geek);
+    const notExist = await getGamesThatDontExist(conn);
     for (const game of games) {
+        if (notExist.indexOf(game.gameId) >= 0) continue;
         await insertOrUpdateGeekgame(conn, geek, geekId, game);
     }
 }
@@ -271,7 +284,8 @@ async function doEnsureGames(conn: mysql.Connection, games: CollectionGame[]) {
         params = [ids];
     }
     const found = (await conn.query(sql, params)).map(row => row.bggid);
-    for (const id of listMinus(ids, found)) {
+    const notExist = await getGamesThatDontExist(conn);
+    for (const id of listMinus(listMinus(ids, found), notExist)) {
         await doRecordGame(conn, id);
     }
 }
@@ -414,4 +428,9 @@ async function countWhere(conn: mysql.Connection, where: string, params: any[]) 
     const sql = "select count(*) from " + where;
     const result = await conn.query(sql, params);
     return result[0]["count(*)"];
+}
+
+async function getGamesThatDontExist(conn: mysql.Connection): Promise<number[]> {
+    const sql = "select bggid from not_games";
+    return (await conn.query(sql)).map(row => row.bggid);
 }
