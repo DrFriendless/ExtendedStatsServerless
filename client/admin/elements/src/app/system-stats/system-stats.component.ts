@@ -18,19 +18,7 @@ import {Subscription} from "rxjs/internal/Subscription";
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SystemStatsComponent implements AfterViewInit, OnDestroy {
-  public stats: SystemStats = {
-    userRows: 0,
-    gameRows: 0,
-    geekGamesRows: 0,
-    mechanics: 0,
-    categories: 0,
-    gameMechanics: 0,
-    gameCategories: 0,
-    notGames: 0,
-    fileRows: [] as TypeCount[],
-    distinctGGOwners: 0,
-    ggForZero: 0
-  };
+  public stats = {} as SystemStats;
   private subscription: Subscription = null;
 
   constructor(private http: HttpClient, private changeDetector: ChangeDetectorRef) { }

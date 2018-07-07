@@ -17,4 +17,5 @@ export interface SystemStats {
     fileRows: TypeCount[];
     ggForZero: number;
     distinctGGOwners: number;
+    playsRows: number;
 }
