@@ -213,7 +213,7 @@ export async function processPlays(event, context, callback: Callback) {
     const data = await request(encodeURI(invocation.url)) as string;
     const playsData = await processPlaysFile(data, invocation);
     console.log(playsData);
-    const playsResult = { geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData } as ProcessPlaysResult;
+    const playsResult = { geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url } as ProcessPlaysResult;
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
 }
 

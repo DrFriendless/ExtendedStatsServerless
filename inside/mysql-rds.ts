@@ -1,7 +1,7 @@
 import mysql = require('promise-mysql');
 import {
     CollectionGame,
-    MonthPlayed,
+    MonthPlayed, PlayData,
     ProcessGameResult,
     RankingTableRow,
     ToProcessElement,
@@ -315,12 +315,11 @@ async function doEnsureMonthsPlayed(conn: mysql.Connection, geek: string, months
 }
 
 export async function ensureGames(games: CollectionGame[]) {
-    await withConnection(conn => doEnsureGames(conn, games));
+    await withConnection(conn => doEnsureGames(conn, games.map(cg => cg.gameId)));
 }
 
-async function doEnsureGames(conn: mysql.Connection, games: CollectionGame[]) {
-    if (games.length === 0) return;
-    const ids = games.map(cg => cg.gameId);
+async function doEnsureGames(conn: mysql.Connection, ids: number[]) {
+    if (ids.length === 0) return;
     const sqlSome = "select bggid from files where bggid in (?) and processMethod = 'processGame'";
     const sqlOne = "select bggid from files where bggid = ? and processMethod = 'processGame'";
     let params;
@@ -464,6 +463,33 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         await conn.query(updateSql, [fpg.geekName, fpg.total_plays, fpg.distinct_games, fpg.top50, fpg.sdj, fpg.owned,
             fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
             fpg.top100, fpg.hindex, fpg.preordered, fpg.geek]);
+    }
+}
+
+export async function ensurePlaysGames(gameIds: number[]) {
+    console.log("ensurePlaysGames");
+    console.log(gameIds);
+    await withConnection(conn => doEnsureGames(conn, gameIds));
+}
+
+export async function setGeekPlaysForMonth(geek: string, month: number, year: number, plays: PlayData[]) {
+    await withConnection(conn => doSetGeekPlaysForMonth(conn, geek, month, year, plays));
+}
+
+async function doSetGeekPlaysForMonth(conn: mysql.Connection, geek: string, month: number, year: number, plays: PlayData[]) {
+    console.log(plays);
+    const deleteSql = "delete from plays where geek = ? and month = ? and year = ?";
+    const insertSql = "insert into plays (game, geek, playDate, quantity, raters, ratingsTotal, location, month, year) values (?, ?, STR_TO_DATE(?, '%Y-%m-%d'), ?, ?, ?, ?, ?, ?)";
+    const geekId = await getGeekId(conn, geek);
+    const playsAlready = await countWhere(conn, "plays where geek = ? and month = ? and year = ?", [geekId, month, year]);
+    if (playsAlready > 0 && plays.length === 0) {
+        console.log("Not updating plays for " + geek + " " + month + "/" + year + " because there are existing plays and none to replace them.");
+        return;
+    }
+    await conn.query(deleteSql, [geekId, month, year]);
+    for (const play of plays) {
+        console.log(play);
+        await conn.query(insertSql, [play.gameid, geekId, play.date, play.quantity, play.raters, play.ratingsTotal, play.location, month, year]);
     }
 }
 

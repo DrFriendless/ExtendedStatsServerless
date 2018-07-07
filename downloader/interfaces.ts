@@ -100,4 +100,5 @@ export interface ProcessPlaysResult {
     month: number;
     year: number;
     plays: PlayData[];
+    url: string;
 }

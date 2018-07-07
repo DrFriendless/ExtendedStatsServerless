@@ -1,13 +1,13 @@
 import {Callback} from 'aws-lambda';
 import {
-    ensureGames, ensureMonthsPlayed, ensureProcessPlaysFiles,
+    ensureGames, ensureMonthsPlayed, ensurePlaysGames, ensureProcessPlaysFiles,
     ensureUsers,
     listToProcess,
     listToProcessByMethod,
     markGameDoesNotExist,
     markUrlProcessed,
     markUrlUnprocessed,
-    restrictCollectionToGames,
+    restrictCollectionToGames, setGeekPlaysForMonth,
     updateFrontPageGeek,
     updateGame,
     updateGamesForGeek,
@@ -18,8 +18,8 @@ import {
     CleanUpCollectionResult,
     FileToProcess,
     ProcessCollectionResult,
-    ProcessGameResult, ProcessMonthsPlayedResult,
-    ProcessUserResult, WarTableRow
+    ProcessGameResult, ProcessMonthsPlayedResult, ProcessPlaysResult,
+    ProcessUserResult
 } from "./interfaces";
 import {promiseToCallback} from "./library";
 
@@ -114,6 +114,25 @@ export async function processPlayedMonths(event, context, callback: Callback) {
         await ensureMonthsPlayed(params.geek, params.monthsPlayed);
         await ensureProcessPlaysFiles(params.geek, params.monthsPlayed);
         await markUrlProcessed("processPlayed", params.url);
+        callback(null, null);
+    } catch (e) {
+        console.log(e);
+        callback(e);
+    }
+}
+
+export async function processPlaysResult(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    const params = event as ProcessPlaysResult;
+    console.log(params);
+    try {
+        const gameIds = [];
+        for (const play of params.plays) {
+            if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
+        }
+        await ensurePlaysGames(gameIds);
+        await setGeekPlaysForMonth(params.geek, params.month, params.year, params.plays);
+        await markUrlProcessed("processPlays", params.url);
         callback(null, null);
     } catch (e) {
         console.log(e);

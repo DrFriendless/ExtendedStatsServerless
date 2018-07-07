@@ -1,18 +1,20 @@
 export interface FileToProcess {
-    processMethod: string,
-    url: string,
-    bggid: number,
-    geek: string
+    processMethod: string;
+    url: string;
+    bggid: number;
+    geek: string;
+    month: number;
+    year: number;
+    geekid: number;
 }
 
 export interface ToProcessElement extends FileToProcess {
-    lastUpdate: any,
-    nextUpdate: any,
-    tillNextUpdate: any,
-    description: string,
-    lastattempt: any,
+    lastUpdate: any;
+    nextUpdate: any;
+    tillNextUpdate: any;
+    description: string;
+    lastattempt: any;
     last_scheduled: any;
-    bggid: number;
 }
 
 export interface ProcessUserResult {
@@ -115,5 +117,22 @@ export interface MonthPlayed {
 export interface ProcessMonthsPlayedResult {
     geek: string;
     monthsPlayed: MonthPlayed[];
+    url: string;
+}
+
+export interface PlayData {
+    quantity: number;
+    location: string;
+    date: string;
+    gameid: number;
+    raters: number;
+    ratingsTotal: number;
+}
+
+export interface ProcessPlaysResult {
+    geek: string;
+    month: number;
+    year: number;
+    plays: PlayData[];
     url: string;
 }
