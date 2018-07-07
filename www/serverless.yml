@@ -1,0 +1,32 @@
+service: www
+
+plugins:
+    - serverless-s3-deploy
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  stage: dev
+  timeout: 30
+  region: ap-southeast-2
+
+custom:
+  assets:
+    auto: true
+    targets:
+     - bucket:
+         Ref: WwwBucket
+       files:
+        - source: static/
+          globs: '**/*.*'
+
+resources:
+  Resources:
+    WwwBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: www-drfriendless-com
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
