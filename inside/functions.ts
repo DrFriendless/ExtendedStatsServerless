@@ -1,6 +1,6 @@
 import {Callback} from 'aws-lambda';
 import {
-    ensureGames,
+    ensureGames, ensureMonthsPlayed, ensureProcessPlaysFiles,
     ensureUsers,
     listToProcess,
     listToProcessByMethod,
@@ -18,7 +18,7 @@ import {
     CleanUpCollectionResult,
     FileToProcess,
     ProcessCollectionResult,
-    ProcessGameResult,
+    ProcessGameResult, ProcessMonthsPlayedResult,
     ProcessUserResult, WarTableRow
 } from "./interfaces";
 import {promiseToCallback} from "./library";
@@ -104,6 +104,21 @@ export async function processCollectionUpdateGames(event, context, callback: Cal
        console.log(e);
        callback(e);
    }
+}
+
+export async function processPlayedMonths(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    const params = event as ProcessMonthsPlayedResult;
+    console.log(params);
+    try {
+        await ensureMonthsPlayed(params.geek, params.monthsPlayed);
+        await ensureProcessPlaysFiles(params.geek, params.monthsPlayed);
+        await markUrlProcessed("processPlayed", params.url);
+        callback(null, null);
+    } catch (e) {
+        console.log(e);
+        callback(e);
+    }
 }
 
 export async function updateUrlAsProcessed(event, context, callback: Callback) {

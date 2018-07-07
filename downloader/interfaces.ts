@@ -81,4 +81,5 @@ export interface MonthPlayed {
 export interface ProcessMonthsPlayedResult {
     geek: string;
     monthsPlayed: MonthPlayed[];
+    url: string;
 }

@@ -1,6 +1,13 @@
 import mysql = require('promise-mysql');
-import {CollectionGame, ProcessGameResult, RankingTableRow, ToProcessElement, WarTableRow} from "./interfaces";
-import {count, getConnection, returnWithConnection, withConnection, withConnectionAsync} from "./library";
+import {
+    CollectionGame,
+    MonthPlayed,
+    ProcessGameResult,
+    RankingTableRow,
+    ToProcessElement,
+    WarTableRow
+} from "./interfaces";
+import {count, returnWithConnection, withConnection, withConnectionAsync} from "./library";
 
 export function updateGame(data: ProcessGameResult): Promise<void> {
     console.log("updateGame");
@@ -224,18 +231,24 @@ function deleteExtraUsers(conn: mysql.Connection, extraUsers: string[]): Promise
     }
 }
 
-function doEnsureUser(conn: mysql.Connection, user: string): Promise<void> {
+async function doEnsureUser(conn: mysql.Connection, user: string) {
     const insertSql = "insert into geeks (username) values (?)";
-    return conn.query(insertSql, [user])
-        .then(() => console.log("added user " + user))
-        .catch(Error, err => {})
-        .then(() => doEnsureFileProcessUser(conn, user))
-        .then(() => doEnsureFileProcessUserCollection(conn, user))
-        .then(() => doEnsureFileProcessUserPlayed(conn, user));
+    try {
+        await conn.query(insertSql, [user]);
+        console.log("added user " + user);
+    } catch (e) {
+        // user already there
+    }
+    const geekid = await getGeekId(conn, user);
+    await doEnsureFileProcessUser(conn, user, geekid);
+    await doEnsureFileProcessUserCollection(conn, user, geekid);
+    await doEnsureFileProcessUserPlayed(conn, user, geekid);
 }
 
-function doEnsureUsers(conn: mysql.Connection, users: string[]): Promise<void> {
-    return Promise.all(users.map(user => doEnsureUser(conn, user)));
+async function doEnsureUsers(conn: mysql.Connection, users: string[]) {
+    for (const user of users) {
+        await doEnsureUser(conn, user);
+    }
 }
 
 export async function updateGamesForGeek(geek: string, games: CollectionGame[]) {
@@ -262,6 +275,42 @@ async function insertOrUpdateGeekgame(conn: mysql.Connection, geek: string, geek
     } catch (e) {
         await conn.query(updateSql, [geekId, game.rating, game.owned, game.want, game.wishListPriority, game.forTrade,
             game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered, geek, game.gameId]);
+    }
+}
+
+export async function ensureProcessPlaysFiles(geek: string, months: MonthPlayed[]) {
+    await withConnection(conn => doEnsureProcessPlaysFiles(conn, geek, months));
+}
+
+async function doEnsureProcessPlaysFiles(conn: mysql.Connection, geek: string, months: MonthPlayed[]) {
+    const playsUrl = "https://boardgamegeek.com/xmlapi2/plays?username=%s&mindate=%d-%d-01&maxdate=%d-%d-31&subtype=boardgame".replace("%s", encodeURIComponent(geek));
+    const timelessPlaysUrl = "https://boardgamegeek.com/xmlapi2/plays?username=%s&mindate=0000-00-00&maxdate=0000-00-00&subtype=boardgame".replace("%s", encodeURIComponent(geek));
+    const geekId = await getGeekId(conn, geek);
+    for (const month of months) {
+        let url = playsUrl
+            .replace("%d", month.year.toString())
+            .replace("%d", month.month.toString())
+            .replace("%d", month.year.toString())
+            .replace("%d", month.month.toString());
+        if (month.month === 0 && month.year === 0) url = timelessPlaysUrl;
+        await doRecordFile(conn, url, "processPlays", geek, "Plays for " + geek + " for " + month.month + "/" + month.year,
+            null, month.month, month.year, geekId);
+    }
+}
+
+export async function ensureMonthsPlayed(geek: string, months: MonthPlayed[]) {
+    await withConnection(conn => doEnsureMonthsPlayed(conn, geek, months));
+}
+
+async function doEnsureMonthsPlayed(conn: mysql.Connection, geek: string, months: MonthPlayed[]) {
+    const geekId = await getGeekId(conn, geek);
+    const insertSql = "insert into months_played (geek, month, year) values (?, ?, ?)";
+    for (const month of months) {
+        try {
+            await conn.query(insertSql, [geekId, month.month, month.year]);
+        } catch (e) {
+            // ignore insert duplicate row
+        }
     }
 }
 
@@ -302,43 +351,42 @@ function doRecordGame(conn: mysql.Connection, bggid: number): Promise<void> {
     const insertParams = [url, "processGame", null, null, tillNext, "Game #" + bggid, bggid];
 
     return conn.query(insertSql, insertParams)
-        .then(() => console.log("added url " + url))
         .catch(err => console.log(err));
 }
 
 
-function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string, bggid: number | null): Promise<void> {
+function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string,
+                      bggid: number | null, month: number | null, year: number | null, geekid: number | null): Promise<void> {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
-    const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     return count(conn, countSql, [url, processMethod])
         .then(count => {
             if (count === 0) {
                 const tillNext = TILL_NEXT_UPDATE[processMethod];
-                const insertParams = [url, processMethod, user, null, tillNext, description, bggid];
+                const insertParams = [url, processMethod, user, null, tillNext, description, bggid, month, year, geekid];
                 return conn.query(insertSql, insertParams)
-                    .then(() => console.log("added url " + url))
                     .catch(err => console.log(err));
             }
         });
 }
 
-function doEnsureFileProcessUser(conn: mysql.Connection, geek: string): Promise<void> {
+function doEnsureFileProcessUser(conn: mysql.Connection, geek: string, geekid: number): Promise<void> {
     const url = `https://boardgamegeek.com/user/${geek}`;
-    return doRecordFile(conn, url, "processUser", geek, "User's profile", null);
+    return doRecordFile(conn, url, "processUser", geek, "User's profile", null, null, null, geekid);
 }
 
-function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: string): Promise<void> {
+function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: string, geekid: number): Promise<void> {
     const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
-    return doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", null);
+    return doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", null, null, null, geekid);
 }
 
-function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string): Promise<void> {
+function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string, geekid: number): Promise<void> {
     const url = `https://boardgamegeek.com/plays/bymonth/user/${geek}/subtype/boardgame`;
-    return doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", null);
+    return doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", null, null, null, geekid);
 }
 
 export function listToProcess(count: number): Promise<ToProcessElement[]> {
-    const sql = "select * from files where (lastUpdate is null || nextUpdate is null || nextUpdate < now()) and processMethod != 'processPlayed' and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    const sql = "select * from files where (lastUpdate is null || nextUpdate is null || nextUpdate < now()) and (processMethod != 'processPlays') and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
     return returnWithConnection(conn => conn.query(sql, [count]).map(row => row as ToProcessElement));
 }
 
@@ -403,13 +451,13 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, mv, ext100, hindex, preordered) values " +
         "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update war_table set geekName = ?, totalPlays = ?, distinctGames = ?, top50 = ?, sdj = ?, owned = ?, "
-    + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, mv = ?, "
-    + "ext100 = ?, hindex = ?, preordered = ? where geek = ?";
+        + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, mv = ?, "
+        + "ext100 = ?, hindex = ?, preordered = ? where geek = ?";
     try {
         console.log("insert");
         await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.total_plays, fpg.distinct_games, fpg.top50, fpg.sdj, fpg.owned,
-        fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
-        fpg.top100, fpg.hindex, fpg.preordered]);
+            fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
+            fpg.top100, fpg.hindex, fpg.preordered]);
     } catch (e) {
         console.log("update");
         console.log(e);

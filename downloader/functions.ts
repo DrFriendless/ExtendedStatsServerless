@@ -197,7 +197,7 @@ export async function processPlayed(event, context, callback: Callback) {
             console.log(data);
             toAdd.push(data);
         });
-    const monthsData = { geek: invocation.geek, monthsPlayed: toAdd } as ProcessMonthsPlayedResult;
+    const monthsData = { geek: invocation.geek, monthsPlayed: toAdd, url: invocation.url } as ProcessMonthsPlayedResult;
     console.log(monthsData);
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYED_RESULT, monthsData);
 }
