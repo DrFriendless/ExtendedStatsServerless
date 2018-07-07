@@ -127,13 +127,11 @@ async function updateRankingTableStatsForGame(conn: mysql.Connection, game: numb
 }
 
 export function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
-    console.log("updateUserValues " + geek + " " + bggid + " " + country);
     const sql = "update geeks set country = ?, bggid = ? where username = ?";
     return withConnection(conn => conn.query(sql, [country, bggid, geek]));
 }
 
 export async function restrictCollectionToGames(geek: string, items: number[]) {
-    console.log("restrictCollectionToGames " + geek);
     const deleteStatementSome = "delete from geekgames where geek = ? and game not in (?)";
     const deleteStatementOne = "delete from geekgames where geek = ? and game != ?";
     const deleteStatementNone = "delete from geekgames where geek = ?";
@@ -149,8 +147,6 @@ export async function restrictCollectionToGames(geek: string, items: number[]) {
         deleteStatement = deleteStatementSome;
         params = [geek, items];
     }
-    console.log(deleteStatement);
-    console.log(params);
     await withConnectionAsync(async conn => await conn.query(deleteStatement, params));
 }
 
@@ -160,20 +156,17 @@ const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '
 
 
 export async function markUrlProcessed(processMethod: string, url: string) {
-    console.log("markUrlProcessed " + url);
     const delta = TILL_NEXT_UPDATE[processMethod];
     const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
     await withConnectionAsync(async conn => await conn.query(sqlSet, [delta, url, processMethod]));
 }
 
 export async function markUrlUnprocessed(processMethod: string, url: string) {
-    console.log("markUrlUnprocessed " + url);
     const sqlSet = "update files set last_scheduled = null where url = ? and processMethod = ?";
     await withConnectionAsync(async conn => await conn.query(sqlSet, [url, processMethod]));
 }
 
 export async function markGameDoesNotExist(bggid: number) {
-    console.log("markGameDoesNotExist " + bggid);
     return withConnection(conn => doMarkGameDoesNotExist(conn, bggid));
 }
 
@@ -348,9 +341,7 @@ function doRecordGame(conn: mysql.Connection, bggid: number): Promise<void> {
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
     const tillNext = TILL_NEXT_UPDATE["processGame"];
     const insertParams = [url, "processGame", null, null, tillNext, "Game #" + bggid, bggid];
-
-    return conn.query(insertSql, insertParams)
-        .catch(err => console.log(err));
+    return conn.query(insertSql, insertParams).catch(err => {});
 }
 
 
@@ -363,8 +354,7 @@ function doRecordFile(conn: mysql.Connection, url: string, processMethod: string
             if (count === 0) {
                 const tillNext = TILL_NEXT_UPDATE[processMethod];
                 const insertParams = [url, processMethod, user, null, tillNext, description, bggid, month, year, geekid];
-                return conn.query(insertSql, insertParams)
-                    .catch(err => console.log(err));
+                return conn.query(insertSql, insertParams).catch(err => {});
             }
         });
 }
@@ -415,7 +405,6 @@ export async function updateFrontPageGeek(geekName: string) {
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
-    console.log("doUpdateFrontPageGeek " + geekName);
     const geekId = await getGeekId(conn, geekName);
     const owned = await countWhere(conn, "geekgames where geekId = ? and owned > 0", [geekId]);
     const want = await countWhere(conn, "geekgames where geekId = ? and want > 0", [geekId]);
@@ -445,7 +434,6 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         hindex: 0, // TODO
         preordered: preordered
     };
-    console.log(fpg);
     const insertSql = "insert into war_table (geek, geekName, totalPlays, distinctGames, top50, sdj, owned, want, wish, " +
         "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, mv, ext100, hindex, preordered) values " +
         "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
@@ -453,13 +441,10 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, mv = ?, "
         + "ext100 = ?, hindex = ?, preordered = ? where geek = ?";
     try {
-        console.log("insert");
         await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.total_plays, fpg.distinct_games, fpg.top50, fpg.sdj, fpg.owned,
             fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
             fpg.top100, fpg.hindex, fpg.preordered]);
     } catch (e) {
-        console.log("update");
-        console.log(e);
         await conn.query(updateSql, [fpg.geekName, fpg.total_plays, fpg.distinct_games, fpg.top50, fpg.sdj, fpg.owned,
             fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
             fpg.top100, fpg.hindex, fpg.preordered, fpg.geek]);
@@ -467,8 +452,6 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
 }
 
 export async function ensurePlaysGames(gameIds: number[]) {
-    console.log("ensurePlaysGames");
-    console.log(gameIds);
     await withConnection(conn => doEnsureGames(conn, gameIds));
 }
 
@@ -477,7 +460,6 @@ export async function setGeekPlaysForMonth(geek: string, month: number, year: nu
 }
 
 async function doSetGeekPlaysForMonth(conn: mysql.Connection, geek: string, month: number, year: number, plays: PlayData[]) {
-    console.log(plays);
     const deleteSql = "delete from plays where geek = ? and month = ? and year = ?";
     const insertSql = "insert into plays (game, geek, playDate, quantity, raters, ratingsTotal, location, month, year) values (?, ?, STR_TO_DATE(?, '%Y-%m-%d'), ?, ?, ?, ?, ?, ?)";
     const geekId = await getGeekId(conn, geek);
@@ -488,7 +470,6 @@ async function doSetGeekPlaysForMonth(conn: mysql.Connection, geek: string, mont
     }
     await conn.query(deleteSql, [geekId, month, year]);
     for (const play of plays) {
-        console.log(play);
         await conn.query(insertSql, [play.gameid, geekId, play.date, play.quantity, play.raters, play.ratingsTotal, play.location, month, year]);
     }
 }

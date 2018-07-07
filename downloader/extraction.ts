@@ -9,9 +9,7 @@ import {between} from "./library";
 const xml2js = require('xml2js-es6-promise');
 
 export async function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
-    console.log("extractUserCollectionFromPage from " + url);
     const dom = await xml2js(pageContent, {trim: true});
-    console.log("Finished parsing DOM");
     if (dom && dom.message) {
         console.log("BGG says come back later");
         throw new Error("BGG says come back later to get collection for " + geek);
@@ -53,7 +51,6 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
             items.push(gameItem);
         }
     });
-    console.log("" + items.length + " items");
     return { geek: geek, items: items };
 }
 
@@ -126,7 +123,6 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         const ratings = statistics[0].ratings;
         const ranks = ratings[0].ranks[0].rank;
         let ranking = 0;
-        console.log(ranks);
         if (ranks) {
             const bgRank = ranks.filter(r => r.$.name = 'boardgame');
             if (bgRank.length > 0) {
@@ -161,7 +157,6 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         result.designers = designers ? designers.map(c => c.$.objectid) : [];
         result.rank = ranking; // TODO
     }
-    console.log(result);
     return result;
 }
 
@@ -174,12 +169,9 @@ export class NoSuchGameError {
 }
 
 export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<PlayData[]> {
-    console.log("processPlaysFile");
     const dom = await xml2js(fileContents, {trim: true});
-    console.log("Finished parsing DOM");
     const result: PlayData[] = [];
     dom.plays.play.forEach(play => {
-        console.log(play);
         const date = play.$.date;
         const items = play.item;
         const quantity = play.$.quantity;
@@ -192,6 +184,7 @@ export async function processPlaysFile(fileContents: string, invocation: FileToP
     return result;
 }
 
+// TODO - get player ratings
 // def processPlaysFile(filename, recorded):
 // import xml.dom.minidom
 // try:
