@@ -1,4 +1,10 @@
-import {ProcessUserResult, ProcessCollectionResult, CollectionGame, ProcessGameResult} from "./interfaces";
+import {
+    ProcessUserResult,
+    ProcessCollectionResult,
+    CollectionGame,
+    ProcessGameResult,
+    FileToProcess, PlayData
+} from "./interfaces";
 import {between} from "./library";
 const xml2js = require('xml2js-es6-promise');
 
@@ -166,3 +172,64 @@ export class NoSuchGameError {
         return this.id;
     }
 }
+
+export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<PlayData[]> {
+    console.log("processPlaysFile");
+    const dom = await xml2js(fileContents, {trim: true});
+    console.log("Finished parsing DOM");
+    const result: PlayData[] = [];
+    dom.plays.play.forEach(play => {
+        console.log(play);
+        const date = play.$.date;
+        const items = play.item;
+        const quantity = play.$.quantity;
+        const location = play.$.location;
+        const gameid = parseInt(items[0].$.objectid);
+        const raters = 0; // TODO
+        const ratingsTotal = 0; // TODO
+        result.push({ quantity, location, date, gameid, raters, ratingsTotal });
+    });
+    return result;
+}
+
+// def processPlaysFile(filename, recorded):
+// import xml.dom.minidom
+// try:
+// dom = xml.dom.minidom.parse(filename)
+// except xml.parsers.expat.ExpatError, e:
+// print "Error parsing XML in file %s" % filename, e
+// return
+// playElements = dom.getElementsByTagName("play")
+// if len(playElements) == 0:
+// print "no plays in %s" % filename
+// return
+// try:
+// numEntries = int(dom.getElementsByTagName("plays")[0].getAttribute("total"))
+// except ValueError:
+//     numEntries = 1
+// for pe in playElements:
+// playerRecs = []
+// date = pe.getAttribute("date")
+// quantity = int(pe.getAttribute("quantity"))
+// items = pe.getElementsByTagName("item")
+// gameId = int(items[0].getAttribute("objectid"))
+// location = pe.getAttribute("location")
+// (raters, ratingsTotal) = getRatings(pe)
+// playersNodes = pe.getElementsByTagName("players")
+// if len(playersNodes):
+// players = playersNodes[0].getElementsByTagName("player")
+// for p in players:
+// username = p.getAttribute("username")
+// name = p.getAttribute("name")
+// colour = p.getAttribute("color")
+// if username == "":
+// username = None
+// if name == "":
+// name = None
+// if colour == "":
+// colour = None
+// if username is not None or name is not None or colour is not None:
+//     playerRecs.append((username, name, colour))
+// if quantity < 10000:
+// recorded.add(date, (gameId, quantity, raters, ratingsTotal,  location, playerRecs))
+// return numEntries

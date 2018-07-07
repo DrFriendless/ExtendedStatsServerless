@@ -4,14 +4,14 @@ import {
     FileToProcess,
     ToProcessElement,
     CleanUpCollectionResult,
-    MonthPlayed, ProcessMonthsPlayedResult
+    MonthPlayed, ProcessMonthsPlayedResult, ProcessPlaysResult
 } from "./interfaces"
 import {between, invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
     extractUserDataFromPage,
-    NoSuchGameError
+    NoSuchGameError, processPlaysFile
 } from "./extraction";
 import * as _ from "lodash";
 
@@ -26,6 +26,7 @@ const METHOD_PROCESS_USER = "processUser";
 const METHOD_PROCESS_COLLECTION = "processCollection";
 const METHOD_PROCESS_PLAYED = "processPlayed";
 const METHOD_PROCESS_GAME = "processGame";
+const METHOD_PROCESS_PLAYS = "processPlays";
 
 // lambda names we expect to see
 const FUNCTION_RETRIEVE_FILES = "getToProcessList";
@@ -34,7 +35,9 @@ const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
 const FUNCTION_PROCESS_PLAYED_RESULT = "processPlayedMonthsResult";
+const FUNCTION_PROCESS_PLAYS_RESULT = "processPlaysResult";
 const FUNCTION_PROCESS_GAME = "processGame";
+const FUNCTION_PROCESS_PLAYS = "processPlays";
 const FUNCTION_PROCESS_GAME_RESULT = "processGameResult";
 const FUNCTION_NO_SUCH_GAME = "updateGameAsDoesNotExist";
 const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
@@ -82,6 +85,8 @@ export function fireFileProcessing(event, context, callback: Callback) {
                     return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
                 } else if (element.processMethod == METHOD_PROCESS_GAME) {
                     return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
+                } else if (element.processMethod == METHOD_PROCESS_PLAYS) {
+                    return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
                 }
             });
             return files.length;
@@ -201,3 +206,14 @@ export async function processPlayed(event, context, callback: Callback) {
     console.log(monthsData);
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYED_RESULT, monthsData);
 }
+
+export async function processPlays(event, context, callback: Callback) {
+    console.log(event);
+    const invocation = event as FileToProcess;
+    const data = await request(encodeURI(invocation.url)) as string;
+    const playsData = await processPlaysFile(data, invocation);
+    console.log(playsData);
+    const playsResult = { geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData } as ProcessPlaysResult;
+    await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
+}
+
