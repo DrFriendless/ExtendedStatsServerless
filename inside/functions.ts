@@ -80,7 +80,6 @@ export async function processCollectionCleanup(event, context, callback: Callbac
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as CleanUpCollectionResult;
     console.log("processCollectionCleanup");
-    console.log(params);
     try {
         await restrictCollectionToGames(params.geek, params.items);
         await markUrlProcessed("processCollection", params.url);
@@ -95,7 +94,6 @@ export async function processCollectionCleanup(event, context, callback: Callbac
 export async function processCollectionUpdateGames(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
    const params = event as ProcessCollectionResult;
-   console.log(params);
    try {
        await ensureGames(params.items);
        await updateGamesForGeek(params.geek, params.items);
@@ -109,7 +107,6 @@ export async function processCollectionUpdateGames(event, context, callback: Cal
 export async function processPlayedMonths(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as ProcessMonthsPlayedResult;
-    console.log(params);
     try {
         await ensureMonthsPlayed(params.geek, params.monthsPlayed);
         await ensureProcessPlaysFiles(params.geek, params.monthsPlayed);
@@ -124,7 +121,6 @@ export async function processPlayedMonths(event, context, callback: Callback) {
 export async function processPlaysResult(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as ProcessPlaysResult;
-    console.log(params);
     try {
         const gameIds = [];
         for (const play of params.plays) {
