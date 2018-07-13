@@ -67,6 +67,7 @@ export interface ProcessGameResult {
     mechanics: string[];
     designers: number[];
     publishers: number[];
+    expansions: number[];
 }
 
 export interface CleanUpCollectionResult {

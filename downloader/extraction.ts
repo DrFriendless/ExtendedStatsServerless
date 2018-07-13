@@ -101,9 +101,14 @@ export function extractUserDataFromPage(geek: string, url: string, pageContent: 
     return result;
 }
 
+// def saveGameExpands(db, id, bases):
+// db.execute("delete from expansions where expansion = %d" % id)
+// for b in bases:
+// db.execute("insert into expansions (basegame, expansion) values (%s, %d)" % (b, id))
+
 export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string): Promise<ProcessGameResult> {
     const dom = await xml2js(pageContent, {trim: true});
-    if (!dom || !dom.boardgames || dom.boardgames.boardgame.length == 0 || dom.boardgames.boardgame.error) {
+    if (!dom || !dom.boardgames || dom.boardgames.boardgame.length == 0) {
         throw new NoSuchGameError(bggid);
     }
     const result = {} as ProcessGameResult;
@@ -112,8 +117,8 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         // TODO
         // console.log(boardgame);
         if (boardgame.error) throw new NoSuchGameError(bggid);
-        const expansions = boardgame.boardgameexpansion;
-        console.log(expansions);
+        const expansions = boardgame.boardgameexpansion || [];
+        const expIds = expansions.map(row => parseInt(row.$.objectid));
         const categories = boardgame.boardgamecategory;
         const mechanics = boardgame.boardgamemechanic;
         const designers = boardgame.boardgamedesigner;
@@ -133,8 +138,6 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
                 }
             }
         }
-        console.log(designers); // TODO
-        console.log(publishers); // TODO
         const name = names.filter(it => it.$.primary == 'true')[0]._;
         result.gameId = parseInt(boardgame.$.objectid);
         result.yearPublished = parseInt(boardgame.yearpublished[0]);
@@ -154,9 +157,12 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         result.url = url;
         result.categories = categories ? categories.map(c => c._) : [];
         result.mechanics = mechanics ? mechanics.map(c => c._) : [];
-        result.designers = designers ? designers.map(c => c.$.objectid) : [];
+        result.designers = designers ? designers.map(c => parseInt(c.$.objectid)) : [];
+        result.publishers = publishers ? publishers.map(c => parseInt(c.$.objectid)) : [];
         result.rank = ranking; // TODO
+        result.expansions = expIds;
     }
+    console.log(result);
     return result;
 }
 
