@@ -61,12 +61,12 @@ export interface ProcessGameResult {
     expansion: number;
     usersOwned: number;
     subdomain: string;
-    expands: number[];
     url: string;
     categories: string[];
     mechanics: string[];
     designers: number[];
     publishers: number[];
+    expansions: number[];
 }
 
 export interface RankingTableRow {

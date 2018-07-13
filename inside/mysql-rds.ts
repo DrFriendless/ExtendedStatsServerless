@@ -10,9 +10,30 @@ import {
 import {count, returnWithConnection, withConnection, withConnectionAsync} from "./library";
 
 export function updateGame(data: ProcessGameResult): Promise<void> {
-    console.log("updateGame");
-    console.log(data);
     return withConnection(conn => doUpdateGame(conn, data));
+}
+
+export function recordGameExpansions(gameId: number, expansions: number[]) {
+    return withConnection(conn => doRecordGameExpansions(conn, gameId, expansions));
+}
+
+// def saveGameExpands(db, id, bases):
+// db.execute("delete from expansions where expansion = %d" % id)
+// for b in bases:
+// db.execute("insert into expansions (basegame, expansion) values (%s, %d)" % (b, id))
+
+async function doRecordGameExpansions(conn: mysql.Connection, gameId: number, expansions: number[]) {
+    const deleteSql = "delete from expansions where expansion = ?";
+    const insertSql = "insert into expansions (basegame, expansion) values (?, ?)";
+    await conn.query(deleteSql, gameId);
+    for (const exp of expansions) {
+        try {
+            await conn.query(insertSql, [gameId, exp]);
+        } catch (e) {
+            // probably foreign key constraint because the expansion is not in the database
+            // I see no need to put it there.
+        }
+    }
 }
 
 async function doEnsureCategory(conn: mysql.Connection, name: string) {

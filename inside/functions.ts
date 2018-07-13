@@ -6,7 +6,7 @@ import {
     listToProcessByMethod,
     markGameDoesNotExist,
     markUrlProcessed,
-    markUrlUnprocessed,
+    markUrlUnprocessed, recordGameExpansions,
     restrictCollectionToGames, setGeekPlaysForMonth,
     updateFrontPageGeek,
     updateGame,
@@ -24,13 +24,19 @@ import {
 import {promiseToCallback} from "./library";
 
 
-export function processGameResult(event, context, callback: Callback) {
+export async function processGameResult(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     console.log(event);
     const data = event as ProcessGameResult;
-    const promise = updateGame(data)
-        .then(() => markUrlProcessed("processGame", data.url));
-    promiseToCallback(promise, callback);
+    try {
+        await updateGame(data);
+        await recordGameExpansions(data.gameId, data.expansions);
+        await markUrlProcessed("processGame", data.url);
+        callback(null, null);
+    } catch (e) {
+        console.log(e);
+        callback(e);
+    }
 }
 
 export function processUserResult(event, context, callback: Callback) {

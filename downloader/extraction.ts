@@ -101,11 +101,6 @@ export function extractUserDataFromPage(geek: string, url: string, pageContent: 
     return result;
 }
 
-// def saveGameExpands(db, id, bases):
-// db.execute("delete from expansions where expansion = %d" % id)
-// for b in bases:
-// db.execute("insert into expansions (basegame, expansion) values (%s, %d)" % (b, id))
-
 export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string): Promise<ProcessGameResult> {
     const dom = await xml2js(pageContent, {trim: true});
     if (!dom || !dom.boardgames || dom.boardgames.boardgame.length == 0) {
