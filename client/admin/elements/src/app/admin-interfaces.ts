@@ -9,6 +9,7 @@ export interface SystemStats {
   userRows: number;
   gameRows: number;
   geekGamesRows: number;
+  expansionRows: number;
   mechanics: number;
   categories: number;
   gameMechanics: number;

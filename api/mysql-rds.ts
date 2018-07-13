@@ -78,6 +78,7 @@ async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats>
     const countGeekGamesOwnedByZero = "select count(*) from geekgames where geekid = 0";
     const countGGOwners = "select count(distinct(geekid)) c from geekgames";
     const countsPlaysRows = "select count(*) from plays";
+    const countExpansionsRows = "select count(*) from expansions";
     const userRows = await count(conn, countUserRows, []);
     const gameRows = await count(conn, countGameRows, []);
     const geekGamesRows = await count(conn, countGeekGameRows, []);
@@ -90,6 +91,7 @@ async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats>
     const ggForZero = await count(conn, countGeekGamesOwnedByZero, []);
     const distinctGGOwners = (await conn.query(countGGOwners, []))[0]["c"];
     const playsRows = await count(conn, countsPlaysRows, []);
+    const expansionRows = await count(conn, countExpansionsRows, []);
     ((await conn.query(countWaitingFileRows)) as any[]).forEach(row => patch(fileRows, "waiting", row));
     ((await conn.query(countUnprocessedFileRows)) as any[]).forEach(row => patch(fileRows, "unprocessed", row));
     return {
@@ -104,7 +106,8 @@ async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats>
         gameMechanics: gameMechanics,
         ggForZero: ggForZero,
         distinctGGOwners: distinctGGOwners,
-        playsRows: playsRows
+        playsRows: playsRows,
+        expansionRows: expansionRows
     } as SystemStats;
 }
 
