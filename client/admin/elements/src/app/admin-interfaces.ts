@@ -19,4 +19,5 @@ export interface SystemStats {
   ggForZero: number;
   distinctGGOwners: number;
   playsRows: number;
+  normalisedPlaysRows: number;
 }
