@@ -113,7 +113,7 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         // console.log(boardgame);
         if (boardgame.error) throw new NoSuchGameError(bggid);
         const expansions = boardgame.boardgameexpansion || [];
-        const expIds = expansions.map(row => parseInt(row.$.objectid));
+        const expIds = expansions.filter(row => row.$.inbound != "true").map(row => parseInt(row.$.objectid));
         const categories = boardgame.boardgamecategory;
         const mechanics = boardgame.boardgamemechanic;
         const designers = boardgame.boardgamedesigner;
