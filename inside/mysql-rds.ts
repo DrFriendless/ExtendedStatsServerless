@@ -1,7 +1,7 @@
 import mysql = require('promise-mysql');
 import {
     CollectionGame,
-    MonthPlayed, PlayData,
+    MonthPlayed, NormalisedPlays, PlayData,
     ProcessGameResult,
     RankingTableRow,
     ToProcessElement,
@@ -184,6 +184,11 @@ export async function markUrlProcessed(processMethod: string, url: string) {
 
 export async function markUrlUnprocessed(processMethod: string, url: string) {
     const sqlSet = "update files set last_scheduled = null where url = ? and processMethod = ?";
+    await withConnectionAsync(async conn => await conn.query(sqlSet, [url, processMethod]));
+}
+
+export async function markUrlTryTomorrow(processMethod: string, url: string) {
+    const sqlSet = "update files set last_scheduled = addtime(now(), '24:00:00') where url = ? and processMethod = ?";
     await withConnectionAsync(async conn => await conn.query(sqlSet, [url, processMethod]));
 }
 
@@ -476,17 +481,27 @@ export async function ensurePlaysGames(gameIds: number[]) {
     await withConnection(conn => doEnsureGames(conn, gameIds));
 }
 
-export async function setGeekPlaysForMonth(geek: string, month: number, year: number, plays: PlayData[]) {
-    await withConnection(conn => doSetGeekPlaysForMonth(conn, geek, month, year, plays));
+export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number) {
+    console.log("normalising plays for " + geekId + " " + month + " " + year);
+    const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
+    const rows = await conn.query(selectSql, [geekId, month, year]);
+    const rawData = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
+    console.log(rawData);
 }
 
-async function doSetGeekPlaysForMonth(conn: mysql.Connection, geek: string, month: number, year: number, plays: PlayData[]) {
+function extractNormalisedPlayFromPlayRow(row: object, geek: number, month: number, year: number): NormalisedPlays {
+    const playDate = row["playDate"].toString();
+    const date = parseInt(playDate.split(" ")[2]);
+    const result = { month, year, geek, date, game: row["game"], quantity: row["quantity"] } as NormalisedPlays;
+    return result;
+}
+
+export async function doSetGeekPlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, plays: PlayData[]) {
     const deleteSql = "delete from plays where geek = ? and month = ? and year = ?";
     const insertSql = "insert into plays (game, geek, playDate, quantity, raters, ratingsTotal, location, month, year) values (?, ?, STR_TO_DATE(?, '%Y-%m-%d'), ?, ?, ?, ?, ?, ?)";
-    const geekId = await getGeekId(conn, geek);
     const playsAlready = await countWhere(conn, "plays where geek = ? and month = ? and year = ?", [geekId, month, year]);
     if (playsAlready > 0 && plays.length === 0) {
-        console.log("Not updating plays for " + geek + " " + month + "/" + year + " because there are existing plays and none to replace them.");
+        console.log("Not updating plays for " + geekId + " " + month + "/" + year + " because there are existing plays and none to replace them.");
         return;
     }
     await conn.query(deleteSql, [geekId, month, year]);
@@ -495,7 +510,7 @@ async function doSetGeekPlaysForMonth(conn: mysql.Connection, geek: string, mont
     }
 }
 
-async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {
+export async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {
     const getIdSql = "select id from geeks where geeks.username = ?";
     return (await conn.query(getIdSql, [geek]))[0]['id'];
 }

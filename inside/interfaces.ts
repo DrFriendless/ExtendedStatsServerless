@@ -136,3 +136,12 @@ export interface ProcessPlaysResult {
     plays: PlayData[];
     url: string;
 }
+
+export interface NormalisedPlays {
+    quantity: number;
+    game: number;
+    geek: number;
+    date: number;
+    month: number;
+    year: number;
+}

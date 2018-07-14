@@ -1,13 +1,15 @@
 import {Callback} from 'aws-lambda';
 import {
+    doNormalisePlaysForMonth,
+    doSetGeekPlaysForMonth,
     ensureGames, ensureMonthsPlayed, ensurePlaysGames, ensureProcessPlaysFiles,
-    ensureUsers,
+    ensureUsers, getGeekId,
     listToProcess,
     listToProcessByMethod,
     markGameDoesNotExist,
-    markUrlProcessed,
+    markUrlProcessed, markUrlTryTomorrow,
     markUrlUnprocessed, recordGameExpansions,
-    restrictCollectionToGames, setGeekPlaysForMonth,
+    restrictCollectionToGames,
     updateFrontPageGeek,
     updateGame,
     updateGamesForGeek,
@@ -21,7 +23,7 @@ import {
     ProcessGameResult, ProcessMonthsPlayedResult, ProcessPlaysResult,
     ProcessUserResult
 } from "./interfaces";
-import {promiseToCallback} from "./library";
+import {getConnection, promiseToCallback} from "./library";
 
 
 export async function processGameResult(event, context, callback: Callback) {
@@ -132,8 +134,11 @@ export async function processPlaysResult(event, context, callback: Callback) {
         for (const play of params.plays) {
             if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
         }
+        const conn = await getConnection();
+        const geekId = await getGeekId(conn, params.geek);
         await ensurePlaysGames(gameIds);
-        await setGeekPlaysForMonth(params.geek, params.month, params.year, params.plays);
+        await doSetGeekPlaysForMonth(conn, geekId, params.month, params.year, params.plays);
+        await doNormalisePlaysForMonth(conn, geekId, params.month, params.year);
         await markUrlProcessed("processPlays", params.url);
         callback(null, null);
     } catch (e) {
@@ -156,6 +161,12 @@ export function updateUrlAsUnprocessed(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
     promiseToCallback(markUrlUnprocessed(params.processMethod, params.url), callback);
+}
+
+export function updateUrlAsTryTomorrow(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    const params = event as FileToProcess;
+    promiseToCallback(markUrlTryTomorrow(params.processMethod, params.url), callback);
 }
 
 export function updateGameAsDoesNotExist(event, context, callback: Callback) {

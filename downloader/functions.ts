@@ -45,6 +45,7 @@ const FUNCTION_PROCESS_COLLECTION_CLEANUP = "processCollectionCleanup";
 const FUNCTION_PROCESS_PLAYED = "processPlayed";
 const FUNCTION_MARK_PROCESSED = "updateUrlAsProcessed";
 const FUNCTION_MARK_UNPROCESSED = "updateUrlAsUnprocessed";
+const FUNCTION_MARK_TOMORROW = "updateUrlAsTryTomorrow";
 
 const MAX_GAMES_PER_CALL = 500;
 
@@ -64,7 +65,6 @@ export function processUserList(event, context, callback: Callback) {
 
 // Lambda to get files to be processed and invoke the lambdas to do that
 export function fireFileProcessing(event, context, callback: Callback) {
-    console.log("fireFileProcessing");
     console.log(event);
     let count = PROCESS_COUNT;
     if (event.hasOwnProperty("count")) count = event.count;
@@ -74,9 +74,10 @@ export function fireFileProcessing(event, context, callback: Callback) {
     }
     const promise = invokeLambdaSync("{}", INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload)
         .then(data => {
-            console.log(data);
-            const files = data as [ToProcessElement];
+            const files = data as ToProcessElement[];
             files.forEach(element => {
+                // if (event.hasOwnProperty("processMethod")) console.log(element);
+                console.log(element);
                 if (element.processMethod == METHOD_PROCESS_USER) {
                     return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
                 } else if (element.processMethod == METHOD_PROCESS_COLLECTION) {
@@ -96,13 +97,11 @@ export function fireFileProcessing(event, context, callback: Callback) {
 
 // Lambda to harvest data about a game
 export async function processGame(event, context, callback: Callback) {
-    console.log("processGame");
     console.log(event);
     const invocation = event as FileToProcess;
     const data = await request(encodeURI(invocation.url));
     try {
         const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data.toString());
-        console.log(result);
         await invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result);
         callback(null, null);
     } catch (err) {
@@ -119,17 +118,12 @@ export async function processGame(event, context, callback: Callback) {
 
 // Lambda to harvest data about a user
 export function processUser(event, context, callback: Callback) {
-    console.log("processUser");
     console.log(event);
     const invocation = event as FileToProcess;
 
     promiseToCallback(
         request(encodeURI(invocation.url))
             .then(data => extractUserDataFromPage(invocation.geek, invocation.url, data.toString()))
-            .then(result => {
-                console.log(result);
-                return result;
-            })
             .then(result => invokeLambdaAsync("processUser", INSIDE_PREFIX + FUNCTION_PROCESS_USER_RESULT, result)),
         callback);
 }
@@ -140,6 +134,7 @@ export async function processCollection(event, context, callback: Callback) {
     const invocation = event as FileToProcess;
     try {
         await tryToProcessCollection(invocation);
+        await markTryAgainTomorrow("processCollection", invocation);
         callback(null, null);
     } catch (e) {
         console.log(e);
@@ -149,11 +144,21 @@ export async function processCollection(event, context, callback: Callback) {
 }
 
 // return success
-async function tryToProcessCollection(invocation: FileToProcess) {
+async function tryToProcessCollection(invocation: FileToProcess): Promise<number> {
     const options = { uri: encodeURI(invocation.url), resolveWithFullResponse: true };
-    let response = await request.get(options);
-    if (response.statusCode == 202) {
-        throw new Error("BGG says to wait a bit.");
+    let response;
+    try {
+        response = await request.get(options);
+        console.log("got response");
+        console.log(response);
+        if (response.statusCode == 202) {
+            throw new Error("BGG says to wait a bit.");
+            // return 202;
+        }
+    } catch (e) {
+        // 504 is a BGG timeout.
+        if ((e as Error).message.lastIndexOf("504") >= 0) return 504;
+        throw e;
     }
     const collection = await extractUserCollectionFromPage(invocation.geek, invocation.url, response.body.toString());
     console.log(collection);
@@ -163,6 +168,7 @@ async function tryToProcessCollection(invocation: FileToProcess) {
     }
     await cleanupCollection(collection, invocation.url);
     console.log("cleaned up collection");
+    return 200;
 }
 
 async function cleanupCollection(collection: ProcessCollectionResult, url: string) {
@@ -182,6 +188,10 @@ async function markAsUnprocessed(context: string, fileDetails: FileToProcess) {
     return invokeLambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_UNPROCESSED, fileDetails);
 }
 
+async function markTryAgainTomorrow(context: string, fileDetails: FileToProcess) {
+    return invokeLambdaAsync(context, INSIDE_PREFIX + FUNCTION_MARK_TOMORROW, fileDetails);
+}
+
 function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {
     return _.chunk(original.items, MAX_GAMES_PER_CALL)
         .map(items => { return { geek: original.geek, items: items } as ProcessCollectionResult});
@@ -191,7 +201,6 @@ export async function processPlayed(event, context, callback: Callback) {
     console.log(event);
     const invocation = event as FileToProcess;
     const data = await request(encodeURI(invocation.url)) as string;
-    console.log(data);
     const toAdd = [] as MonthPlayed[];
     data.split("\n")
         .filter(line => line.indexOf(">By date<") >= 0)
@@ -199,11 +208,9 @@ export async function processPlayed(event, context, callback: Callback) {
             const s = between(line, '/end/', '"');
             const fields = s.split('-');
             const data = { month: parseInt(fields[1]), year: parseInt(fields[0]) } as MonthPlayed;
-            console.log(data);
             toAdd.push(data);
         });
     const monthsData = { geek: invocation.geek, monthsPlayed: toAdd, url: invocation.url } as ProcessMonthsPlayedResult;
-    console.log(monthsData);
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYED_RESULT, monthsData);
 }
 
@@ -212,7 +219,6 @@ export async function processPlays(event, context, callback: Callback) {
     const invocation = event as FileToProcess;
     const data = await request(encodeURI(invocation.url)) as string;
     const playsData = await processPlaysFile(data, invocation);
-    console.log(playsData);
     const playsResult = { geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url } as ProcessPlaysResult;
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
 }

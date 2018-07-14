@@ -27,7 +27,7 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
             // const name = item.name[0]._;
             const stats = item.stats[0];
             const status = item.status[0];
-            const gameItem: CollectionGame = { gameId: gameId };
+            const gameItem = { gameId: gameId } as CollectionGame;
             if (stats) {
                 const rating = stats.rating;
                 if (rating && rating.length > 0) {
@@ -157,7 +157,7 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         result.rank = ranking; // TODO
         result.expansions = expIds;
     }
-    console.log(result);
+    // console.log(result);
     return result;
 }
 
