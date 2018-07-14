@@ -10,13 +10,28 @@
     "aws-sdk": "^2.259.1",
     "graphql": "^0.12.3",
     "graphql-tag": "^2.7.3",
+    "lodash": "^4.17.10",
     "mysql": "^2.15.0",
+    "npm": "^6.2.0",
     "promise-mysql": "^3.2.1",
     "serverless": "^1.28.0"
   },
   "devDependencies": {
+    "@types/chai": "^4.1.4",
+    "@types/mocha": "^5.2.4",
     "@types/node": "^8.5.2",
+    "chai": "^4.1.2",
+    "mocha": "^5.2.0",
+    "mocha-typescript": "^1.1.16",
     "serverless-domain-manager": "^2.4.0",
-    "serverless-plugin-typescript": "^1.1.5"
+    "serverless-plugin-typescript": "^1.1.5",
+    "source-map-support": "^0.5.6",
+    "typescript": "^2.9.2"
+  },
+  "scripts": {
+    "pretest": "tsc",
+    "test": "mocha",
+    "watch": "mocha-typescript-watch",
+    "prepare": "tsc"
   }
 }

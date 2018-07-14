@@ -8,6 +8,8 @@ import {
     WarTableRow
 } from "./interfaces";
 import {count, returnWithConnection, withConnection, withConnectionAsync} from "./library";
+import * as _ from "lodash";
+import {inferExtraPlays, ExpansionData} from "./plays";
 
 export function updateGame(data: ProcessGameResult): Promise<void> {
     return withConnection(conn => doUpdateGame(conn, data));
@@ -17,13 +19,8 @@ export function recordGameExpansions(gameId: number, expansions: number[]) {
     return withConnection(conn => doRecordGameExpansions(conn, gameId, expansions));
 }
 
-// def saveGameExpands(db, id, bases):
-// db.execute("delete from expansions where expansion = %d" % id)
-// for b in bases:
-// db.execute("insert into expansions (basegame, expansion) values (%s, %d)" % (b, id))
-
 async function doRecordGameExpansions(conn: mysql.Connection, gameId: number, expansions: number[]) {
-    const deleteSql = "delete from expansions where expansion = ?";
+    const deleteSql = "delete from expansions where basegame = ?";
     const insertSql = "insert into expansions (basegame, expansion) values (?, ?)";
     await conn.query(deleteSql, gameId);
     for (const exp of expansions) {
@@ -481,19 +478,25 @@ export async function ensurePlaysGames(gameIds: number[]) {
     await withConnection(conn => doEnsureGames(conn, gameIds));
 }
 
-export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number) {
+function playDate(play: NormalisedPlays): number {
+    return play.year * 10000 + play.month * 100 + play.date;
+}
+
+export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, expansionData: ExpansionData) {
     console.log("normalising plays for " + geekId + " " + month + " " + year);
     const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
     const rows = await conn.query(selectSql, [geekId, month, year]);
     const rawData = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
     console.log(rawData);
+    const byDate = _.groupBy(rawData, playDate);
+    const allPlays = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays, expansionData)));
+    console.log(allPlays);
 }
 
 function extractNormalisedPlayFromPlayRow(row: object, geek: number, month: number, year: number): NormalisedPlays {
     const playDate = row["playDate"].toString();
     const date = parseInt(playDate.split(" ")[2]);
-    const result = { month, year, geek, date, game: row["game"], quantity: row["quantity"] } as NormalisedPlays;
-    return result;
+    return { month, year, geek, date, game: row["game"], quantity: row["quantity"] } as NormalisedPlays;
 }
 
 export async function doSetGeekPlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, plays: PlayData[]) {
@@ -524,4 +527,8 @@ async function countWhere(conn: mysql.Connection, where: string, params: any[]) 
 async function getGamesThatDontExist(conn: mysql.Connection): Promise<number[]> {
     const sql = "select bggid from not_games";
     return (await conn.query(sql)).map(row => row.bggid);
+}
+
+export async function loadExpansionData(conn: mysql.Connection): Promise<ExpansionData> {
+    return new ExpansionData(await conn.query("select basegame, expansion from expansions"));
 }

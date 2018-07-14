@@ -1,7 +1,7 @@
 import mysql = require('promise-mysql');
 import {Callback} from 'aws-lambda';
 
-export function withConnection(func: (conn: mysql.Connection) => Promise<void>): Promise<void> {
+export function withConnection(func: (conn: mysql.Connection) => Promise<any>): Promise<any> {
     let connection;
     return getConnection()
         .then(conn => {
@@ -16,7 +16,7 @@ export function withConnection(func: (conn: mysql.Connection) => Promise<void>):
         });
 }
 
-export async function withConnectionAsync(func: (conn: mysql.Connection) => Promise<void>) {
+export async function withConnectionAsync(func: (conn: mysql.Connection) => Promise<any>) {
     let connection = await getConnection();
     try {
         await func(connection);
@@ -44,7 +44,7 @@ export function returnWithConnection<T>(func: (conn: mysql.Connection) => Promis
         .then(() => result);
 }
 
-export function getConnection(): Promise<mysql.Connection> {
+export async function getConnection(): Promise<mysql.Connection> {
     const params = {
         host: process.env.mysqlHost,
         user: process.env.mysqlUsername,

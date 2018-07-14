@@ -145,3 +145,13 @@ export interface NormalisedPlays {
     month: number;
     year: number;
 }
+
+export interface WorkingNormalisedPlays extends NormalisedPlays {
+    expansions: number[];
+    isExpansion: boolean;
+}
+
+export interface ExpansionRow {
+    basegame: number;
+    expansion: number;
+}

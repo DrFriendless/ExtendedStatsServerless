@@ -5,7 +5,7 @@ import {
     ensureGames, ensureMonthsPlayed, ensurePlaysGames, ensureProcessPlaysFiles,
     ensureUsers, getGeekId,
     listToProcess,
-    listToProcessByMethod,
+    listToProcessByMethod, loadExpansionData,
     markGameDoesNotExist,
     markUrlProcessed, markUrlTryTomorrow,
     markUrlUnprocessed, recordGameExpansions,
@@ -41,22 +41,32 @@ export async function processGameResult(event, context, callback: Callback) {
     }
 }
 
-export function processUserResult(event, context, callback: Callback) {
+export async function processUserResult(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    console.log(event);
     const data = event as ProcessUserResult;
-    const promise = updateUserValues(data.geek, data.bggid, data.country)
-        .then(() => markUrlProcessed("processUser", data.url));
-    promiseToCallback(promise, callback);
+    try {
+        await updateUserValues(data.geek, data.bggid, data.country);
+        await markUrlProcessed("processUser", data.url);
+        callback(null, null);
+    } catch (e) {
+        console.log(e);
+        callback(e);
+    }
 }
 
 // Lambda to receive the list of users from processUserList and make sure they are all in the database
-export function updateUserList(event, context, callback: Callback) {
+export async function updateUserList(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const body = event as string;
     const usernames = body.split(/\r?\n/);
     console.log("checking for " + usernames.length + " users");
-    promiseToCallback(ensureUsers(usernames), callback);
+    try {
+        await ensureUsers(usernames);
+        callback(null, null);
+    } catch (e) {
+        console.log(e);
+        callback(e);
+    }
 }
 
 // Lambda to retrieve some number of files that need processing
@@ -136,9 +146,10 @@ export async function processPlaysResult(event, context, callback: Callback) {
         }
         const conn = await getConnection();
         const geekId = await getGeekId(conn, params.geek);
+        const expansionData = await loadExpansionData(conn);
         await ensurePlaysGames(gameIds);
         await doSetGeekPlaysForMonth(conn, geekId, params.month, params.year, params.plays);
-        await doNormalisePlaysForMonth(conn, geekId, params.month, params.year);
+        await doNormalisePlaysForMonth(conn, geekId, params.month, params.year, expansionData);
         await markUrlProcessed("processPlays", params.url);
         callback(null, null);
     } catch (e) {
@@ -152,26 +163,40 @@ export async function updateUrlAsProcessed(event, context, callback: Callback) {
     const params = event as FileToProcess;
     try {
         await markUrlProcessed(params.processMethod, params.url);
+        callback(null, null);
     } catch (e) {
         callback(e);
     }
 }
 
-export function updateUrlAsUnprocessed(event, context, callback: Callback) {
+export async function updateUrlAsUnprocessed(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
-    promiseToCallback(markUrlUnprocessed(params.processMethod, params.url), callback);
+    try {
+        await markUrlUnprocessed(params.processMethod, params.url);
+        callback(null, null);
+    } catch (e) {
+        callback(e);
+    }
 }
 
-export function updateUrlAsTryTomorrow(event, context, callback: Callback) {
+export async function updateUrlAsTryTomorrow(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
-    promiseToCallback(markUrlTryTomorrow(params.processMethod, params.url), callback);
+    try {
+        await markUrlTryTomorrow(params.processMethod, params.url);
+        callback(null, null);
+    } catch (e) {
+        callback(e);
+    }
 }
 
-export function updateGameAsDoesNotExist(event, context, callback: Callback) {
+export async function updateGameAsDoesNotExist(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    console.log(event);
-    const bggid = event.bggid;
-    promiseToCallback(markGameDoesNotExist(bggid), callback);
+    try {
+        await markGameDoesNotExist(event.bggid);
+        callback(null, null);
+    } catch (e) {
+        callback(e);
+    }
 }
