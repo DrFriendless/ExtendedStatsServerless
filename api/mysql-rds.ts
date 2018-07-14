@@ -1,7 +1,7 @@
 import mysql = require('promise-mysql');
 import {SystemStats, TypeCount} from "./admin-interfaces"
-import {GeekGame, GeekGameQuery} from "./collection-interfaces";
-import {count, getConnection, returnWithConnection} from "./library";
+import {GeekGame, GeekGameQuery, WarTableRow} from "./collection-interfaces";
+import {asyncReturnWithConnection, count, getConnection, returnWithConnection} from "./library";
 import {RankingTableRow} from "./ranking-interfaces";
 
 export function listGeekGames(query: GeekGameQuery): Promise<GeekGame[]> {
@@ -124,8 +124,37 @@ function gatherTypeCount(row: any): TypeCount {
     return { type: row.processMethod, existing: row["count(url)"], unprocessed: 0, waiting: 0 } as TypeCount;
 }
 
+export async function listWarTable(): Promise<WarTableRow[]> {
+    const sql = "select * from war_table order by lower(geekName) asc";
+    return asyncReturnWithConnection(conn => conn.query(sql).map(makeWarTableRow));
+}
+
+function makeWarTableRow(row: object): WarTableRow {
+    return {
+        geek: row.geek,
+        geekName: row.geekName,
+        total_plays: row.totalPlays,
+        distinct_games: row.distinctGames,
+        top50: row.top50,
+        sdj: row.sdj,
+        owned: row.owned,
+        want: row.want,
+        wish: row.wish,
+        forTrade: row.trade,
+        prevOwned: row.prevOwned,
+        friendless: row.friendless,
+        cfm: row.cfm,
+        utilisation: row.utilisation,
+        tens: row.tens,
+        zeros: row.zeros,
+        mostVoters: row.mv,
+        top100: row.ext100,
+        hindex: row.hindex,
+        preordered: row.preordered
+    } as WarTableRow;
+}
+
 export function listUsers(): Promise<string[]> {
-    console.log("listUsers");
     const sql = "select username from geeks";
     return returnWithConnection(conn => conn.query(sql).then(data => data.map(row => row['username'])));
 }

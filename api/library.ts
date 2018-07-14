@@ -32,6 +32,15 @@ export function returnWithConnection<T>(func: (conn: mysql.Connection) => Promis
         .then(() => result);
 }
 
+export async function asyncReturnWithConnection<T>(func: (conn: mysql.Connection) => Promise<T>): Promise<T> {
+    const connection = await getConnection();
+    try {
+        return await func(connection);
+    } finally {
+        if (connection) connection.destroy();
+    }
+}
+
 export function getConnection(): Promise<mysql.Connection> {
     const params = {
         host: process.env.mysqlHost,
