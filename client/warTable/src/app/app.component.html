@@ -1,0 +1,54 @@
+<div class="war-table" *ngIf="!!rows">
+  <table class="table table-striped extstats-table" [mfData]="rows" #mf="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'name'" [mfSortOrder]="'asc'">
+    <thead>
+    <tr>
+      <th><mfDefaultSorter by="geekName">Geek</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="totalPlays">Total Plays</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="distinctGames">Distinct Games</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="owned">Owned</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="want">Want in Trade</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="wish">Wishlist</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="trade">For Trade</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="sdj">Spiel des Jahre</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="top50">BGG Top 50</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="ext100">Ext Stats Top 100</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="mv">Most Voters</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="prevOwned">Prev Owned</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="friendless">Friendless</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="cfm">CFM</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="zeros">0s</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="tens">10s</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="hindex">H-Index</mfDefaultSorter></th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let row of mf.data">
+      <td><a href="http://extstats.drfriendless.com/collection.html?geek={{row.geekName}}">{{row.geekName}}</a></td>
+      <td>{{row.totalPlays}}</td>
+      <td>{{row.distinctGames}}</td>
+      <td>{{row.owned}}</td>
+      <td>{{row.want}}</td>
+      <td>{{row.wish}}</td>
+      <td>{{row.trade}}</td>
+      <td>{{row.sdj}}</td>
+      <td>{{row.top50}}</td>
+      <td>{{row.ext100}}</td>
+      <td>{{row.mv}}</td>
+      <td>{{row.prevOwned}}</td>
+      <td>{{row.friendless}}</td>
+      <td>{{row.cfm}}</td>
+      <td>{{row.zeros}}</td>
+      <td>{{row.tens}}</td>
+      <td>{{row.hindex}}</td>
+    </tr>
+    </tbody>
+    <tfoot>
+    <tr>
+      <td colspan="4">
+        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]"></mfBootstrapPaginator>
+      </td>
+    </tr>
+    </tfoot>
+  </table>
+</div>
+
