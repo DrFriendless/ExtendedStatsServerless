@@ -1,23 +1,39 @@
 /* Styles for war-table */
 
-ranking-table .table.table-striped.extstats-table .pagination li:not(.active) a:hover {
+.war-table table.extstats-table tfoot ul.pagination li:not(.active) a:hover {
   background-color: #ddd;
 }
-ranking-table .table.table-striped.extstats-table .pagination li.active {
-  background-color: #4054b2;
+.war-table table.extstats-table tfoot ul.pagination li.active a {
+  background-color: green;
   color: white;
 }
 
-ranking-table .table.extstats-table td,
-.table.extstats-table tbody,
-.table.extstats-table thead,
-.table.extstats-table.table thead th {
+.war-table table.extstats-table td,
+.war-table table.extstats-table tbody,
+.war-table table.extstats-table thead,
+.war-table table.extstats-table.table thead th {
   border-color: #673fb4;
 }
 /* border colour modified to 16 saturation */
-ranking-table .table.table-striped.extstats-table tbody tr:nth-child(odd){
+.war-table table.table-striped.extstats-table tbody tr:nth-child(odd){
   background-color: rgba(170, 146, 174, 0.5);
 }
-ranking-table .table.table-striped.extstats-table tbody tr:nth-child(even){
+.war-table table.table-striped.extstats-table tbody tr:nth-child(even){
   background-color: white;
 }
+
+.war-table div.extstats-doc button {
+  border: solid 1px #4054b2;
+}
+.war-table div.extstats-doc li.nav-item a.nav-link.active {
+  color: #4054b2;
+}
+.war-table div.extstats-doc li.nav-item a.nav-link {
+  color: #777777;
+  font-size: 14px;
+  border-radius: unset;
+}
+.war-table div.collapse {
+  margin-top: 1rem;
+}
+

@@ -9,7 +9,7 @@ body {
     padding: 0 4px;
     border-top: 0;
 }
-.table.extstats-table {
+.table.extstats-table, div.extstats-doc {
     margin-left: 1rem;
     margin-right: 1rem;
     width: 95%;
@@ -50,3 +50,15 @@ ul.pagination {
     text-decoration: none;
 }
 
+/* documentation widgets */
+div.extstats-doc {
+    margin-bottom: 1rem;
+    font-size: 14px;
+}
+div.extstats-doc button {
+    color: #777777;
+    font-size: 14px;
+    line-height: 18px;
+    background-color: white;
+    border-radius: unset;
+}
