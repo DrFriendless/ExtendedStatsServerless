@@ -6,7 +6,6 @@
   "dependencies": {
     "@types/aws-lambda": "0.0.17",
     "aws-sdk": "^2.259.1",
-    "metalsmith": "^2.3.0",
     "npm": "^6.1.0",
     "serverless": "^1.27.3"
   },

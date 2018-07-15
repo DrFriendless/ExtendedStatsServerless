@@ -3,7 +3,7 @@ import { NgModule } from '@angular/core';
 
 import {WarTableComponent} from './app.component';
 import {HttpClientModule} from "@angular/common/http";
-import {DataTableModule} from "angular-6-datatable";
+import {DataTableModule} from "extstats-datatable";
 
 @NgModule({
   declarations: [

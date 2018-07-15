@@ -1,5 +1,5 @@
 <div class="war-table" *ngIf="!!rows">
-  <table class="table table-striped extstats-table" [mfData]="rows" #mf="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'name'" [mfSortOrder]="'asc'">
+  <table class="table table-striped extstats-table" [mfData]="rows" #warTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'geekName'" [mfSortOrder]="'asc'">
     <thead>
     <tr>
       <th><mfDefaultSorter by="geekName">Geek</mfDefaultSorter></th>
@@ -22,7 +22,7 @@
     </tr>
     </thead>
     <tbody>
-    <tr *ngFor="let row of mf.data">
+    <tr *ngFor="let row of warTable.data">
       <td><a href="http://extstats.drfriendless.com/collection.html?geek={{row.geekName}}">{{row.geekName}}</a></td>
       <td>{{row.totalPlays}}</td>
       <td>{{row.distinctGames}}</td>
@@ -45,7 +45,7 @@
     <tfoot>
     <tr>
       <td colspan="4">
-        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]"></mfBootstrapPaginator>
+        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]" [mfTable]="warTable"></mfBootstrapPaginator>
       </td>
     </tr>
     </tfoot>
