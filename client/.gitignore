@@ -6,4 +6,4 @@ jspm_packages
 .serverless
 env.yml
 
-static/
+static
