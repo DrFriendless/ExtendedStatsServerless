@@ -6,8 +6,8 @@
   "dependencies": {
     "@types/aws-lambda": "0.0.17",
     "aws-sdk": "^2.259.1",
-    "npm": "^6.1.0",
-    "serverless": "^1.27.3"
+    "npm": "^6.2.0",
+    "serverless": "^1.28.0"
   },
   "devDependencies": {
     "@angular/cli": "^6.0.8",

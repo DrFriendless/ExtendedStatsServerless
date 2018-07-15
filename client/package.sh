@@ -5,6 +5,6 @@ for F in src/*.mustache
     do
     FILENAME=`basename ${F}`
     FILENAME=${FILENAME%%.*}
-    mustache -p src/partials/*.mustache values.json ${F} >static/${FILENAME}.html
+    mustache values.json -p src/partials/*.mustache ${F} >static/${FILENAME}.html
     done
 
