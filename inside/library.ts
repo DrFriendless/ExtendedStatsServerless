@@ -27,7 +27,7 @@ export async function withConnectionAsync(func: (conn: mysql.Connection) => Prom
     }
 }
 
-export function returnWithConnection<T>(func: (conn: mysql.Connection) => Promise<T>): Promise<T> {
+export function returnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
     let connection;
     let result;
     return getConnection()
@@ -54,7 +54,7 @@ export async function getConnection(): Promise<mysql.Connection> {
     return mysql.createConnection(params);
 }
 
-export function count(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
+export function count(conn: mysql.Connection, sql: string, params: any[]): PromiseLike<number> {
     return conn.query(sql, params).then(result => result[0]["count(*)"]);
 }
 

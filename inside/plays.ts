@@ -58,9 +58,22 @@ function toWorkingPlay(expansionData: ExpansionData, play: NormalisedPlays): Wor
 // #         result.append(play)
 // #     return result, messages, False
 
-export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: ExpansionData): NormalisedPlays[] {
+function sumQuantities(plays: WorkingNormalisedPlays[]): WorkingNormalisedPlays {
+    if (plays.length === 1) return plays[0];
+    const total = plays.map(p => p.quantity).reduce((a,b) => a + b);
+    plays[0].quantity = total;
+    return plays[0];
+}
+
+function coalescePlays(initial: WorkingNormalisedPlays[]): WorkingNormalisedPlays[] {
+    const byGame = _.groupBy(initial, wnp => wnp.game);
+    return Object.values(byGame).map(sumQuantities);
+}
+
+// figure out the canonical list of plays for a single geek on a single date
+export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: ExpansionData): WorkingNormalisedPlays[] {
     let current = initialPlays.map(play => toWorkingPlay(expansionData, play));
-    current.forEach(play => play.expansions = []);
+    current = coalescePlays(current);
     let iterations = 0;
     while (iterations < 100) {
         iterations++;
@@ -75,8 +88,6 @@ export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: 
 
 function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: ExpansionData): WorkingNormalisedPlays[] {
     const expansionPlays = current.filter(play => play.isExpansion);
-    console.log("expansion plays are");
-    console.log(expansionPlays);
     for (let expansionPlay of expansionPlays) {
         for (let basegamePlay of current) {
             if (Object.is(expansionPlay, basegamePlay)) continue;

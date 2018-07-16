@@ -5,7 +5,7 @@ import {
     ProcessGameResult,
     RankingTableRow,
     ToProcessElement,
-    WarTableRow
+    WarTableRow, WorkingNormalisedPlays
 } from "./interfaces";
 import {count, returnWithConnection, withConnection, withConnectionAsync} from "./library";
 import * as _ from "lodash";
@@ -144,9 +144,9 @@ async function updateRankingTableStatsForGame(conn: mysql.Connection, game: numb
     }
 }
 
-export function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
+export async function updateUserValues(geek: string, bggid: number, country: string): Promise<void> {
     const sql = "update geeks set country = ?, bggid = ? where username = ?";
-    return withConnection(conn => conn.query(sql, [country, bggid, geek]));
+    await withConnectionAsync(async conn => await conn.query(sql, [country, bggid, geek]));
 }
 
 export async function restrictCollectionToGames(geek: string, items: number[]) {
@@ -219,31 +219,25 @@ export function ensureUsers(users: string[]): Promise<void> {
         .then(() => console.log("All users processed."));
 }
 
-function doEnsureExactlyUsers(conn: mysql.Connection, users: string[]): Promise<void> {
-    let extraUsers;
+async function doEnsureExactlyUsers(conn: mysql.Connection, users: string[]): Promise<void> {
     const extraSql = "select username from geeks where username not in (?)";
-    return conn.query(extraSql, [users])
-        .then(xus => {
-            extraUsers = xus.map(it => it.username);
-        })
-        .then(() => doEnsureUsers(conn, users))
-        .then(() => deleteExtraUsers(conn, extraUsers));
+    const extraUsers = (await conn.query(extraSql, [users])).map(it => it.username);
+    await doEnsureUsers(conn, users);
+    await deleteExtraUsers(conn, extraUsers);
 }
 
-function deleteExtraUsers(conn: mysql.Connection, extraUsers: string[]): Promise<void> {
+async function deleteExtraUsers(conn: mysql.Connection, extraUsers: string[]): Promise<void> {
     console.log("Deleting " + extraUsers.length + " unwanted users.");
     const deleteOneFile = "delete from files where geek = ?";
     const deleteOneGeek = "delete from geeks where username = ?";
     const deleteSomeFiles = "delete from files where geek in (?)";
     const deleteSomeGeeks = "delete from geeks where username in (?)";
-    if (extraUsers.length === 0) {
-        return Promise.resolve();
-    } else if (extraUsers.length === 1) {
-        return conn.query(deleteOneFile, extraUsers)
-            .then(() => conn.query(deleteOneGeek, extraUsers));
+    if (extraUsers.length === 1) {
+        await conn.query(deleteOneFile, extraUsers);
+        await conn.query(deleteOneGeek, extraUsers);
     } else {
-        return conn.query(deleteSomeFiles, [extraUsers])
-            .then(() => conn.query(deleteSomeGeeks, [extraUsers]));
+        await conn.query(deleteSomeFiles, [extraUsers]);
+        await conn.query(deleteSomeGeeks, [extraUsers]);
     }
 }
 
@@ -358,28 +352,26 @@ function listMinus(ints: number[], takeaway: number[]): number[] {
     return ints.filter(x => takeaway.indexOf(x) < 0);
 }
 
-function doRecordGame(conn: mysql.Connection, bggid: number): Promise<void> {
+async function doRecordGame(conn: mysql.Connection, bggid: number): Promise<void> {
     const GAME_URL = "https://boardgamegeek.com/xmlapi/boardgame/%d&stats=1";
     const url = GAME_URL.replace("%d", bggid.toString());
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
     const tillNext = TILL_NEXT_UPDATE["processGame"];
     const insertParams = [url, "processGame", null, null, tillNext, "Game #" + bggid, bggid];
-    return conn.query(insertSql, insertParams).catch(err => {});
+    await conn.query(insertSql, insertParams).catch(err => {});
 }
 
 
-function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string,
+async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string,
                       bggid: number | null, month: number | null, year: number | null, geekid: number | null): Promise<void> {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    return count(conn, countSql, [url, processMethod])
-        .then(count => {
-            if (count === 0) {
-                const tillNext = TILL_NEXT_UPDATE[processMethod];
-                const insertParams = [url, processMethod, user, null, tillNext, description, bggid, month, year, geekid];
-                return conn.query(insertSql, insertParams).catch(err => {});
-            }
-        });
+    const found = await count(conn, countSql, [url, processMethod]);
+    if (found === 0) {
+        const tillNext = TILL_NEXT_UPDATE[processMethod];
+        const insertParams = [url, processMethod, user, null, tillNext, description, bggid, month, year, geekid];
+        await conn.query(insertSql, insertParams).catch(err => {});
+    }
 }
 
 function doEnsureFileProcessUser(conn: mysql.Connection, geek: string, geekid: number): Promise<void> {
@@ -485,12 +477,28 @@ function playDate(play: NormalisedPlays): number {
 export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, expansionData: ExpansionData) {
     console.log("normalising plays for " + geekId + " " + month + " " + year);
     const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
+    const deleteSql = "delete from plays_normalised where geek = ? and month = ? and year = ?";
+    const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values (?, ?, ?, ?, ?, ?, 0)";
+    const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
+    const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values (?, ?, ?, ?, ?, ?, 1, ?)";
     const rows = await conn.query(selectSql, [geekId, month, year]);
     const rawData = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
-    console.log(rawData);
     const byDate = _.groupBy(rawData, playDate);
-    const allPlays = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays, expansionData)));
+    const allPlays = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays as NormalisedPlays[], expansionData))) as WorkingNormalisedPlays[];
     console.log(allPlays);
+    await conn.query(deleteSql, [geekId, month, year]);
+    for (let np of allPlays) {
+        await conn.query(insertBasePlaySql, [np.game, geekId, np.quantity, np.year, np.month, np.date]);
+        if (np.expansions.length > 0) {
+            console.log("has expansioms");
+            console.log([np.game, geekId, np.quantity, np.year, np.month, np.date]);
+            const id = (await conn.query(getIdSql, [np.game, geekId, np.quantity, np.year, np.month, np.date]))[0].id;
+            for (let e of np.expansions) {
+                const eparams = [e, geekId, np.quantity, np.year, np.month, np.date, id];
+                await conn.query(insertExpansionPlaySql, eparams);
+            }
+        }
+    }
 }
 
 function extractNormalisedPlayFromPlayRow(row: object, geek: number, month: number, year: number): NormalisedPlays {

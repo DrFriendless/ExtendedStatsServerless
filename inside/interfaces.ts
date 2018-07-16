@@ -144,6 +144,9 @@ export interface NormalisedPlays {
     date: number;
     month: number;
     year: number;
+    baseplay: number;
+    expansionPlay: boolean;
+    id: number;
 }
 
 export interface WorkingNormalisedPlays extends NormalisedPlays {
