@@ -140,12 +140,12 @@ export async function processPlaysResult(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as ProcessPlaysResult;
     console.log(params);
+    const conn = await getConnection();
     try {
         const gameIds = [];
         for (const play of params.plays) {
             if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
         }
-        const conn = await getConnection();
         const geekId = await getGeekId(conn, params.geek);
         const expansionData = await loadExpansionData(conn);
         await ensurePlaysGames(gameIds);
@@ -168,6 +168,8 @@ export async function processPlaysResult(event, context, callback: Callback) {
     } catch (e) {
         console.log(e);
         callback(e);
+    } finally {
+        if (conn) conn.destroy();
     }
 }
 
