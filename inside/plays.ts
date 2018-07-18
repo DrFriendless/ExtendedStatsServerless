@@ -141,11 +141,8 @@ export class ExpansionData {
     private expansionToBaseGames: object;
 
     constructor(rows: ExpansionRow[]) {
-        console.log(rows);
         this.gameToExpansions = _.mapValues(_.groupBy(rows, row => row.basegame), (rs: ExpansionRow[]) => rs.map(row => row.expansion));
-        console.log(this.gameToExpansions);
         this.expansionToBaseGames = _.mapValues(_.groupBy(rows, row => row.expansion), (rs: ExpansionRow[]) => rs.map(row => row.basegame));
-        console.log(this.expansionToBaseGames);
     }
 
     public isExpansion(game: number): boolean {

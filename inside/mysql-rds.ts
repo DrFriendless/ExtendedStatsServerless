@@ -179,6 +179,11 @@ export async function markUrlProcessed(processMethod: string, url: string) {
     await withConnectionAsync(async conn => await conn.query(sqlSet, [delta, url, processMethod]));
 }
 
+export async function markUrlProcessedWithUpdate(processMethod: string, url: string, delta: string) {
+    const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
+    await withConnectionAsync(async conn => await conn.query(sqlSet, [delta, url, processMethod]));
+}
+
 export async function markUrlUnprocessed(processMethod: string, url: string) {
     const sqlSet = "update files set last_scheduled = null where url = ? and processMethod = ?";
     await withConnectionAsync(async conn => await conn.query(sqlSet, [url, processMethod]));
@@ -390,7 +395,7 @@ function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string, gee
 }
 
 export function listToProcess(count: number): Promise<ToProcessElement[]> {
-    const sql = "select * from files where (lastUpdate is null || nextUpdate is null || nextUpdate < now()) and (processMethod != 'processPlays') and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    const sql = "select * from files where (lastUpdate is null || nextUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
     return returnWithConnection(conn => conn.query(sql, [count]).map(row => row as ToProcessElement));
 }
 
@@ -419,6 +424,14 @@ export async function updateFrontPageGeek(geekName: string) {
     await withConnectionAsync(async conn => await doUpdateFrontPageGeek(conn, geekName));
 }
 
+async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number) {
+    const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
+    const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
+    const tensSql = "select count(plays.g) from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
+    const distinct_games = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
+    const total_plays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
+}
+
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
     const geekId = await getGeekId(conn, geekName);
     const owned = await countWhere(conn, "geekgames where geekId = ? and owned > 0", [geekId]);
@@ -427,6 +440,7 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
     const forTrade = await countWhere(conn, "geekgames where geekId = ? and trade > 0", [geekId]);
     const prevOwned = await countWhere(conn, "geekgames where geekId = ? and prevowned > 0", [geekId]);
     const preordered = await countWhere(conn, "geekgames where geekId = ? and preordered > 0", [geekId]);
+    const playsDataForWarTable = await gatherPlaysDataForWarTable(conn, geekId);
     const fpg: WarTableRow = {
         geek: geekId,
         geekName: geekName,
@@ -475,7 +489,7 @@ function playDate(play: NormalisedPlays): number {
 }
 
 export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, expansionData: ExpansionData) {
-    console.log("normalising plays for " + geekId + " " + month + " " + year);
+    // console.log("normalising plays for " + geekId + " " + month + " " + year);
     const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
     const deleteSql = "delete from plays_normalised where geek = ? and month = ? and year = ?";
     const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values (?, ?, ?, ?, ?, ?, 0)";
@@ -485,13 +499,12 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
     const rawData = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
     const byDate = _.groupBy(rawData, playDate);
     const allPlays = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays as NormalisedPlays[], expansionData))) as WorkingNormalisedPlays[];
-    console.log(allPlays);
     await conn.query(deleteSql, [geekId, month, year]);
     for (let np of allPlays) {
         await conn.query(insertBasePlaySql, [np.game, geekId, np.quantity, np.year, np.month, np.date]);
         if (np.expansions.length > 0) {
-            console.log("has expansioms");
-            console.log([np.game, geekId, np.quantity, np.year, np.month, np.date]);
+            // console.log("has expansioms");
+            // console.log([np.game, geekId, np.quantity, np.year, np.month, np.date]);
             const id = (await conn.query(getIdSql, [np.game, geekId, np.quantity, np.year, np.month, np.date]))[0].id;
             for (let e of np.expansions) {
                 const eparams = [e, geekId, np.quantity, np.year, np.month, np.date, id];

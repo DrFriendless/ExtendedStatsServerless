@@ -7,7 +7,7 @@ import {
     listToProcess,
     listToProcessByMethod, loadExpansionData,
     markGameDoesNotExist,
-    markUrlProcessed, markUrlTryTomorrow,
+    markUrlProcessed, markUrlProcessedWithUpdate, markUrlTryTomorrow,
     markUrlUnprocessed, recordGameExpansions,
     restrictCollectionToGames,
     updateFrontPageGeek,
@@ -139,6 +139,7 @@ export async function processPlayedMonths(event, context, callback: Callback) {
 export async function processPlaysResult(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as ProcessPlaysResult;
+    console.log(params);
     try {
         const gameIds = [];
         for (const play of params.plays) {
@@ -150,7 +151,19 @@ export async function processPlaysResult(event, context, callback: Callback) {
         await ensurePlaysGames(gameIds);
         await doSetGeekPlaysForMonth(conn, geekId, params.month, params.year, params.plays);
         await doNormalisePlaysForMonth(conn, geekId, params.month, params.year, expansionData);
-        await markUrlProcessed("processPlays", params.url);
+        const now = new Date();
+        const nowMonth = now.getFullYear() * 12 + now.getMonth();
+        const thenMonth = params.year * 12 + params.month;
+        let delta;
+        if (nowMonth - thenMonth > 6) {
+            delta = '838:00:00';
+        } else if (nowMonth - thenMonth > 2) {
+            delta = '168:00:00';
+        } else {
+            delta = '72:00:00';
+        }
+        await markUrlProcessedWithUpdate("processPlays", params.url, delta);
+        console.log("processPlaysResult success");
         callback(null, null);
     } catch (e) {
         console.log(e);
