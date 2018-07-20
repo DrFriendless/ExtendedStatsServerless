@@ -240,7 +240,7 @@ async function deleteExtraUsers(conn: mysql.Connection, extraUsers: string[]): P
     if (extraUsers.length === 1) {
         await conn.query(deleteOneFile, extraUsers);
         await conn.query(deleteOneGeek, extraUsers);
-    } else {
+    } else if (extraUsers.length > 0) {
         await conn.query(deleteSomeFiles, [extraUsers]);
         await conn.query(deleteSomeGeeks, [extraUsers]);
     }
