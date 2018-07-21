@@ -1,5 +1,3 @@
-CREATE DATABASE `extended` /*!40100 DEFAULT CHARACTER SET latin1 */;
-
 -- MySQL dump 10.13  Distrib 5.7.22, for Linux (x86_64)
 --
 -- ------------------------------------------------------
@@ -28,7 +26,7 @@ CREATE TABLE `categories` (
   `name` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name_UNIQUE` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=3946 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -123,11 +121,14 @@ DROP TABLE IF EXISTS `expansions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `expansions` (
-  `basegame` int(10) unsigned NOT NULL,
-  `expansion` int(10) unsigned NOT NULL,
+  `basegame` int(11) NOT NULL,
+  `expansion` int(11) NOT NULL,
+  UNIQUE KEY `expansions_unique` (`basegame`,`expansion`),
   KEY `expansions_basegame` (`basegame`),
-  KEY `expansions_expansion` (`expansion`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  KEY `expansions_expansion` (`expansion`),
+  CONSTRAINT `fk_expansions_basegame` FOREIGN KEY (`basegame`) REFERENCES `games` (`bggid`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_expansions_expansion` FOREIGN KEY (`expansion`) REFERENCES `games` (`bggid`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -148,42 +149,12 @@ CREATE TABLE `files` (
   `lastattempt` datetime DEFAULT NULL,
   `last_scheduled` datetime DEFAULT NULL,
   `bggid` int(10) DEFAULT NULL,
+  `month` int(11) DEFAULT NULL,
+  `year` int(11) DEFAULT NULL,
+  `geekid` int(11) DEFAULT NULL,
   UNIQUE KEY `files_url_unique` (`url`),
   KEY `files_geek` (`geek`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `front_page_geeks`
---
-
-DROP TABLE IF EXISTS `front_page_geeks`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `front_page_geeks` (
-  `geek` int(11) NOT NULL DEFAULT '0',
-  `totalPlays` int(10) NOT NULL DEFAULT '0',
-  `distinctGames` int(10) NOT NULL DEFAULT '0',
-  `top50` int(10) NOT NULL DEFAULT '0',
-  `sdj` int(10) NOT NULL DEFAULT '0',
-  `the100` int(10) NOT NULL DEFAULT '0',
-  `owned` int(10) NOT NULL DEFAULT '0',
-  `want` int(10) NOT NULL DEFAULT '0',
-  `wish` int(10) NOT NULL DEFAULT '0',
-  `trade` int(10) NOT NULL DEFAULT '0',
-  `prevOwned` int(10) NOT NULL DEFAULT '0',
-  `friendless` int(10) NOT NULL DEFAULT '0',
-  `cfm` float DEFAULT '0',
-  `utilisation` float DEFAULT '0',
-  `tens` int(10) NOT NULL DEFAULT '0',
-  `zeros` int(10) NOT NULL DEFAULT '0',
-  `ext100` int(10) NOT NULL DEFAULT '0',
-  `mv` int(10) NOT NULL DEFAULT '0',
-  `hindex` int(10) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`geek`),
-  UNIQUE KEY `geek_UNIQUE` (`geek`),
-  CONSTRAINT `fk_front_page_geeks_geek` FOREIGN KEY (`geek`) REFERENCES `geeks` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -309,10 +280,12 @@ CREATE TABLE `geekgames` (
   `wanttobuy` tinyint(1) NOT NULL DEFAULT '0',
   `wanttoplay` tinyint(1) NOT NULL DEFAULT '0',
   `preordered` tinyint(1) NOT NULL DEFAULT '0',
+  `geekid` int(11) NOT NULL DEFAULT '0',
   UNIQUE KEY `geekgame_geek_game` (`geek`,`game`),
   KEY `geekgame_game` (`game`),
   KEY `geekgame_geek` (`geek`),
-  KEY `geek` (`geek`)
+  KEY `geek` (`geek`),
+  KEY `geekid` (`geekid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -413,7 +386,7 @@ CREATE TABLE `mechanics` (
   `name` varchar(255) DEFAULT NULL,
   UNIQUE KEY `id_UNIQUE` (`id`),
   UNIQUE KEY `name_UNIQUE` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=9722 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -430,18 +403,20 @@ CREATE TABLE `metadata` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `monthsplayed`
+-- Table structure for table `months_played`
 --
 
-DROP TABLE IF EXISTS `monthsplayed`;
+DROP TABLE IF EXISTS `months_played`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `monthsplayed` (
-  `geek` varchar(128) NOT NULL,
+CREATE TABLE `months_played` (
+  `geek` int(11) NOT NULL,
   `month` int(10) unsigned NOT NULL,
   `year` int(10) unsigned NOT NULL,
-  KEY `monthsplayed_geek` (`geek`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+  UNIQUE KEY `unique_index` (`geek`,`month`,`year`),
+  KEY `monthsplayed_geek` (`geek`),
+  CONSTRAINT `fk_months_played_geek` FOREIGN KEY (`geek`) REFERENCES `geeks` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -517,19 +492,47 @@ DROP TABLE IF EXISTS `plays`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `plays` (
-  `game` int(10) unsigned NOT NULL DEFAULT '0',
-  `geek` varchar(128) NOT NULL DEFAULT '',
+  `game` int(11) NOT NULL,
+  `geek` int(11) NOT NULL,
   `playDate` date NOT NULL,
   `quantity` int(10) unsigned NOT NULL DEFAULT '1',
   `basegame` int(10) DEFAULT '0',
   `raters` int(11) DEFAULT '0',
   `ratingsTotal` int(11) DEFAULT '0',
   `location` varchar(256) DEFAULT NULL,
+  `month` int(11) NOT NULL,
+  `year` int(11) NOT NULL,
   KEY `plays_index` (`geek`,`playDate`),
   KEY `plays_games` (`geek`,`game`),
   KEY `plays_game` (`game`),
-  KEY `plays_geek` (`geek`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  KEY `plays_geek` (`geek`),
+  CONSTRAINT `fk_plays_geek` FOREIGN KEY (`geek`) REFERENCES `geeks` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `plays_normalised`
+--
+
+DROP TABLE IF EXISTS `plays_normalised`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `plays_normalised` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `game` int(11) NOT NULL,
+  `geek` int(11) NOT NULL,
+  `quantity` int(10) unsigned NOT NULL,
+  `year` int(11) NOT NULL,
+  `month` int(11) NOT NULL,
+  `date` int(11) NOT NULL,
+  `expansion_play` int(1) NOT NULL,
+  `baseplay` bigint(20) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fk_plays_normalised_game_idx` (`game`),
+  KEY `fk_plays_normalised_geek_idx` (`geek`),
+  CONSTRAINT `fk_plays_normalised_game` FOREIGN KEY (`game`) REFERENCES `games` (`bggid`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_plays_normalised_geek` FOREIGN KEY (`geek`) REFERENCES `geeks` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB AUTO_INCREMENT=387829 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -549,6 +552,28 @@ CREATE TABLE `publishers` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `ranking_table`
+--
+
+DROP TABLE IF EXISTS `ranking_table`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ranking_table` (
+  `game` int(11) NOT NULL,
+  `game_name` varchar(255) NOT NULL,
+  `total_ratings` int(11) NOT NULL DEFAULT '0',
+  `num_ratings` int(11) NOT NULL DEFAULT '0',
+  `bgg_ranking` int(11) NOT NULL DEFAULT '0',
+  `bgg_rating` float NOT NULL,
+  `normalised_ranking` int(11) NOT NULL DEFAULT '0',
+  `total_plays` int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`game`),
+  UNIQUE KEY `game_UNIQUE` (`game`),
+  CONSTRAINT `fk_ranking_table_game` FOREIGN KEY (`game`) REFERENCES `games` (`bggid`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `series`
 --
 
@@ -562,6 +587,41 @@ CREATE TABLE `series` (
   KEY `series_name` (`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `war_table`
+--
+
+DROP TABLE IF EXISTS `war_table`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `war_table` (
+  `geek` int(11) NOT NULL DEFAULT '0',
+  `totalPlays` int(10) NOT NULL DEFAULT '0',
+  `distinctGames` int(10) NOT NULL DEFAULT '0',
+  `top50` int(10) NOT NULL DEFAULT '0',
+  `sdj` int(10) NOT NULL DEFAULT '0',
+  `the100` int(10) NOT NULL DEFAULT '0',
+  `owned` int(10) NOT NULL DEFAULT '0',
+  `want` int(10) NOT NULL DEFAULT '0',
+  `wish` int(10) NOT NULL DEFAULT '0',
+  `trade` int(10) NOT NULL DEFAULT '0',
+  `prevOwned` int(10) NOT NULL DEFAULT '0',
+  `friendless` int(10) NOT NULL DEFAULT '0',
+  `cfm` float DEFAULT '0',
+  `utilisation` float DEFAULT '0',
+  `tens` int(10) NOT NULL DEFAULT '0',
+  `zeros` int(10) NOT NULL DEFAULT '0',
+  `ext100` int(10) NOT NULL DEFAULT '0',
+  `mv` int(10) NOT NULL DEFAULT '0',
+  `hindex` int(10) NOT NULL DEFAULT '0',
+  `geekName` varchar(255) NOT NULL,
+  `preordered` int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`geek`),
+  UNIQUE KEY `geek_UNIQUE` (`geek`),
+  CONSTRAINT `fk_front_page_geeks_geek` FOREIGN KEY (`geek`) REFERENCES `geeks` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -572,4 +632,4 @@ CREATE TABLE `series` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2018-07-01 10:54:15
+-- Dump completed on 2018-07-21 22:22:24
