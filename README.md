@@ -36,15 +36,15 @@ They also perform some preprocessing on the data so that it's stored more effici
 
 The API stack implements calls which the Client components use to retrieve data for display.
 This stack is a set of lambdas running behind an API Gateway.
-This is api.drfriendless.com.
+This is http://api.drfriendless.com.
 
 ## Client
 
 The Client stack is JavaScript and HTML components hosted on S3.
 The JavaScript is currently Angular components, as that's what I know, but other technologies could be used.
-This is extstats.drfriendless.com.
+This is http://extstats.drfriendless.com.
 
 ## WWW
 
-The WWW stack is a very tiny stack which implements www.drfriendless.com by hosting on S3.
+The WWW stack is a very tiny stack which implements https://www.drfriendless.com by hosting on S3.
 This site isn't used for much, except as a signpost to more useful parts of the site.
