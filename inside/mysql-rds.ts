@@ -368,7 +368,7 @@ async function doRecordGame(conn: mysql.Connection, bggid: number): Promise<void
 
 
 async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string,
-                      bggid: number | null, month: number | null, year: number | null, geekid: number | null): Promise<void> {
+                            bggid: number | null, month: number | null, year: number | null, geekid: number | null): Promise<void> {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     const found = await count(conn, countSql, [url, processMethod]);
@@ -424,12 +424,19 @@ export async function updateFrontPageGeek(geekName: string) {
     await withConnectionAsync(async conn => await doUpdateFrontPageGeek(conn, geekName));
 }
 
-async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number) {
+async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<{
+    total_plays: number, distinct_games: number, tens: number, zeros: number
+}> {
     const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
     const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
-    const tensSql = "select count(plays.g) from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
+    const tensSql = "select count(plays.g) t from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
+    const zerosSql = "select count(game) z from geekgames where geekid = ? and owned > 0 and game not in (select game from plays_normalised where geek = ?)";
     const distinct_games = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
     const total_plays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
+    const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
+    const zeros = (await conn.query(zerosSql, [geekId, geekId]))[0]["z"];
+    // TODO
+    return { total_plays, distinct_games, tens, zeros };
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
@@ -444,8 +451,8 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
     const fpg: WarTableRow = {
         geek: geekId,
         geekName: geekName,
-        total_plays: 0, // TODO
-        distinct_games: 0, // TODO
+        total_plays: playsDataForWarTable.total_plays,
+        distinct_games: playsDataForWarTable.distinct_games,
         top50: 0, // TODO
         sdj: 0, // TODO
         owned: owned,
@@ -456,8 +463,8 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         friendless: 0, // TODO
         cfm: 0.0, // TODO
         utilisation: 0.0, // TODO
-        tens: 0, //TODO
-        zeros: 0, // TODO
+        tens: playsDataForWarTable.tens,
+        zeros: playsDataForWarTable.zeros,
         mostVoters: 0, // TODO
         top100: 0, // TODO
         hindex: 0, // TODO
