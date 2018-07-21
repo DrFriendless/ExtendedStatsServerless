@@ -37,11 +37,11 @@ functions:
     events:
       - schedule:
           name: processFiles
-          description: every 10 minutes, look to see if there are files to process
+          description: every minute, look to see if there are files to process
           rate: rate(1 minute)
           enabled: true
           input:
-            count: 10
+            count: 30
             stageParams:
               stage: dev
   processUser:

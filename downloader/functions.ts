@@ -217,7 +217,7 @@ export async function processPlayed(event, context, callback: Callback) {
 export async function processPlays(event, context, callback: Callback) {
     console.log(event);
     const invocation = event as FileToProcess;
-    const data = await request(encodeURI(invocation.url)) as string;
+    const data = await request(invocation.url) as string;
     const playsData = await processPlaysFile(data, invocation);
     const playsResult = { geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url } as ProcessPlaysResult;
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
