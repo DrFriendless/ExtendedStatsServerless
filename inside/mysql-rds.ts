@@ -1,15 +1,61 @@
 import mysql = require('promise-mysql');
 import {
-    CollectionGame,
+    CollectionGame, MetadataRule,
     MonthPlayed, NormalisedPlays, PlayData,
     ProcessGameResult,
-    RankingTableRow,
+    RankingTableRow, SeriesMetadata,
     ToProcessElement,
     WarTableRow, WorkingNormalisedPlays
 } from "./interfaces";
 import {count, returnWithConnection, withConnection, withConnectionAsync} from "./library";
 import * as _ from "lodash";
 import {inferExtraPlays, ExpansionData} from "./plays";
+
+export async function doUpdateMetadata(conn: mysql.Connection, series: SeriesMetadata[], rules: MetadataRule[]) {
+    await doUpdateSeries(conn, series);
+    await doUpdateMetadataRules(conn, rules);
+}
+
+async function doUpdateSeries(conn: mysql.Connection, seriesMetada: SeriesMetadata[]) {
+    const deleteSql = "delete from series where series_id = ?";
+    const insertSql = "insert into series (series_id, game) values (?,?)";
+    const gamesThatDontExist = await getGamesThatDontExist(conn);
+        for (const sm of seriesMetada) {
+        const sid = await getOrCreateSeriesMetadata(conn, sm.name);
+        const gamesToUse = listMinus(sm.games, gamesThatDontExist);
+        await doEnsureGames(conn, gamesToUse);
+        await conn.query(deleteSql, sid);
+        for (const game of gamesToUse) {
+            console.log(sm.name + " " + game);
+            conn.query(insertSql, [sid, game]);
+        }
+    }
+}
+
+async function getOrCreateSeriesMetadata(conn: mysql.Connection, name: string): Promise<number> {
+    const findSql = "select id from series_metadata where name = ?";
+    const insertSql = "insert into series_metadata (name) values (?)";
+    const findResults = await conn.query(findSql, [name]);
+    if (findResults.length === 0) {
+        await conn.query(insertSql, [name]);
+        // look up the autoincremented ID in the row we just created
+        return (await conn.query(findSql, [name]))[0]["id"];
+    } else {
+        return findResults[0]["id"];
+    }
+}
+
+async function doUpdateMetadataRules(conn: mysql.Connection, rules: MetadataRule[]) {
+    const deleteSql = "delete from metadata";
+    const insertSql = "insert into metadata  (ruletype, game) values (?,?)";
+    const gamesThatDontExist = await getGamesThatDontExist(conn);
+    const gamesToUse = listMinus(rules.map(r => r.game), gamesThatDontExist);
+    await doEnsureGames(conn, gamesToUse);
+    await conn.query(deleteSql);
+    for (const rule of rules.filter(r => gamesToUse.indexOf(r.game) >= 0)) {
+        await conn.query(insertSql, [rule.rule, rule.game]);
+    }
+}
 
 export function updateGame(data: ProcessGameResult): Promise<void> {
     return withConnection(conn => doUpdateGame(conn, data));
@@ -425,18 +471,21 @@ export async function updateFrontPageGeek(geekName: string) {
 }
 
 async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<{
-    total_plays: number, distinct_games: number, tens: number, zeros: number
-}> {
+    total_plays: number, distinct_games: number, tens: number, zeros: number, hindex: number }> {
     const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
     const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
     const tensSql = "select count(plays.g) t from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
     const zerosSql = "select count(game) z from geekgames where geekid = ? and owned > 0 and game not in (select game from plays_normalised where geek = ?)";
+    const hindexSql = "select sum(quantity) q from plays_normalised where geek = ? and expansion_play = 0 group by game order by q desc";
     const distinct_games = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
     const total_plays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
     const zeros = (await conn.query(zerosSql, [geekId, geekId]))[0]["z"];
+    const hindexData = (await conn.query(hindexSql, [geekId])).map(row => row["q"]);
+    let hindex = 0;
+    while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
     // TODO
-    return { total_plays, distinct_games, tens, zeros };
+    return { total_plays, distinct_games, tens, zeros, hindex };
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
@@ -467,7 +516,7 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         zeros: playsDataForWarTable.zeros,
         mostVoters: 0, // TODO
         top100: 0, // TODO
-        hindex: 0, // TODO
+        hindex: playsDataForWarTable.hindex,
         preordered: preordered
     };
     const insertSql = "insert into war_table (geek, geekName, totalPlays, distinctGames, top50, sdj, owned, want, wish, " +

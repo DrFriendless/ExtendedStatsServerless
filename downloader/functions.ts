@@ -4,7 +4,13 @@ import {
     FileToProcess,
     ToProcessElement,
     CleanUpCollectionResult,
-    MonthPlayed, ProcessMonthsPlayedResult, ProcessPlaysResult
+    MonthPlayed,
+    ProcessMonthsPlayedResult,
+    ProcessPlaysResult,
+    SeriesMetadata,
+    MetadataRule,
+    METADATA_RULE_BASEGAME,
+    Metadata
 } from "./interfaces"
 import {between, invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
 import {
@@ -31,6 +37,7 @@ const METHOD_PROCESS_PLAYS = "processPlays";
 // lambda names we expect to see
 const FUNCTION_RETRIEVE_FILES = "getToProcessList";
 const FUNCTION_UPDATE_USER_LIST = "updateUserList";
+const FUNCTION_UPDATE_METADATA = "updateMetadata";
 const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
@@ -61,6 +68,46 @@ export function processUserList(event, context, callback: Callback) {
             .then(data => invokeLambdaAsync("processUserList", INSIDE_PREFIX + FUNCTION_UPDATE_USER_LIST, data))
             .then(() => console.log('Sent ' + count + ' users to ' + FUNCTION_UPDATE_USER_LIST)),
         callback);
+}
+
+// Lambda to get the metadata from pastebin and send it to the database.
+export async function processMetadata(event, context, callback: Callback) {
+    const metadataFile = process.env["METADATA_FILE"];
+    const series = [] as SeriesMetadata[];
+    const rules = [] as MetadataRule[];
+    try {
+        const data = await request(encodeURI(metadataFile));
+        const lines = data.split(/\r?\n/).map(s => s.trim());
+        for (const line of lines) {
+            if (line.length == 0) continue;
+            if (line.startsWith('#')) continue;
+            let handled = false;
+            if (line.indexOf(':') > 0) {
+                const fields = line.split(/:/).map(s => s.trim());
+                const title = fields[0];
+                const gameIds = fields[1].split(/\s+/).map(x => parseInt(x)).filter(Number.isInteger);
+                if (title.length > 0 && gameIds.length > 0) {
+                    handled = true;
+                    series.push({ name: title, games: gameIds });
+                }
+            } else {
+                const fields = line.split(/\s+/).map(s => s.trim());
+                if (fields.length === 2) {
+                    const gameId = parseInt(fields[1]);
+                    if (fields[0] === "basegame" && Number.isInteger(gameId)) {
+                        handled = true;
+                        rules.push({ rule: METADATA_RULE_BASEGAME, game: gameId });
+                    }
+                }
+            }
+            if (!handled) console.log("Did not understand metadata: " + line);
+        }
+        const toUpdate: Metadata = { series, rules };
+        invokeLambdaAsync("processMetadata", INSIDE_PREFIX + FUNCTION_UPDATE_METADATA, toUpdate);
+        callback(null, null);
+    } catch (e) {
+        callback(e, null);
+    }
 }
 
 // Lambda to get files to be processed and invoke the lambdas to do that

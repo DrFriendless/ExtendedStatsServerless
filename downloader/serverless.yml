@@ -30,6 +30,21 @@ functions:
           input:
             stageParams:
               stage: dev
+  processMetadata:
+    handler: functions.processMetadata
+    environment:
+      METADATA_FILE: ${self:custom.secret.metadataFile}
+    role:
+      "invokeLambdas"
+    events:
+      - schedule:
+          name: processMetadata
+          description: every day, update metadata
+          rate: rate(24 hours)
+          enabled: true
+          input:
+            stageParams:
+              stage: dev
   fireFileProcessing:
     handler: functions.fireFileProcessing
     role:

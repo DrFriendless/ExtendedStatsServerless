@@ -158,3 +158,20 @@ export interface ExpansionRow {
     basegame: number;
     expansion: number;
 }
+
+export interface SeriesMetadata {
+    name: string;
+    games: number[];
+}
+
+export const METADATA_RULE_BASEGAME = 1;
+
+export interface MetadataRule {
+    rule: number;
+    game: number;
+}
+
+export interface Metadata {
+    series: SeriesMetadata[];
+    rules: MetadataRule[];
+}

@@ -1,7 +1,7 @@
 import {Callback} from 'aws-lambda';
 import {
     doNormalisePlaysForMonth,
-    doSetGeekPlaysForMonth,
+    doSetGeekPlaysForMonth, doUpdateMetadata,
     ensureGames, ensureMonthsPlayed, ensurePlaysGames, ensureProcessPlaysFiles,
     ensureUsers, getGeekId,
     listToProcess,
@@ -18,12 +18,12 @@ import {
 } from "./mysql-rds";
 import {
     CleanUpCollectionResult,
-    FileToProcess,
+    FileToProcess, Metadata,
     ProcessCollectionResult,
     ProcessGameResult, ProcessMonthsPlayedResult, ProcessPlaysResult,
     ProcessUserResult
 } from "./interfaces";
-import {getConnection, promiseToCallback} from "./library";
+import {getConnection, promiseToCallback, withConnection} from "./library";
 
 
 export async function processGameResult(event, context, callback: Callback) {
@@ -62,6 +62,18 @@ export async function updateUserList(event, context, callback: Callback) {
     console.log("checking for " + usernames.length + " users");
     try {
         await ensureUsers(usernames);
+        callback(null, null);
+    } catch (e) {
+        console.log(e);
+        callback(e);
+    }
+}
+
+export async function updateMetadata(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    const body = event as Metadata;
+    try {
+        await withConnection(conn => doUpdateMetadata(conn, body.series, body.rules));
         callback(null, null);
     } catch (e) {
         console.log(e);
