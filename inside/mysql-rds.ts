@@ -471,12 +471,13 @@ export async function updateFrontPageGeek(geekName: string) {
 }
 
 async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<{
-    total_plays: number, distinct_games: number, tens: number, zeros: number, hindex: number }> {
+    total_plays: number, distinct_games: number, tens: number, zeros: number, hindex: number, sdj: number }> {
     const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
     const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
     const tensSql = "select count(plays.g) t from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
     const zerosSql = "select count(game) z from geekgames where geekid = ? and owned > 0 and game not in (select game from plays_normalised where geek = ?)";
     const hindexSql = "select sum(quantity) q from plays_normalised where geek = ? and expansion_play = 0 group by game order by q desc";
+    const seriesPlaysSql = "select count(distinct series.game) c from plays_normalised,series where series.series_id = ? and series.game = plays_normalised.game and plays_normalised.geek = ?";
     const distinct_games = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
     const total_plays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
@@ -484,8 +485,11 @@ async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number
     const hindexData = (await conn.query(hindexSql, [geekId])).map(row => row["q"]);
     let hindex = 0;
     while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
+    const sdjId = await getIdForSeries(conn, "Spiel des Jahre");
+    console.log(sdjId);
+    const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
     // TODO
-    return { total_plays, distinct_games, tens, zeros, hindex };
+    return { total_plays, distinct_games, tens, zeros, hindex, sdj };
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
@@ -503,7 +507,7 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         total_plays: playsDataForWarTable.total_plays,
         distinct_games: playsDataForWarTable.distinct_games,
         top50: 0, // TODO
-        sdj: 0, // TODO
+        sdj: playsDataForWarTable.sdj,
         owned: owned,
         want: want,
         wish: wish,
@@ -604,6 +608,11 @@ async function countWhere(conn: mysql.Connection, where: string, params: any[]) 
 async function getGamesThatDontExist(conn: mysql.Connection): Promise<number[]> {
     const sql = "select bggid from not_games";
     return (await conn.query(sql)).map(row => row.bggid);
+}
+
+async function getIdForSeries(conn: mysql.Connection, seriesName: string): Promise<number> {
+    const sql = "select id from series_metadata where name = ?";
+    return (await conn.query(sql, [seriesName]))[0]["id"];
 }
 
 export async function loadExpansionData(conn: mysql.Connection): Promise<ExpansionData> {
