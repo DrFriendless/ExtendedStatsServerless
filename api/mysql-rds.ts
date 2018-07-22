@@ -1,27 +1,11 @@
 import mysql = require('promise-mysql');
 import {SystemStats, TypeCount} from "./admin-interfaces"
 import {GeekGame, GeekGameQuery, WarTableRow} from "./collection-interfaces";
-import {asyncReturnWithConnection, count, getConnection} from "./library";
+import {asyncReturnWithConnection, count} from "./library";
 import {RankingTableRow} from "./ranking-interfaces";
 
-export function listGeekGames(query: GeekGameQuery): Promise<GeekGame[]> {
-    // TODO
-    // return Promise.resolve([ { name: "Jeu de L'oie", average: 8.5, rating: 9, bggid: 15554 } ] as [GeekGame]);
-    let connection;
-    let result: GeekGame[];
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => doListGeekGames(conn, query))
-        .then(data => {
-            result = data;
-            console.log("result");
-            console.log(result);
-        })
-        .then(() => connection.destroy())
-        .then(() => result);
+export async function listGeekGames(query: GeekGameQuery): Promise<GeekGame[]> {
+    return asyncReturnWithConnection(conn => doListGeekGames(conn, query));
 }
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
@@ -126,32 +110,7 @@ function gatherTypeCount(row: any): TypeCount {
 
 export async function listWarTable(): Promise<WarTableRow[]> {
     const sql = "select * from war_table order by lower(geekName) asc";
-    return asyncReturnWithConnection(conn => conn.query(sql).map(makeWarTableRow));
-}
-
-function makeWarTableRow(row: object): WarTableRow {
-    return {
-        geek: row.geek,
-        geekName: row.geekName,
-        total_plays: row.totalPlays,
-        distinct_games: row.distinctGames,
-        top50: row.top50,
-        sdj: row.sdj,
-        owned: row.owned,
-        want: row.want,
-        wish: row.wish,
-        forTrade: row.trade,
-        prevOwned: row.prevOwned,
-        friendless: row.friendless,
-        cfm: row.cfm,
-        utilisation: row.utilisation,
-        tens: row.tens,
-        zeros: row.zeros,
-        mostVoters: row.mv,
-        top100: row.ext100,
-        hindex: row.hindex,
-        preordered: row.preordered
-    } as WarTableRow;
+    return asyncReturnWithConnection(conn => conn.query(sql));
 }
 
 export async function listUsers(): Promise<string[]> {

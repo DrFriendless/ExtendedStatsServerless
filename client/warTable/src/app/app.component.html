@@ -22,11 +22,6 @@
             <p>This is how many of the <a href="/rankings.html">Extended Stats Top 100</a> the geek has played.</p>
           </ng-template>
         </ngb-tab>
-        <ngb-tab title="Most Voters">
-          <ng-template ngbTabContent>
-            <p>Each Extended Stats user who rates a game counts as a voter. The games with the most voters tend to be the older classics that everyone has played. This metric is how many of the 100 most voted games the geek has played.</p>
-          </ng-template>
-        </ngb-tab>
         <ngb-tab title="Friendless Metric">
           <ng-template ngbTabContent>
             <p>To calculate the Friendless metric, make a list of all of your games in descending order of how many times you've played them. Scrabble with 173 plays comes first, Triominos with 0 plays comes last. For each game at the beginning with 10 or more plays, we consider that game to have earned its keep. Even better, having played one game that many times, you're forgiven one at the other end which you haven't played so much. So for playing Scrabble so many times we'll forgive you for never playing Triominos. People who play games tend to accumulate them, so we'll assume that was a gift. Then, we look at how many times you've played the last game remaining on the list... and that's your Friendless metric. The higher the better. Most bggeeks have a value of zero, so I extended the definition to go into negatives. A value of ­x tells you that to get to a Friendless metric of 1 you need to play x more of your games that you've never played.</p>
@@ -50,16 +45,15 @@
     <thead>
     <tr>
       <th><mfDefaultSorter by="geekName">Geek</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="total_plays" tooltip="Total plays of all games as recorded by Extended Stats">Total Plays</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="distinct_games" tooltip="Number of different games with recorded plays">Distinct Games</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="totalPlays" tooltip="Total plays of all games as recorded by Extended Stats">Total Plays</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="distinctGames" tooltip="Number of different games with recorded plays">Distinct Games</mfDefaultSorter></th>
       <th><mfDefaultSorter by="owned" tooltip="Number of games this geek owns">Owned</mfDefaultSorter></th>
       <th><mfDefaultSorter by="want" tooltip="Number of games this geek wants in trade">Want in Trade</mfDefaultSorter></th>
       <th><mfDefaultSorter by="wish" tooltip="Number of games on this geek's wishlist">Wishlist</mfDefaultSorter></th>
       <th><mfDefaultSorter by="trade" tooltip="Number of games this geek has for trade">For Trade</mfDefaultSorter></th>
       <th><mfDefaultSorter by="sdj" tooltip="Number of different Spiel des Jahre winners played">Spiel des Jahre</mfDefaultSorter></th>
       <th><mfDefaultSorter by="top50" tooltip="Number of different games in the BGG Top 50 played">BGG Top 50</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="top100" tooltip="Number of different games in the Extended Stats Top 100 played">Ext Stats Top 100</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="mv" tooltip="Umm let me get back to you on this one">Most Voters</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="ext100" tooltip="Number of different games in the Extended Stats Top 100 played">Ext Stats Top 100</mfDefaultSorter></th>
       <th><mfDefaultSorter by="prevOwned" tooltip="Number of games previously owned by this geek">Prev Owned</mfDefaultSorter></th>
       <th><mfDefaultSorter by="friendless" tooltip="Friendless Metric for this geek">Friendless</mfDefaultSorter></th>
       <th><mfDefaultSorter by="cfm" tooltip="Continuous Friendless Metric for this geek">CFM</mfDefaultSorter></th>
@@ -71,16 +65,15 @@
     <tbody>
     <tr *ngFor="let row of warTable.data">
       <td><a href="http://extstats.drfriendless.com/collection.html?geek={{row.geekName}}">{{row.geekName}}</a></td>
-      <td>{{row.total_plays}}</td>
-      <td>{{row.distinct_games}}</td>
+      <td>{{row.totalPlays}}</td>
+      <td>{{row.distinctGames}}</td>
       <td>{{row.owned}}</td>
       <td>{{row.want}}</td>
       <td>{{row.wish}}</td>
       <td>{{row.trade}}</td>
       <td>{{row.sdj}}</td>
       <td>{{row.top50}}</td>
-      <td>{{row.top100}}</td>
-      <td>{{row.mostVoters}}</td>
+      <td>{{row.ext100}}</td>
       <td>{{row.prevOwned}}</td>
       <td>{{row.friendless}}</td>
       <td>{{row.cfm}}</td>

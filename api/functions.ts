@@ -7,7 +7,7 @@ export async function adminGatherSystemStats(event, context, callback: Callback)
         callback(null, await gatherSystemStats());
     } catch (err) {
         console.log(err);
-        callback(err, null);
+        callback(err);
     }
 }
 
@@ -19,7 +19,7 @@ export async function getUserList(event, context, callback: Callback) {
         callback(null, await listUsers());
     } catch (err) {
         console.log(err);
-        callback(err, null);
+        callback(err);
     }
 }
 
@@ -31,7 +31,7 @@ export async function getWarTable(event, context, callback: Callback) {
         callback(null, await listWarTable());
     } catch (err) {
         console.log(err);
-        callback(err, null);
+        callback(err);
     }
 }
 
@@ -46,10 +46,10 @@ export async function getGeekGames(event, context, callback: Callback) {
             callback(null, await listGeekGames(query));
         } catch (err) {
             console.log(err);
-            callback(err, null);
+            callback(err);
         }
     } else {
-        callback(null, null);
+        callback(null);
     }
 }
 
@@ -64,9 +64,9 @@ export async function getRankings(event, context, callback: Callback) {
             callback(null, await rankGames(query));
         } catch (err) {
             console.log(err);
-            callback(err, null);
+            callback(err);
         }
     } else {
-        callback(null, null);
+        callback(null);
     }
 }

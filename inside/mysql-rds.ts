@@ -471,15 +471,15 @@ export async function updateFrontPageGeek(geekName: string) {
 }
 
 async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<{
-    total_plays: number, distinct_games: number, tens: number, zeros: number, hindex: number, sdj: number }> {
+    totalPlays: number, distinctGames: number, tens: number, zeros: number, hindex: number, sdj: number }> {
     const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
     const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
     const tensSql = "select count(plays.g) t from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
     const zerosSql = "select count(game) z from geekgames where geekid = ? and owned > 0 and game not in (select game from plays_normalised where geek = ?)";
     const hindexSql = "select sum(quantity) q from plays_normalised where geek = ? and expansion_play = 0 group by game order by q desc";
     const seriesPlaysSql = "select count(distinct series.game) c from plays_normalised,series where series.series_id = ? and series.game = plays_normalised.game and plays_normalised.geek = ?";
-    const distinct_games = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
-    const total_plays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
+    const distinctGames = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
+    const totalPlays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
     const zeros = (await conn.query(zerosSql, [geekId, geekId]))[0]["z"];
     const hindexData = (await conn.query(hindexSql, [geekId])).map(row => row["q"]);
@@ -489,7 +489,7 @@ async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number
     console.log(sdjId);
     const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
     // TODO
-    return { total_plays, distinct_games, tens, zeros, hindex, sdj };
+    return { totalPlays, distinctGames, tens, zeros, hindex, sdj };
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
@@ -497,46 +497,45 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
     const owned = await countWhere(conn, "geekgames where geekId = ? and owned > 0", [geekId]);
     const want = await countWhere(conn, "geekgames where geekId = ? and want > 0", [geekId]);
     const wish = await countWhere(conn, "geekgames where geekId = ? and wish > 0", [geekId]);
-    const forTrade = await countWhere(conn, "geekgames where geekId = ? and trade > 0", [geekId]);
+    const trade = await countWhere(conn, "geekgames where geekId = ? and trade > 0", [geekId]);
     const prevOwned = await countWhere(conn, "geekgames where geekId = ? and prevowned > 0", [geekId]);
     const preordered = await countWhere(conn, "geekgames where geekId = ? and preordered > 0", [geekId]);
     const playsDataForWarTable = await gatherPlaysDataForWarTable(conn, geekId);
     const fpg: WarTableRow = {
         geek: geekId,
         geekName: geekName,
-        total_plays: playsDataForWarTable.total_plays,
-        distinct_games: playsDataForWarTable.distinct_games,
+        totalPlays: playsDataForWarTable.totalPlays,
+        distinctGames: playsDataForWarTable.distinctGames,
         top50: 0, // TODO
         sdj: playsDataForWarTable.sdj,
         owned: owned,
         want: want,
         wish: wish,
-        forTrade: forTrade,
+        trade: trade,
         prevOwned: prevOwned,
         friendless: 0, // TODO
         cfm: 0.0, // TODO
         utilisation: 0.0, // TODO
         tens: playsDataForWarTable.tens,
         zeros: playsDataForWarTable.zeros,
-        mostVoters: 0, // TODO
-        top100: 0, // TODO
+        ext100: 0, // TODO
         hindex: playsDataForWarTable.hindex,
         preordered: preordered
     };
     const insertSql = "insert into war_table (geek, geekName, totalPlays, distinctGames, top50, sdj, owned, want, wish, " +
-        "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, mv, ext100, hindex, preordered) values " +
-        "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, ext100, hindex, preordered) values " +
+        "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update war_table set geekName = ?, totalPlays = ?, distinctGames = ?, top50 = ?, sdj = ?, owned = ?, "
-        + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, mv = ?, "
+        + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, "
         + "ext100 = ?, hindex = ?, preordered = ? where geek = ?";
     try {
-        await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.total_plays, fpg.distinct_games, fpg.top50, fpg.sdj, fpg.owned,
-            fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
-            fpg.top100, fpg.hindex, fpg.preordered]);
+        await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.totalPlays, fpg.distinctGames, fpg.top50, fpg.sdj, fpg.owned,
+            fpg.want, fpg.wish, fpg.trade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros,
+            fpg.ext100, fpg.hindex, fpg.preordered]);
     } catch (e) {
-        await conn.query(updateSql, [fpg.geekName, fpg.total_plays, fpg.distinct_games, fpg.top50, fpg.sdj, fpg.owned,
-            fpg.want, fpg.wish, fpg.forTrade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros, fpg.mostVoters,
-            fpg.top100, fpg.hindex, fpg.preordered, fpg.geek]);
+        await conn.query(updateSql, [fpg.geekName, fpg.totalPlays, fpg.distinctGames, fpg.top50, fpg.sdj, fpg.owned,
+            fpg.want, fpg.wish, fpg.trade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros,
+            fpg.ext100, fpg.hindex, fpg.preordered, fpg.geek]);
     }
 }
 

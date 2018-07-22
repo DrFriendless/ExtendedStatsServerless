@@ -9,7 +9,7 @@ export async function asyncReturnWithConnection<T>(func: (conn: mysql.Connection
     }
 }
 
-export function getConnection(): Promise<mysql.Connection> {
+export function getConnection(): PromiseLike<mysql.Connection> {
     const params = {
         host: process.env.mysqlHost,
         user: process.env.mysqlUsername,

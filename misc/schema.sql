@@ -397,8 +397,10 @@ DROP TABLE IF EXISTS `metadata`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `metadata` (
-  `ruletype` int(11) DEFAULT NULL,
-  `bggid` int(11) DEFAULT NULL
+  `ruletype` int(11) NOT NULL,
+  `game` int(11) NOT NULL,
+  KEY `fk_metadata_game_idx` (`game`),
+  CONSTRAINT `fk_metadata_game` FOREIGN KEY (`game`) REFERENCES `games` (`bggid`) ON DELETE NO ACTION ON UPDATE NO ACTION
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -532,7 +534,7 @@ CREATE TABLE `plays_normalised` (
   KEY `fk_plays_normalised_geek_idx` (`geek`),
   CONSTRAINT `fk_plays_normalised_game` FOREIGN KEY (`game`) REFERENCES `games` (`bggid`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT `fk_plays_normalised_geek` FOREIGN KEY (`geek`) REFERENCES `geeks` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=387829 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=666284 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -581,11 +583,27 @@ DROP TABLE IF EXISTS `series`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `series` (
-  `name` varchar(128) NOT NULL,
-  `game` int(10) unsigned NOT NULL,
+  `series_id` int(11) NOT NULL,
+  `game` int(11) NOT NULL,
   KEY `series_game` (`game`),
-  KEY `series_name` (`name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  KEY `series_name` (`series_id`),
+  CONSTRAINT `fk_series_game` FOREIGN KEY (`game`) REFERENCES `games` (`bggid`) ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_series_id` FOREIGN KEY (`series_id`) REFERENCES `series_metadata` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `series_metadata`
+--
+
+DROP TABLE IF EXISTS `series_metadata`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `series_metadata` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -601,7 +619,6 @@ CREATE TABLE `war_table` (
   `distinctGames` int(10) NOT NULL DEFAULT '0',
   `top50` int(10) NOT NULL DEFAULT '0',
   `sdj` int(10) NOT NULL DEFAULT '0',
-  `the100` int(10) NOT NULL DEFAULT '0',
   `owned` int(10) NOT NULL DEFAULT '0',
   `want` int(10) NOT NULL DEFAULT '0',
   `wish` int(10) NOT NULL DEFAULT '0',
@@ -613,7 +630,6 @@ CREATE TABLE `war_table` (
   `tens` int(10) NOT NULL DEFAULT '0',
   `zeros` int(10) NOT NULL DEFAULT '0',
   `ext100` int(10) NOT NULL DEFAULT '0',
-  `mv` int(10) NOT NULL DEFAULT '0',
   `hindex` int(10) NOT NULL DEFAULT '0',
   `geekName` varchar(255) NOT NULL,
   `preordered` int(11) NOT NULL DEFAULT '0',
@@ -632,4 +648,4 @@ CREATE TABLE `war_table` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2018-07-21 22:22:24
+-- Dump completed on 2018-07-22 16:13:32
