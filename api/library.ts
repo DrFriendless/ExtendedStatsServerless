@@ -1,38 +1,6 @@
 import mysql = require('promise-mysql');
 
-export function withConnection(func: (conn: mysql.Connection) => Promise<void>): Promise<void> {
-    let connection;
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => func(conn))
-        .then(() => connection.destroy())
-        .catch(err => {
-            connection.destroy();
-            throw err;
-        });
-}
-
-export function returnWithConnection<T>(func: (conn: mysql.Connection) => Promise<T>): Promise<T> {
-    let connection;
-    let result;
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => result = func(conn))
-        .then(() => connection.destroy())
-        .catch(err => {
-            connection.destroy();
-            throw err;
-        })
-        .then(() => result);
-}
-
-export async function asyncReturnWithConnection<T>(func: (conn: mysql.Connection) => Promise<T>): Promise<T> {
+export async function asyncReturnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
     const connection = await getConnection();
     try {
         return await func(connection);

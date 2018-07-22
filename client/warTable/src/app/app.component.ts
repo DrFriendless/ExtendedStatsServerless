@@ -1,7 +1,7 @@
 import {AfterViewInit, Component, OnDestroy, ViewEncapsulation} from '@angular/core';
-import {RankingTableRow} from "../../../rankingPage/src/app/interfaces";
 import {Subscription} from "rxjs/internal/Subscription";
 import {HttpClient, HttpHeaders} from "@angular/common/http";
+import {WarTableRow} from "./collection-interfaces";
 
 @Component({
   selector: 'war-table',
@@ -11,7 +11,7 @@ import {HttpClient, HttpHeaders} from "@angular/common/http";
 })
 export class WarTableComponent implements OnDestroy, AfterViewInit {
   private loadData$;
-  public rows: RankingTableRow[] = [];
+  public rows: WarTableRow[] = [];
   private subscription: Subscription;
   public docCollapsed = true;
 

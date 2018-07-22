@@ -1,7 +1,7 @@
 import mysql = require('promise-mysql');
 import {SystemStats, TypeCount} from "./admin-interfaces"
 import {GeekGame, GeekGameQuery, WarTableRow} from "./collection-interfaces";
-import {asyncReturnWithConnection, count, getConnection, returnWithConnection} from "./library";
+import {asyncReturnWithConnection, count, getConnection} from "./library";
 import {RankingTableRow} from "./ranking-interfaces";
 
 export function listGeekGames(query: GeekGameQuery): Promise<GeekGame[]> {
@@ -24,11 +24,11 @@ export function listGeekGames(query: GeekGameQuery): Promise<GeekGame[]> {
         .then(() => result);
 }
 
-export function rankGames(query: object): Promise<RankingTableRow[]> {
-    return returnWithConnection(async conn => doRankGames(conn, query));
+export async function rankGames(query: object): Promise<RankingTableRow[]> {
+    return asyncReturnWithConnection(async conn => doRankGames(conn, query));
 }
 
-async function doRankGames(conn: mysql.Connection, query: object): RankingTableRow[] {
+async function doRankGames(conn: mysql.Connection, query: object): Promise<RankingTableRow[]> {
     const sql = "select game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays from ranking_table order by total_ratings desc limit 1000";
     const rows = await conn.query(sql);
     let ranking = 1;
@@ -39,9 +39,9 @@ async function doRankGames(conn: mysql.Connection, query: object): RankingTableR
     return rows;
 }
 
-function doListGeekGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {
+async function doListGeekGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {
     const sql = "select * from games,geekgames where games.bggid = geekgames.game and geekgames.geek = ? and geekgames.owned = 1";
-    return returnWithConnection(conn => conn.query(sql, [query.geek]).then(data => data.map(extractGeekGame)));
+    return await conn.query(sql, [query.geek]).then(data => data.map(extractGeekGame));
 }
 
 function extractGeekGame(row: object): GeekGame {
@@ -59,8 +59,8 @@ function extractGeekGame(row: object): GeekGame {
     } as GeekGame;
 }
 
-export function gatherSystemStats(): Promise<SystemStats> {
-    return returnWithConnection(doGatherSystemStats);
+export async function gatherSystemStats(): Promise<SystemStats> {
+    return asyncReturnWithConnection(doGatherSystemStats);
 }
 
 async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats> {
@@ -154,8 +154,8 @@ function makeWarTableRow(row: object): WarTableRow {
     } as WarTableRow;
 }
 
-export function listUsers(): Promise<string[]> {
+export async function listUsers(): Promise<string[]> {
     const sql = "select username from geeks";
-    return returnWithConnection(conn => conn.query(sql).then(data => data.map(row => row['username'])));
+    return asyncReturnWithConnection(conn => conn.query(sql).then(data => data.map(row => row['username'])));
 }
 

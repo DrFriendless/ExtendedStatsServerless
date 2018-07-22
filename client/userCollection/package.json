@@ -29,6 +29,7 @@
     "datatables.net": "^1.10.19",
     "datatables.net-dt": "^1.10.19",
     "fs": "0.0.1-security",
+    "hoek": "^4.2.1",
     "install": "^0.12.1",
     "jquery": "^3.3.1",
     "rxjs": "^6.0.0",

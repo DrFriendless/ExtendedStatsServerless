@@ -24,6 +24,7 @@
     "@angular/router": "^6.0.3",
     "angular-6-datatable": "^0.8.0",
     "core-js": "^2.5.4",
+    "hoek": "^4.2.1",
     "rxjs": "^6.0.0",
     "zone.js": "^0.8.26"
   },

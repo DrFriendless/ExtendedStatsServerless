@@ -50,15 +50,15 @@
     <thead>
     <tr>
       <th><mfDefaultSorter by="geekName">Geek</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="totalPlays" tooltip="Total plays of all games as recorded by Extended Stats">Total Plays</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="distinctGames" tooltip="Number of different games with recorded plays">Distinct Games</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="total_plays" tooltip="Total plays of all games as recorded by Extended Stats">Total Plays</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="distinct_games" tooltip="Number of different games with recorded plays">Distinct Games</mfDefaultSorter></th>
       <th><mfDefaultSorter by="owned" tooltip="Number of games this geek owns">Owned</mfDefaultSorter></th>
       <th><mfDefaultSorter by="want" tooltip="Number of games this geek wants in trade">Want in Trade</mfDefaultSorter></th>
       <th><mfDefaultSorter by="wish" tooltip="Number of games on this geek's wishlist">Wishlist</mfDefaultSorter></th>
       <th><mfDefaultSorter by="trade" tooltip="Number of games this geek has for trade">For Trade</mfDefaultSorter></th>
       <th><mfDefaultSorter by="sdj" tooltip="Number of different Spiel des Jahre winners played">Spiel des Jahre</mfDefaultSorter></th>
       <th><mfDefaultSorter by="top50" tooltip="Number of different games in the BGG Top 50 played">BGG Top 50</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="ext100" tooltip="Number of different games in the Extended Stats Top 100 played">Ext Stats Top 100</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="top100" tooltip="Number of different games in the Extended Stats Top 100 played">Ext Stats Top 100</mfDefaultSorter></th>
       <th><mfDefaultSorter by="mv" tooltip="Umm let me get back to you on this one">Most Voters</mfDefaultSorter></th>
       <th><mfDefaultSorter by="prevOwned" tooltip="Number of games previously owned by this geek">Prev Owned</mfDefaultSorter></th>
       <th><mfDefaultSorter by="friendless" tooltip="Friendless Metric for this geek">Friendless</mfDefaultSorter></th>
@@ -71,16 +71,16 @@
     <tbody>
     <tr *ngFor="let row of warTable.data">
       <td><a href="http://extstats.drfriendless.com/collection.html?geek={{row.geekName}}">{{row.geekName}}</a></td>
-      <td>{{row.totalPlays}}</td>
-      <td>{{row.distinctGames}}</td>
+      <td>{{row.total_plays}}</td>
+      <td>{{row.distinct_games}}</td>
       <td>{{row.owned}}</td>
       <td>{{row.want}}</td>
       <td>{{row.wish}}</td>
       <td>{{row.trade}}</td>
       <td>{{row.sdj}}</td>
       <td>{{row.top50}}</td>
-      <td>{{row.ext100}}</td>
-      <td>{{row.mv}}</td>
+      <td>{{row.top100}}</td>
+      <td>{{row.mostVoters}}</td>
       <td>{{row.prevOwned}}</td>
       <td>{{row.friendless}}</td>
       <td>{{row.cfm}}</td>
