@@ -1,7 +1,7 @@
 import {Callback} from 'aws-lambda';
 import {
     doNormalisePlaysForMonth,
-    doSetGeekPlaysForMonth, doUpdateMetadata,
+    doSetGeekPlaysForMonth, doUpdateMetadata, doUpdateRankings,
     ensureGames, ensureMonthsPlayed, ensurePlaysGames, ensureProcessPlaysFiles,
     ensureUsers, getGeekId,
     listToProcess,
@@ -222,6 +222,17 @@ export async function updateGameAsDoesNotExist(event, context, callback: Callbac
     context.callbackWaitsForEmptyEventLoop = false;
     try {
         await markGameDoesNotExist(event.bggid);
+        callback(null, null);
+    } catch (e) {
+        callback(e);
+    }
+}
+
+export async function updateRankings(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    console.log("updateRankings");
+    try {
+        await withConnection(async conn => await doUpdateRankings(conn));
         callback(null, null);
     } catch (e) {
         callback(e);

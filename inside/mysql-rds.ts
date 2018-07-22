@@ -20,14 +20,14 @@ async function doUpdateSeries(conn: mysql.Connection, seriesMetada: SeriesMetada
     const deleteSql = "delete from series where series_id = ?";
     const insertSql = "insert into series (series_id, game) values (?,?)";
     const gamesThatDontExist = await getGamesThatDontExist(conn);
-        for (const sm of seriesMetada) {
+    for (const sm of seriesMetada) {
         const sid = await getOrCreateSeriesMetadata(conn, sm.name);
         const gamesToUse = listMinus(sm.games, gamesThatDontExist);
         await doEnsureGames(conn, gamesToUse);
         await conn.query(deleteSql, sid);
         for (const game of gamesToUse) {
             console.log(sm.name + " " + game);
-            conn.query(insertSql, [sid, game]);
+            await conn.query(insertSql, [sid, game]);
         }
     }
 }
@@ -170,16 +170,18 @@ async function updateRankingTableStatsForGame(conn: mysql.Connection, game: numb
     const ratingSql = "select sum(rating), count(rating) from geekgames where game = ? and rating > 0";
     const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays) values (?,?,?,?,?,?,?,?)";
     const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ? where game = ?";
+    const howManyPlaysSql = "select sum(plays_normalised.quantity) s from plays_normalised where plays_normalised.game = ?";
     const ratings = await conn.query(ratingSql, [game]);
     const total = ratings[0]['sum(rating)'];
     const count = ratings[0]['count(rating)'];
+    const howManyPlays = (await conn.query(howManyPlaysSql, [game]))[0]["s"];
     const row: RankingTableRow = {
         game: game,
         game_name: data.name,
         bgg_ranking: data.rank || 1000000,
         bgg_rating: data.average || 0,
         normalised_ranking: 0, // TODO
-        total_plays: 0, // TODO
+        total_plays: howManyPlays,
         total_ratings: total || 0,
         num_ratings: count
     };
@@ -471,7 +473,7 @@ export async function updateFrontPageGeek(geekName: string) {
 }
 
 async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<{
-    totalPlays: number, distinctGames: number, tens: number, zeros: number, hindex: number, sdj: number }> {
+    totalPlays: number, distinctGames: number, tens: number, zeros: number, hindex: number, sdj: number, ext100: number }> {
     const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
     const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
     const tensSql = "select count(plays.g) t from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
@@ -486,10 +488,11 @@ async function gatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number
     let hindex = 0;
     while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
     const sdjId = await getIdForSeries(conn, "Spiel des Jahre");
-    console.log(sdjId);
     const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
+    const ext100Id = await getIdForSeries(conn, "Extended Stats Top 100");
+    const ext100 = (await conn.query(seriesPlaysSql, [ext100Id, geekId]))[0]["c"];
     // TODO
-    return { totalPlays, distinctGames, tens, zeros, hindex, sdj };
+    return { totalPlays, distinctGames, tens, zeros, hindex, sdj, ext100 };
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
@@ -518,7 +521,7 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         utilisation: 0.0, // TODO
         tens: playsDataForWarTable.tens,
         zeros: playsDataForWarTable.zeros,
-        ext100: 0, // TODO
+        ext100: playsDataForWarTable.ext100,
         hindex: playsDataForWarTable.hindex,
         preordered: preordered
     };
@@ -591,6 +594,16 @@ export async function doSetGeekPlaysForMonth(conn: mysql.Connection, geekId: num
     for (const play of plays) {
         await conn.query(insertSql, [play.gameid, geekId, play.date, play.quantity, play.raters, play.ratingsTotal, play.location, month, year]);
     }
+}
+
+export async function doUpdateRankings(conn: mysql.Connection) {
+    // calculate extended stats top 100
+    const ext100Sql = "select game from ranking_table order by ranking_table.total_ratings desc limit 100";
+    const top100Games = (await conn.query(ext100Sql)).map(row => row["game"]);
+    await doUpdateSeries(conn, [ { name: "Extended Stats Top 100", games: top100Games } as SeriesMetadata ]);
+
+    // calculate normalised rankings
+    // TODO
 }
 
 export async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {

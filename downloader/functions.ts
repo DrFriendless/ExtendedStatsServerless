@@ -104,9 +104,9 @@ export async function processMetadata(event, context, callback: Callback) {
         }
         const toUpdate: Metadata = { series, rules };
         invokeLambdaAsync("processMetadata", INSIDE_PREFIX + FUNCTION_UPDATE_METADATA, toUpdate);
-        callback(null, null);
+        callback(null);
     } catch (e) {
-        callback(e, null);
+        callback(e);
     }
 }
 
@@ -196,8 +196,6 @@ async function tryToProcessCollection(invocation: FileToProcess): Promise<number
     let response;
     try {
         response = await request.get(options);
-        console.log("got response");
-        console.log(response);
         if (response.statusCode == 202) {
             throw new Error("BGG says to wait a bit.");
             // return 202;
@@ -208,7 +206,6 @@ async function tryToProcessCollection(invocation: FileToProcess): Promise<number
         throw e;
     }
     const collection = await extractUserCollectionFromPage(invocation.geek, invocation.url, response.body.toString());
-    console.log(collection);
     for (const games of splitCollection(collection)) {
         await invokeLambdaAsync("processCollection", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES, games);
         console.log("invoked " + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES + " for " + games.items.length + " games.");

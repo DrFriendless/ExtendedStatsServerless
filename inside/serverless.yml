@@ -132,8 +132,8 @@ functions:
       mysqlDatabase: ${self:custom.database.mysqlDatabase}
     role:
         "doStuffFromInsideVPC"
-  updateMetadata:
-    handler: functions.updateMetadata
+  updateRankings:
+    handler: functions.updateRankings
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -141,6 +141,15 @@ functions:
       mysqlDatabase: ${self:custom.database.mysqlDatabase}
     role:
         "doStuffFromInsideVPC"
+    events:
+      - schedule:
+          name: updateRankings
+          description: every day, calculate normalised ranking and ext top 100
+          rate: rate(24 hours)
+          enabled: true
+          input:
+            stageParams:
+              stage: dev
   getToProcessList:
     handler: functions.getToProcessList
     environment:
