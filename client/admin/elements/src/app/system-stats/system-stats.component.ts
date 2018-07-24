@@ -7,7 +7,7 @@ import {
   ViewEncapsulation
 } from '@angular/core';
 import {HttpClient, HttpHeaders} from '@angular/common/http';
-import {SystemStats, TypeCount} from '../admin-interfaces';
+import {SystemStats} from '../admin-interfaces';
 import {Subscription} from "rxjs/internal/Subscription";
 
 @Component({
