@@ -114,6 +114,8 @@ export async function processMetadata(event, context, callback: Callback) {
 export function fireFileProcessing(event, context, callback: Callback) {
     console.log(event);
     let count = PROCESS_COUNT;
+    const envCount = process.env["COUNT"];
+    if (parseInt(envCount)) count = parseInt(envCount);
     if (event.hasOwnProperty("count")) count = event.count;
     const payload = { count: count, updateLastScheduled: true };
     if (event.hasOwnProperty("processMethod")) {

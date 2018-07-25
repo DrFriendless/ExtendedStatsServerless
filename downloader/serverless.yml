@@ -47,6 +47,8 @@ functions:
               stage: dev
   fireFileProcessing:
     handler: functions.fireFileProcessing
+    environment:
+      COUNT: ${self:custom.secret.filesPerMinute}
     role:
       "invokeLambdas"
     events:
@@ -56,7 +58,6 @@ functions:
           rate: rate(1 minute)
           enabled: true
           input:
-            count: 100
             stageParams:
               stage: dev
   processUser:
