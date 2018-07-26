@@ -159,6 +159,7 @@ export async function processPlaysResult(event, context, callback: Callback) {
             if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
         }
         const geekId = await getGeekId(conn, params.geek);
+        console.log("geekId = " + geekId);
         const expansionData = await loadExpansionData(conn);
         await ensurePlaysGames(gameIds);
         await doSetGeekPlaysForMonth(conn, geekId, params.month, params.year, params.plays);

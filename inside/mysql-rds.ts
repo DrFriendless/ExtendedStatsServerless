@@ -281,14 +281,31 @@ async function doEnsureExactlyUsers(conn: mysql.Connection, users: string[]): Pr
 
 async function deleteExtraUsers(conn: mysql.Connection, extraUsers: string[]): Promise<void> {
     console.log("Deleting " + extraUsers.length + " unwanted users.");
+    const idsToDelete = [];
+    for (const u of extraUsers) {
+        const geekId = await getGeekId(conn, u);
+        idsToDelete.push(geekId);
+    }
     const deleteOneFile = "delete from files where geek = ?";
     const deleteOneGeek = "delete from geeks where username = ?";
     const deleteSomeFiles = "delete from files where geek in (?)";
     const deleteSomeGeeks = "delete from geeks where username in (?)";
+    const deleteOnePlays = "delete from plays where geek = ?";
+    const deleteSomePlays = "delete from plays where geek in (?)";
+    const deleteOneNormalisedPlays = "delete from plays_normalised where geek = ?";
+    const deleteSomeNormalisedPlays = "delete from plays_normalised where geek in (?)";
+    const deleteOneWarTable = "delete from war_table where geek = ?";
+    const deleteSomeWarTable = "delete from war_table where geek in (?)";
     if (extraUsers.length === 1) {
+        await conn.query(deleteOneWarTable, extraUsers);
+        await conn.query(deleteOnePlays, extraUsers);
+        await conn.query(deleteOneNormalisedPlays, extraUsers);
         await conn.query(deleteOneFile, extraUsers);
         await conn.query(deleteOneGeek, extraUsers);
     } else if (extraUsers.length > 0) {
+        await conn.query(deleteSomeWarTable, [extraUsers]);
+        await conn.query(deleteSomePlays, [extraUsers]);
+        await conn.query(deleteSomeNormalisedPlays, [extraUsers]);
         await conn.query(deleteSomeFiles, [extraUsers]);
         await conn.query(deleteSomeGeeks, [extraUsers]);
     }

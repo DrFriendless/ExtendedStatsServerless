@@ -157,19 +157,6 @@ functions:
       mysqlUsername: ${self:custom.database.mysqlUsername}
       mysqlPassword: ${self:custom.database.mysqlPassword}
       mysqlDatabase: ${self:custom.database.mysqlDatabase}
-    events:
-      - http:
-          path: toProcess
-          method: post
-          cors: true
-          integration: lambda
-          private: true
-      - http:
-          path: toProcess
-          method: get
-          cors: true
-          integration: lambda
-          private: true
     role:
         "doStuffFromInsideVPC"
 
