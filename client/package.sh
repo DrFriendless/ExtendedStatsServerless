@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+cd ts; tsc; cd ..
 cp src/*.css static
 for F in src/*.mustache
     do

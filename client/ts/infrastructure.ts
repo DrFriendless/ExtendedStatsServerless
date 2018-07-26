@@ -8,6 +8,7 @@ function getQueryVariable(variable: string): string | undefined {
     const vars = query.split("&");
     for (let i=0; i < vars.length; i++) {
         const pair = vars[i].split("=");
+        console.log(pair);
         if (pair[0] == variable) {
             return pair[1];
         }
@@ -17,9 +18,24 @@ function getQueryVariable(variable: string): string | undefined {
 
 function getExtStatsStorage(): ExtStatsStorage {
     const localStorage = window.localStorage;
-    localStorage.extStats = localStorage.extStats || {};
-    return localStorage.extStats as ExtStatsStorage;
+    console.log(typeof localStorage.extStats);
+    let result = {};
+    if (localStorage.extStats) {
+        try {
+            result = JSON.parse(localStorage.extStats);
+        } catch (err) {
+            console.log(err);
+        }
+    }
+    return result as ExtStatsStorage;
+}
+
+function withExtStatsStorage(func: (storage: ExtStatsStorage) => void) {
+    const content = getExtStatsStorage();
+    func(content);
+    window.localStorage.extStats = JSON.stringify(content);
 }
 
 const geek = getQueryVariable("geek");
-if (geek) getExtStatsStorage().geek = geek;
+console.log("geek = " + geek);
+if (geek) withExtStatsStorage(storage => storage.geek = geek);
