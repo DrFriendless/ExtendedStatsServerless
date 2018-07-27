@@ -1,11 +1,11 @@
 import {
   AfterViewInit,
-  Component,
-  Input, OnDestroy, ViewEncapsulation,
+  Component, OnDestroy, ViewEncapsulation,
 } from '@angular/core';
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
 import {GeekGame, GeekGameQuery} from "../collection-interfaces";
+import {fromExtStatsStorage} from "../extstats-storage";
 
 @Component({
   selector: 'user-collection',
@@ -14,15 +14,13 @@ import {GeekGame, GeekGameQuery} from "../collection-interfaces";
   encapsulation: ViewEncapsulation.None
 })
 export class UserCollectionComponent implements OnDestroy, AfterViewInit {
-  // remember @Inputs don't get populated on the root component
-  @Input('geek') geek: string;
+  private geek: string;
   private loadData$;
   public rows: [GeekGame] = [] as [GeekGame];
   private subscription: Subscription;
 
   constructor(private http: HttpClient) {
-    const queryString = document.URL.split('?')[1];
-    if (queryString.startsWith("geek=")) this.geek = queryString.slice(5);
+    this.geek = fromExtStatsStorage(storage => storage.geek);
   }
 
   public ngAfterViewInit(): void {

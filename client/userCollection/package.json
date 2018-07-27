@@ -8,8 +8,7 @@
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e",
-    "buildprod": "ng build --prod --output-hashing none --watch false --verbose",
-    "package": "ng build --prod --output-hashing none --watch false --verbose && ./package.sh"
+    "buildprod": "ng build --prod --output-hashing none --watch false --verbose"
   },
   "private": true,
   "dependencies": {

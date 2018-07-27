@@ -1,8 +1,6 @@
-interface ExtStatsStorage {
-    geek: string;
-}
-
 // https://css-tricks.com/snippets/javascript/get-url-variables/
+import {withExtStatsStorage} from "./extstats-storage";
+
 function getQueryVariable(variable: string): string | undefined {
     const query = window.location.search.substring(1);
     const vars = query.split("&");
@@ -14,26 +12,6 @@ function getQueryVariable(variable: string): string | undefined {
         }
     }
     return undefined;
-}
-
-function getExtStatsStorage(): ExtStatsStorage {
-    const localStorage = window.localStorage;
-    console.log(typeof localStorage.extStats);
-    let result = {};
-    if (localStorage.extStats) {
-        try {
-            result = JSON.parse(localStorage.extStats);
-        } catch (err) {
-            console.log(err);
-        }
-    }
-    return result as ExtStatsStorage;
-}
-
-function withExtStatsStorage(func: (storage: ExtStatsStorage) => void) {
-    const content = getExtStatsStorage();
-    func(content);
-    window.localStorage.extStats = JSON.stringify(content);
 }
 
 const geek = getQueryVariable("geek");
