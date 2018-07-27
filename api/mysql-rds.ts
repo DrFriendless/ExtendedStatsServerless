@@ -1,7 +1,7 @@
 import mysql = require('promise-mysql');
 import {SystemStats, TypeCount} from "./admin-interfaces"
 import {GeekGame, GeekGameQuery, WarTableRow} from "./collection-interfaces";
-import {asyncReturnWithConnection, count} from "./library";
+import {asyncReturnWithConnection, count, countTableRows} from "./library";
 import {RankingTableRow} from "./ranking-interfaces";
 
 export async function listGeekGames(query: GeekGameQuery): Promise<GeekGame[]> {
@@ -48,36 +48,25 @@ export async function gatherSystemStats(): Promise<SystemStats> {
 }
 
 async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats> {
-    const countUserRows = "select count(*) from geeks";
-    const countGameRows = "select count(*) from games";
-    const countGeekGameRows = "select count(*) from geekgames";
-    const countNotGames = "select count(*) from not_games";
-    const countCategories = "select count(*) from categories";
-    const countMechanics = "select count(*) from mechanics";
-    const countGameMechanics = "select count(*) from game_mechanics";
-    const countGameCategories = "select count(*) from game_categories";
     const countFileRows = "select processMethod, count(url) from files group by processMethod";
     const countWaitingFileRows = "select processMethod, count(url) from files where lastUpdate is null or nextUpdate is null or nextUpdate < now() group by processMethod";
     const countUnprocessedFileRows = "select processMethod, count(url) from files where lastUpdate is null or nextUpdate is null group by processMethod";
     const countGeekGamesOwnedByZero = "select count(*) from geekgames where geekid = 0";
     const countGGOwners = "select count(distinct(geekid)) c from geekgames";
-    const countsPlaysRows = "select count(*) from plays";
-    const countExpansionsRows = "select count(*) from expansions";
-    const countNormalisedPlaysRows = "select count(*) from plays_normalised";
-    const userRows = await count(conn, countUserRows, []);
-    const gameRows = await count(conn, countGameRows, []);
-    const geekGamesRows = await count(conn, countGeekGameRows, []);
-    const notGames = await count(conn, countNotGames, []);
-    const mechanics = await count(conn, countMechanics, []);
-    const categories = await count(conn, countCategories, []);
-    const gameMechanics = await count(conn, countGameMechanics, []);
-    const gameCategories = await count(conn, countGameCategories, []);
+    const userRows = await countTableRows(conn, "geeks");
+    const gameRows = await countTableRows(conn, "games");
+    const geekGamesRows = await countTableRows(conn, "geekgames");
+    const notGames = await countTableRows(conn, "not_games");
+    const mechanics = await countTableRows(conn, "mechanics");
+    const categories = await countTableRows(conn, "categories");
+    const gameMechanics = await countTableRows(conn, "game_mechanics");
+    const gameCategories = await countTableRows(conn, "game_categories");
     const fileRows = (await conn.query(countFileRows)).map(gatherTypeCount);
     const ggForZero = await count(conn, countGeekGamesOwnedByZero, []);
     const distinctGGOwners = (await conn.query(countGGOwners, []))[0]["c"];
-    const playsRows = await count(conn, countsPlaysRows, []);
-    const expansionRows = await count(conn, countExpansionsRows, []);
-    const normalisedPlaysRows = await count(conn, countNormalisedPlaysRows, []);
+    const playsRows = await countTableRows(conn, "plays");
+    const expansionRows = await countTableRows(conn, "expansions");
+    const normalisedPlaysRows = await countTableRows(conn, "plays_normalised");
     ((await conn.query(countWaitingFileRows)) as any[]).forEach(row => patch(fileRows, "waiting", row));
     ((await conn.query(countUnprocessedFileRows)) as any[]).forEach(row => patch(fileRows, "unprocessed", row));
     return {

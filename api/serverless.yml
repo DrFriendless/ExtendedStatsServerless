@@ -34,6 +34,7 @@ custom:
 functions:
   adminGatherSystemStats:
     handler: functions.adminGatherSystemStats
+    timeout: 300
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}

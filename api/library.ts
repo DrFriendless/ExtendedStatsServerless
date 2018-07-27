@@ -23,3 +23,8 @@ export async function count(conn: mysql.Connection, sql: string, params: any[]):
     return (await conn.query(sql, params))[0]["count(*)"];
 }
 
+export async function countTableRows(conn: mysql.Connection, tableName: string): Promise<number> {
+    const sql = "select TABLE_ROWS t FROM INFORMATION_SCHEMA.TABLES where TABLE_NAME=?";
+    return (await conn.query(sql, [tableName]))[0]["t"];
+}
+
