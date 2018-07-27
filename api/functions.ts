@@ -1,6 +1,14 @@
 import {Callback} from 'aws-lambda';
-import {gatherSystemStats, listGeekGames, listUsers, listWarTable, rankGames} from "./mysql-rds";
-import {GeekGameQuery} from "./collection-interfaces";
+import {
+    doListCollection,
+    doListCollectionWithPlays,
+    gatherSystemStats,
+    listUsers,
+    listWarTable,
+    rankGames
+} from "./mysql-rds";
+import {CollectionWithPlays, GeekGame, GeekGameQuery} from "./collection-interfaces";
+import {asyncReturnWithConnection} from "./library";
 
 export async function adminGatherSystemStats(event, context, callback: Callback) {
     try {
@@ -43,7 +51,7 @@ export async function getGeekGames(event, context, callback: Callback) {
     if (event && event.body) {
         const query = event.body as GeekGameQuery;
         try {
-            callback(null, await listGeekGames(query));
+            callback(null, await doGetGeekGames(query));
         } catch (err) {
             console.log(err);
             callback(err);
@@ -51,6 +59,30 @@ export async function getGeekGames(event, context, callback: Callback) {
     } else {
         callback(null);
     }
+}
+
+async function doGetGeekGames(query: GeekGameQuery): Promise<GeekGame[]> {
+    return await asyncReturnWithConnection(async conn => await doListCollection(conn, query));
+}
+
+export async function getCollectionWithPlays(event, context, callback: Callback) {
+    console.log("getGeekGames");
+    console.log(event);
+    if (event && event.body) {
+        const query = event.body as GeekGameQuery;
+        try {
+            callback(null, await doGetCollectionWithPlays(query));
+        } catch (err) {
+            console.log(err);
+            callback(err);
+        }
+    } else {
+        callback(null);
+    }
+}
+
+async function doGetCollectionWithPlays(query: GeekGameQuery): Promise<CollectionWithPlays> {
+    return await asyncReturnWithConnection(async conn => await doListCollectionWithPlays(conn, query));
 }
 
 // Lambda to retrieve game rankings

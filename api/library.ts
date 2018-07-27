@@ -28,3 +28,7 @@ export async function countTableRows(conn: mysql.Connection, tableName: string):
     return (await conn.query(sql, [tableName]))[0]["t"];
 }
 
+export async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {
+    const getIdSql = "select id from geeks where geeks.username = ?";
+    return (await conn.query(getIdSql, [geek]))[0]['id'];
+}

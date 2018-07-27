@@ -35,3 +35,14 @@ export interface WarTableRow {
     hindex: number;
     preordered: number;
 }
+
+export interface GamePlays {
+    game: number;
+    plays: number;
+    expansion: boolean;
+}
+
+export interface CollectionWithPlays {
+    collection: GeekGame[];
+    plays: GamePlays[];
+}

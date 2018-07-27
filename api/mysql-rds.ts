@@ -1,12 +1,8 @@
 import mysql = require('promise-mysql');
 import {SystemStats, TypeCount} from "./admin-interfaces"
-import {GeekGame, GeekGameQuery, WarTableRow} from "./collection-interfaces";
-import {asyncReturnWithConnection, count, countTableRows} from "./library";
+import {CollectionWithPlays, GamePlays, GeekGame, GeekGameQuery, WarTableRow} from "./collection-interfaces";
+import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
 import {RankingTableRow} from "./ranking-interfaces";
-
-export async function listGeekGames(query: GeekGameQuery): Promise<GeekGame[]> {
-    return asyncReturnWithConnection(conn => doListGeekGames(conn, query));
-}
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return asyncReturnWithConnection(async conn => doRankGames(conn, query));
@@ -23,9 +19,25 @@ async function doRankGames(conn: mysql.Connection, query: object): Promise<Ranki
     return rows;
 }
 
-async function doListGeekGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {
+export async function doListCollection(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {
     const sql = "select * from games,geekgames where games.bggid = geekgames.game and geekgames.geek = ? and geekgames.owned = 1";
     return await conn.query(sql, [query.geek]).then(data => data.map(extractGeekGame));
+}
+
+export async function doListCollectionWithPlays(conn: mysql.Connection, query: GeekGameQuery): Promise<CollectionWithPlays> {
+    const collection = await doListCollection(conn, query);
+    const gamesInCollection = collection.map(gg => gg.bggid);
+    const plays = (await getAllPlays(conn, query.geek)).filter(gp => gamesInCollection.indexOf(gp.game) >= 0);
+    return { collection, plays } as CollectionWithPlays;
+}
+
+async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
+    const playsSql = "select game, sum(quantity) q, max(expansion_play) x from plays_normalised where geek = ? group by game";
+    const geekId = await getGeekId(conn, geek);
+    const rows = await conn.query(playsSql, [geekId]);
+    return rows.map(row => {
+        return { game: row["game"], expansion: row["x"] > 0, plays: row["q"] } as GamePlays;
+    });
 }
 
 function extractGeekGame(row: object): GeekGame {
