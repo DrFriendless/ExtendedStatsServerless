@@ -2,20 +2,26 @@
 <html lang="en">
 
 <head>
+    {{> gtmhead}}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     <link rel="stylesheet" href="theme.css">
-
     {{> adsbygoogle}}
 
-    <title>Geek Page</title>
-    <script src="collection-elements.js" type="text/javascript"></script>
+    <title>Your Favourite Games - Extended Stats</title>
 </head>
 
 <body>
-<h1>Extended Stats for Bob</h1>
-<extstats-system-stats></extstats-system-stats>
+{{> gtmbody}}
+<h1>Your Favourite Games</h1>
+
+<extstats-favourites></extstats-favourites>
+
+{{> infrastructure}}
+<script src="favouritesWidget/runtime.js" type="text/javascript"></script>
+<script src="favouritesWidget/polyfills.js" type="text/javascript"></script>
+<script src="favouritesWidget/main.js" type="text/javascript"></script>
 </body>
 
 </html>
