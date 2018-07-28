@@ -7,7 +7,22 @@
 
     <div id="favouritesTableDoc" [ngbCollapse]="docCollapsed">
       <ngb-tabset>
-        <ngb-tab title="Spiel des Jahre">
+        <ngb-tab title="Friendless Happiness Metric">
+          <ng-template ngbTabContent>
+            <p>The Spiel des Jahre (German Game of the Year) is an annual prize awarded since 1978. This metric is how many SdJ winners the geek has played.</p>
+          </ng-template>
+        </ngb-tab>
+        <ngb-tab title="Huber Happiness Metric">
+          <ng-template ngbTabContent>
+            <p>The Spiel des Jahre (German Game of the Year) is an annual prize awarded since 1978. This metric is how many SdJ winners the geek has played.</p>
+          </ng-template>
+        </ngb-tab>
+        <ngb-tab title="Huber Heat">
+          <ng-template ngbTabContent>
+            <p>The Spiel des Jahre (German Game of the Year) is an annual prize awarded since 1978. This metric is how many SdJ winners the geek has played.</p>
+          </ng-template>
+        </ngb-tab>
+        <ngb-tab title="Randy Cox Not Unhappiness Metric">
           <ng-template ngbTabContent>
             <p>The Spiel des Jahre (German Game of the Year) is an annual prize awarded since 1978. This metric is how many SdJ winners the geek has played.</p>
           </ng-template>
@@ -26,16 +41,13 @@
       <th><mfDefaultSorter by="bggRating" tooltip="This game's rating on BoardGameGeek.">BGG Rating</mfDefaultSorter></th>
       <th><mfDefaultSorter by="firstPlayed" tooltip="First date you played this game.">First Played</mfDefaultSorter></th>
       <th><mfDefaultSorter by="lastPlayed" tooltip="Last date you played this game.">Last Played</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="trade" tooltip="Number of games this geek has for trade">For Trade</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="sdj" tooltip="Number of different Spiel des Jahre winners played">Spiel des Jahre</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="top50" tooltip="Number of different games in the BGG Top 50 played">BGG Top 50</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="ext100" tooltip="Number of different games in the Extended Stats Top 100 played">Ext Stats Top 100</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="prevOwned" tooltip="Number of games previously owned by this geek">Prev Owned</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="friendless" tooltip="Friendless Metric for this geek">Friendless</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="cfm" tooltip="Continuous Friendless Metric for this geek">CFM</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="zeros" tooltip="Number of games this geek owns that they have played 0 times">0s</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="tens" tooltip="Number of games this geek owns that they have played 10+ times">10s</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="hindex" tooltip="This geek's H-Index">H-Index</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="monthsPlayed" tooltip="Months in which you have played this game.">Months Played</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="hoursPlayed" tooltip="Hours for which you have played this game.">Hours Played</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="fhm" tooltip="Friendless Happiness Metric">FHM</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="hhm" tooltip="Huber Happiness Metric">HHM</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="huberHeat" tooltip="Huber Heat">Huber Heat</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="ruhm" tooltip="Randy Cox Not Unhappiness Metric">R!UHM</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="yearPublished" tooltip="The year in which this game was first published.">Year Published</mfDefaultSorter></th>
     </tr>
     </thead>
     <tbody>
@@ -47,15 +59,13 @@
       <td>{{row.bggRating}}</td>
       <td>{{row.firstPlayed}}</td>
       <td>{{row.lastPlayed}}</td>
-      <td>{{row.sdj}}</td>
-      <td>{{row.top50}}</td>
-      <td>{{row.ext100}}</td>
-      <td>{{row.prevOwned}}</td>
-      <td>{{row.friendless}}</td>
-      <td>{{row.cfm}}</td>
-      <td>{{row.zeros}}</td>
-      <td>{{row.tens}}</td>
-      <td>{{row.hindex}}</td>
+      <td>{{row.monthsPlayed}}</td>
+      <td>{{row.hoursPlayed}}</td>
+      <td>{{row.fhm}}</td>
+      <td>{{row.hhm}}</td>
+      <td>{{row.huberHeat}}</td>
+      <td>{{row.ruhm}}</td>
+      <td>{{row.yearPublished}}</td>
     </tr>
     </tbody>
     <tfoot>

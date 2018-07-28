@@ -5,7 +5,6 @@ export interface GeekGameQuery {
 export interface GeekGame {
   bggid: number;
   rating: number;
-  average:  number;
   owned: boolean;
   wantToBuy: boolean;
   wantToPlay: boolean;

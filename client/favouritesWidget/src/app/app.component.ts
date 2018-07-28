@@ -47,11 +47,26 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
     const gamesIndex = FavouritesComponent.makeGamesIndex(games);
     const rows = [] as FavouritesRow[];
     collection.forEach(gg => {
-      const gp = playsIndex[gg.bggid] || { plays: 0, expansion: false, game: gg.bggid } as GamePlays;
+      if (!gg.rating) gg.rating = undefined;
+      const gp = playsIndex[gg.bggid] || { plays: 0, expansion: false, game: gg.bggid, distinctMonths: 0, distinctYears: 0 } as GamePlays;
       const game = gamesIndex[gg.bggid] || { name: "Unknown", bggRanking: 1000000, bggRating: 1.0 } as GameData;
+      const hoursPlayed = gp.plays * game.playTime / 60;
+      // (rating * 5 + plays + months played * 4 + hours played)
+      const fhm = (!gg.rating) ? undefined : Math.floor((gg.rating * 5 + gp.plays + gp.distinctMonths * 4 + hoursPlayed) * 10) / 10;
+      if (!fhm) {
+        console.log("plays " + gp.plays);
+        console.log("playtime " + game.playTime);
+        console.log("rating " + gg.rating);
+        console.log("months " + gp.distinctMonths);
+      }
+      // ((rating - 4.5) * hours played)
+      const hhm = (!gg.rating) ? undefined : Math.floor((gg.rating - 4.5) * hoursPlayed);
+      const huberHeat = 0; // TODO
+      const ruhm = 0; // TODO
       const row = { gameName: game.name, game: gg.bggid, rating: gg.rating, plays: gp.plays, bggRanking: game.bggRanking,
         bggRating: game.bggRating, firstPlayed: FavouritesComponent.toDateString(gp.firstPlay),
-        lastPlayed: FavouritesComponent.toDateString(gp.lastPlay) } as FavouritesRow;
+        lastPlayed: FavouritesComponent.toDateString(gp.lastPlay), monthsPlayed: gp.distinctMonths, yearsPlayed: gp.distinctYears,
+        yearPublished: game.yearPublished, fhm, hhm, huberHeat, hoursPlayed: Math.floor(hoursPlayed), ruhm } as FavouritesRow;
       rows.push(row);
     });
     return rows;

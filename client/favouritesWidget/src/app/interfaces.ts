@@ -7,4 +7,12 @@ export interface FavouritesRow {
   bggRating: number;
   firstPlayed: string;
   lastPlayed: string;
+  monthsPlayed: number;
+  yearsPlayed: number;
+  hoursPlayed: number;
+  fhm: number;
+  hhm: number;
+  ruhm: number;
+  huberHeat: number;
+  yearPublished: number;
 }
