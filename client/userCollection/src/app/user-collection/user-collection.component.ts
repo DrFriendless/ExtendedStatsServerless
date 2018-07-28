@@ -6,6 +6,8 @@ import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
 import {GeekGame, GeekGameQuery} from "../collection-interfaces";
 import {fromExtStatsStorage} from "../extstats-storage";
+import {Collection, GameData} from "../../../../../api/collection-interfaces";
+import {UserCollectionRow} from "./interfaces";
 
 @Component({
   selector: 'user-collection',
@@ -16,7 +18,8 @@ import {fromExtStatsStorage} from "../extstats-storage";
 export class UserCollectionComponent implements OnDestroy, AfterViewInit {
   private geek: string;
   private loadData$;
-  public rows: [GeekGame] = [] as [GeekGame];
+  private data: Collection;
+  public rows = [] as UserCollectionRow[];
   private subscription: Subscription;
 
   constructor(private http: HttpClient) {
@@ -32,11 +35,24 @@ export class UserCollectionComponent implements OnDestroy, AfterViewInit {
       geek: this.geek
     };
     console.log(body);
-    this.loadData$ = this.http.post("https://api.drfriendless.com/v1/geekgames", body, options);
+    this.loadData$ = this.http.post("https://api.drfriendless.com/v1/collection", body, options);
     this.subscription = this.loadData$.subscribe(result => {
-      this.rows = result;
-      console.log(this.rows);
-    })
+      this.data = result;
+      console.log(this.data);
+      this.rows = UserCollectionComponent.makeRows(this.data.collection, this.data.games);
+    });
+  }
+
+  private static makeRows(geekGames: GeekGame[], games: GameData[]): UserCollectionRow[] {
+    const gameIndex = {};
+    games.forEach(game => gameIndex[game.bggid] = game);
+    const result = [];
+    geekGames.forEach(gg => {
+      const game = gameIndex[gg.bggid];
+      const row = { bggid: gg.bggid, name: game.name, average: game.bggRating, rating: gg.rating } as UserCollectionRow;
+      result.push(row);
+    });
+    return result;
   }
 
   public ngOnDestroy(): void {
