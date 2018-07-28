@@ -45,10 +45,10 @@
     <thead>
     <tr>
       <th><mfDefaultSorter by="gameName">Game</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="rating">Rating</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="totalPlays" tooltip="Total plays of all games as recorded by Extended Stats">Total Plays</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="distinctGames" tooltip="Number of different games with recorded plays">Distinct Games</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="owned" tooltip="Number of games this geek owns">Owned</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="rating" tooltip="Your rating for this game.">Rating</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="plays" tooltip="The number of times you have played this game.">Plays</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="bggRanking" tooltip="This game's ranking on BoardGameGeek.">BGG Ranking</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="bggRating" tooltip="This game's rating on BoardGameGeek.">BGG Rating</mfDefaultSorter></th>
       <th><mfDefaultSorter by="want" tooltip="Number of games this geek wants in trade">Want in Trade</mfDefaultSorter></th>
       <th><mfDefaultSorter by="wish" tooltip="Number of games on this geek's wishlist">Wishlist</mfDefaultSorter></th>
       <th><mfDefaultSorter by="trade" tooltip="Number of games this geek has for trade">For Trade</mfDefaultSorter></th>
@@ -66,10 +66,10 @@
     <tbody>
     <tr *ngFor="let row of favouritesTable.data">
       <td><a href="https://boardgamegeek.com/boardgame/{{row.game}}">{{row.gameName}}</a></td>
-      <td>{{row.totalPlays}}</td>
-      <td>{{row.distinctGames}}</td>
-      <td>{{row.owned}}</td>
-      <td>{{row.want}}</td>
+      <td>{{row.rating}}</td>
+      <td>{{row.plays}}</td>
+      <td>{{row.bggRanking}}</td>
+      <td>{{row.bggRating}}</td>
       <td>{{row.wish}}</td>
       <td>{{row.trade}}</td>
       <td>{{row.sdj}}</td>

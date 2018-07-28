@@ -44,8 +44,8 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
     const playsIndex = FavouritesComponent.makePlaysIndex(plays);
     const rows = [] as FavouritesRow[];
     collection.forEach(gg => {
-      const gp = playsIndex[gg.bggid];
-      const row = { gameName: gg.name, game: gg.bggid, rating: gg.rating } as FavouritesRow;
+      const gp = playsIndex[gg.bggid] || { plays: 0, expansion: false, game: gg.bggid } as GamePlays;
+      const row = { gameName: gg.name, game: gg.bggid, rating: gg.rating, plays: gp.plays } as FavouritesRow;
       rows.push(row);
     });
     return rows;
