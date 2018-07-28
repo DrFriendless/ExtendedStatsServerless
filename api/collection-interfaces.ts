@@ -69,11 +69,3 @@ export interface CollectionWithPlays {
     plays: GamePlays[];
     games: GameData[];
 }
-
-export interface GameSummary {
-    bggid: number;
-    name: string;
-    bggRating: number;
-    bggRanking: number;
-}
-

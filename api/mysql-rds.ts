@@ -78,7 +78,7 @@ async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePl
 
 function extractGeekGame(row: object): GeekGame {
     return {
-        bggid: row["bggid"],
+        bggid: row["game"],
         rating: row["rating"],
         average: row["average"],
         owned: row['owned'] > 0,
