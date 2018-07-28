@@ -62,8 +62,9 @@ export async function doGetCollectionWithPlays(conn: mysql.Connection, query: Ge
     const collection = await doListOwnedGames(conn, query);
     const geekGames = collection.map(gg => gg.bggid);
     const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
+    const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
     const games = await doRetrieveGames(conn, geekGames);
-    return { collection, plays, games } as CollectionWithPlays;
+    return { collection, plays, games, lastYearPlays } as CollectionWithPlays;
 }
 
 async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
@@ -73,6 +74,18 @@ async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePl
     return rows.map(row => {
         return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], firstPlay: row["mi"], lastPlay: row["ma"],
             distinctMonths: row["months"], distinctYears: row["years"]} as GamePlays;
+    });
+}
+
+async function getLastYearOfPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
+    const now = new Date();
+    const today = now.getFullYear() * 10000 + now.getMonth() * 100 + now.getDate();
+    const playsSql = "select game, sum(quantity) q, max(expansion_play) x, count(month) months from plays_normalised where geek = ? and ? - (year * 10000 + month * 100 + date) < 10000  group by game";
+    const geekId = await getGeekId(conn, geek);
+    const rows = await conn.query(playsSql, [geekId, today]);
+    return rows.map(row => {
+        return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], firstPlay: undefined, lastPlay: undefined,
+            distinctMonths: row["months"], distinctYears: 0 } as GamePlays;
     });
 }
 

@@ -66,5 +66,6 @@ export interface Collection {
 export interface CollectionWithPlays {
     collection: GeekGame[];
     plays: GamePlays[];
+    lastYearPlays: GamePlays[];
     games: GameData[];
 }
