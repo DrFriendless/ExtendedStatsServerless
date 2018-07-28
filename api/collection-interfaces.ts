@@ -40,9 +40,21 @@ export interface GamePlays {
     game: number;
     plays: number;
     expansion: boolean;
+    firstPlay: number;
+    lastPlay: number;
+    distinctYears: number;
+    distinctMonths: number;
 }
 
 export interface CollectionWithPlays {
     collection: GeekGame[];
     plays: GamePlays[];
 }
+
+export interface GameSummary {
+    bggid: number;
+    name: string;
+    bggRating: number;
+    bggRanking: number;
+}
+

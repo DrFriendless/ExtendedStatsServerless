@@ -32,11 +32,12 @@ export async function doListCollectionWithPlays(conn: mysql.Connection, query: G
 }
 
 async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
-    const playsSql = "select game, sum(quantity) q, max(expansion_play) x from plays_normalised where geek = ? group by game";
+    const playsSql = "select game, sum(quantity) q, max(expansion_play) x, min(year * 10000 + month * 100 + date) mi, max(year * 10000 + month * 100 + date) ma, count(distinct year) years, count(distinct year*100+month) months from plays_normalised where geek = ? group by game";
     const geekId = await getGeekId(conn, geek);
     const rows = await conn.query(playsSql, [geekId]);
     return rows.map(row => {
-        return { game: row["game"], expansion: row["x"] > 0, plays: row["q"] } as GamePlays;
+        return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], firstPlay: row["mi"], lastPlay: row["ma"],
+            distinctMonths: row["months"], distinctYears: row["years"]} as GamePlays;
     });
 }
 
