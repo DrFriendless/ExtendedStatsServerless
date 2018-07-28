@@ -65,8 +65,8 @@ functions:
           private: true
     role:
         "doStuffFromInsideVPC"
-  getGeekGames:
-    handler: functions.getGeekGames
+  getCollection:
+    handler: functions.getCollection
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -74,13 +74,13 @@ functions:
       mysqlDatabase: ${self:custom.database.mysqlDatabase}
     events:
       - http:
-          path: geekgames
+          path: collection
           method: post
           cors: true
           integration: lambda
           private: true
       - http:
-          path: geekgames
+          path: collection
           method: get
           cors: true
           integration: lambda

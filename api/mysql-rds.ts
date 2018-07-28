@@ -1,8 +1,16 @@
 import mysql = require('promise-mysql');
 import {SystemStats, TypeCount} from "./admin-interfaces"
-import {CollectionWithPlays, GamePlays, GeekGame, GeekGameQuery, WarTableRow} from "./collection-interfaces";
+import {
+    Collection,
+    CollectionWithPlays, GameData,
+    GamePlays,
+    GeekGame,
+    GeekGameQuery,
+    WarTableRow
+} from "./collection-interfaces";
 import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
 import {RankingTableRow} from "./ranking-interfaces";
+import {ExpansionData} from "./expansion-data";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return asyncReturnWithConnection(async conn => doRankGames(conn, query));
@@ -19,16 +27,43 @@ async function doRankGames(conn: mysql.Connection, query: object): Promise<Ranki
     return rows;
 }
 
-export async function doListCollection(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {
-    const sql = "select * from games,geekgames where games.bggid = geekgames.game and geekgames.geek = ? and geekgames.owned = 1";
+async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<GameData[]> {
+    const sqlOne = "select * from games where bggid = ?";
+    const sqlMany = "select * from games where bggid in (?)";
+    const expansions = await loadExpansionData(conn);
+    let rows;
+    if (ids.length === 0) return [];
+    if (ids.length === 1) {
+        rows = await conn.query(sqlOne, ids);
+    } else {
+        rows = await conn.query(sqlMany, [ids]);
+    }
+    return rows.map(row => extractGameData(row, expansions));
+}
+
+function extractGameData(row: object, expansionData: ExpansionData): GameData {
+    return { bggid: row["bggid"], bggRanking: row["rank"], bggRating: row["average"], minPlayers: row["minPlayers"],
+        maxPlayers: row["maxPlayers"], name: row["name"], playTime: row["playTime"], subdomain: row["subdomain"],
+        weight: row["averageWeight"], yearPublished: row["yearPublished"], isExpansion: expansionData.isExpansion(row["bggid"]) } as GameData;
+}
+
+export async function doGetCollection(conn: mysql.Connection, query: GeekGameQuery): Promise<Collection> {
+    const geekGames = await doListOwnedGames(conn, query);
+    const games = await doRetrieveGames(conn, geekGames.map(gg => gg.bggid));
+    return { collection: geekGames, games } as Collection;
+}
+
+export async function doListOwnedGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {
+    const sql = "select * from geekgames where geekgames.geek = ? and geekgames.owned = 1";
     return await conn.query(sql, [query.geek]).then(data => data.map(extractGeekGame));
 }
 
-export async function doListCollectionWithPlays(conn: mysql.Connection, query: GeekGameQuery): Promise<CollectionWithPlays> {
-    const collection = await doListCollection(conn, query);
-    const gamesInCollection = collection.map(gg => gg.bggid);
-    const plays = (await getAllPlays(conn, query.geek)).filter(gp => gamesInCollection.indexOf(gp.game) >= 0);
-    return { collection, plays } as CollectionWithPlays;
+export async function doGetCollectionWithPlays(conn: mysql.Connection, query: GeekGameQuery): Promise<CollectionWithPlays> {
+    const collection = await doListOwnedGames(conn, query);
+    const geekGames = collection.map(gg => gg.bggid);
+    const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
+    const games = await doRetrieveGames(conn, geekGames);
+    return { collection, plays, games } as CollectionWithPlays;
 }
 
 async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
@@ -42,10 +77,8 @@ async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePl
 }
 
 function extractGeekGame(row: object): GeekGame {
-    console.log(row);
     return {
         bggid: row["bggid"],
-        name: row["name"],
         rating: row["rating"],
         average: row["average"],
         owned: row['owned'] > 0,
@@ -120,3 +153,6 @@ export async function listUsers(): Promise<string[]> {
     return asyncReturnWithConnection(conn => conn.query(sql).then(data => data.map(row => row['username'])));
 }
 
+export async function loadExpansionData(conn: mysql.Connection): Promise<ExpansionData> {
+    return new ExpansionData(await conn.query("select basegame, expansion from expansions"));
+}

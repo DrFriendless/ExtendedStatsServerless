@@ -4,7 +4,6 @@ export interface GeekGameQuery {
 
 export interface GeekGame {
     bggid: number;
-    name: string;
     rating: number;
     average:  number;
     owned: boolean;
@@ -12,6 +11,20 @@ export interface GeekGame {
     wantToPlay: boolean;
     preordered: boolean;
     prevOwned: boolean;
+}
+
+export interface GameData {
+    bggid: number;
+    name: string;
+    bggRating: number;
+    bggRanking: number;
+    yearPublished: number;
+    minPlayers: number;
+    maxPlayers: number;
+    playTime: number;
+    subdomain: string;
+    weight: number;
+    isExpansion: boolean;
 }
 
 export interface WarTableRow {
@@ -46,9 +59,15 @@ export interface GamePlays {
     distinctMonths: number;
 }
 
+export interface Collection {
+    collection: GeekGame[];
+    games: GameData[];
+}
+
 export interface CollectionWithPlays {
     collection: GeekGame[];
     plays: GamePlays[];
+    games: GameData[];
 }
 
 export interface GameSummary {
