@@ -80,7 +80,6 @@ function extractGeekGame(row: object): GeekGame {
     return {
         bggid: row["game"],
         rating: row["rating"],
-        average: row["average"],
         owned: row['owned'] > 0,
         prevOwned: row['prevowned'] > 0,
         wantToBuy: row['wanttobuy'] > 0,
