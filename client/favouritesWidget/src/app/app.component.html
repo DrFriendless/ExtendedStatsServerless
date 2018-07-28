@@ -12,31 +12,6 @@
             <p>The Spiel des Jahre (German Game of the Year) is an annual prize awarded since 1978. This metric is how many SdJ winners the geek has played.</p>
           </ng-template>
         </ngb-tab>
-        <ngb-tab title="BGG Top 50">
-          <ng-template ngbTabContent>
-            <p>This metric is how many of the current (or at least recent) <a href="https://boardgamegeek.com/browse/boardgame">BoardGameGeek.com Top 50</a> games the geek has played.</p>
-          </ng-template>
-        </ngb-tab>
-        <ngb-tab title="Ext Stats Top 100">
-          <ng-template ngbTabContent>
-            <p>This is how many of the <a href="/rankings.html">Extended Stats Top 100</a> the geek has played.</p>
-          </ng-template>
-        </ngb-tab>
-        <ngb-tab title="Friendless Metric">
-          <ng-template ngbTabContent>
-            <p>To calculate the Friendless metric, make a list of all of your games in descending order of how many times you've played them. Scrabble with 173 plays comes first, Triominos with 0 plays comes last. For each game at the beginning with 10 or more plays, we consider that game to have earned its keep. Even better, having played one game that many times, you're forgiven one at the other end which you haven't played so much. So for playing Scrabble so many times we'll forgive you for never playing Triominos. People who play games tend to accumulate them, so we'll assume that was a gift. Then, we look at how many times you've played the last game remaining on the list... and that's your Friendless metric. The higher the better. Most bggeeks have a value of zero, so I extended the definition to go into negatives. A value of ­x tells you that to get to a Friendless metric of 1 you need to play x more of your games that you've never played.</p>
-          </ng-template>
-        </ngb-tab>
-        <ngb-tab title="CFM">
-          <ng-template ngbTabContent>
-            <p>The standard Friendless metric has a weakness in that once you get that value above zero you can't increase it by playing your games with 0 plays any more. You can ensure that if you buy more games it will stay above zero for a while longer, but until you do that there's no motivation to play (or otherwise deal with) those games you've been ignoring. The Continuous Friendless Metric changes the Friendless metric so that you're ALWAYS rewarded for playing a game you own, but you're rewarded more for playing a game you've played less. </p>
-          </ng-template>
-        </ngb-tab>
-        <ngb-tab title="H-Index">
-          <ng-template ngbTabContent>
-            <p>You H-Index is the largest number H such that you have played H games H times each.</p>
-          </ng-template>
-        </ngb-tab>
       </ngb-tabset>
     </div>
   </div>
@@ -49,8 +24,8 @@
       <th><mfDefaultSorter by="plays" tooltip="The number of times you have played this game.">Plays</mfDefaultSorter></th>
       <th><mfDefaultSorter by="bggRanking" tooltip="This game's ranking on BoardGameGeek.">BGG Ranking</mfDefaultSorter></th>
       <th><mfDefaultSorter by="bggRating" tooltip="This game's rating on BoardGameGeek.">BGG Rating</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="want" tooltip="Number of games this geek wants in trade">Want in Trade</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="wish" tooltip="Number of games on this geek's wishlist">Wishlist</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="firstPlayed" tooltip="First date you played this game.">First Played</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="lastPlayed" tooltip="Last date you played this game.">Last Played</mfDefaultSorter></th>
       <th><mfDefaultSorter by="trade" tooltip="Number of games this geek has for trade">For Trade</mfDefaultSorter></th>
       <th><mfDefaultSorter by="sdj" tooltip="Number of different Spiel des Jahre winners played">Spiel des Jahre</mfDefaultSorter></th>
       <th><mfDefaultSorter by="top50" tooltip="Number of different games in the BGG Top 50 played">BGG Top 50</mfDefaultSorter></th>
@@ -70,8 +45,8 @@
       <td>{{row.plays}}</td>
       <td>{{row.bggRanking}}</td>
       <td>{{row.bggRating}}</td>
-      <td>{{row.wish}}</td>
-      <td>{{row.trade}}</td>
+      <td>{{row.firstPlayed}}</td>
+      <td>{{row.lastPlayed}}</td>
       <td>{{row.sdj}}</td>
       <td>{{row.top50}}</td>
       <td>{{row.ext100}}</td>
