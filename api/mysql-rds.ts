@@ -4,13 +4,13 @@ import {
     Collection,
     CollectionWithPlays, GameData,
     GamePlays,
-    GeekGame,
     GeekGameQuery,
     WarTableRow
 } from "./collection-interfaces";
 import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
 import {RankingTableRow} from "./ranking-interfaces";
 import {ExpansionData} from "./expansion-data";
+import {selectGames} from "./selector";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return asyncReturnWithConnection(async conn => doRankGames(conn, query));
@@ -48,18 +48,13 @@ function extractGameData(row: object, expansionData: ExpansionData): GameData {
 }
 
 export async function doGetCollection(conn: mysql.Connection, query: GeekGameQuery): Promise<Collection> {
-    const geekGames = await doListOwnedGames(conn, query);
+    const geekGames = await selectGames(conn, query);
     const games = await doRetrieveGames(conn, geekGames.map(gg => gg.bggid));
     return { collection: geekGames, games } as Collection;
 }
 
-export async function doListOwnedGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {
-    const sql = "select * from geekgames where geekgames.geek = ? and geekgames.owned = 1";
-    return await conn.query(sql, [query.geek]).then(data => data.map(extractGeekGame));
-}
-
 export async function doGetCollectionWithPlays(conn: mysql.Connection, query: GeekGameQuery): Promise<CollectionWithPlays> {
-    const collection = await doListOwnedGames(conn, query);
+    const collection = await selectGames(conn, query);
     const geekGames = collection.map(gg => gg.bggid);
     const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
     const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
@@ -87,18 +82,6 @@ async function getLastYearOfPlays(conn: mysql.Connection, geek: string): Promise
         return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], firstPlay: undefined, lastPlay: undefined,
             distinctMonths: row["months"], distinctYears: 0 } as GamePlays;
     });
-}
-
-function extractGeekGame(row: object): GeekGame {
-    return {
-        bggid: row["game"],
-        rating: row["rating"],
-        owned: row['owned'] > 0,
-        prevOwned: row['prevowned'] > 0,
-        wantToBuy: row['wanttobuy'] > 0,
-        wantToPlay: row['wanttoplay'] > 0,
-        preordered: row['preordered'] > 0
-    } as GeekGame;
 }
 
 export async function gatherSystemStats(): Promise<SystemStats> {

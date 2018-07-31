@@ -29,6 +29,71 @@
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PVMS9L9"
                   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <!-- End Google Tag Manager (noscript) --><h1>Extended Stats Admin Stats Page</h1>
+
+<div class="login">
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="#">Auth0 - JavaScript</a>
+
+                <button id="btn-home-view" class="btn btn-primary btn-margin">
+                    Home
+                </button>
+
+                <button id="btn-login" class="btn btn-primary btn-margin">
+                    Log In
+                </button>
+
+                <button id="btn-logout" class="btn btn-primary btn-margin">
+                    Log Out
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- home view -->
+        <div id="home-view">
+            <h4></h4>
+        </div>
+
+    </main>
+    <script src="https://cdn.auth0.com/js/lock/11.8.0/lock.min.js"></script>
+    <script>
+        var options = {
+            auth: {
+                redirect: false
+            },
+            popupOptions: { width: 300, height: 400, left: 200, top: 300 },
+            usernameStyle: 'username'
+        };
+        var lock = new Auth0Lock(
+                'z7FL2jZnXI9C66WcmCMC7V1STnQbFuQl',
+                'drfriendless.au.auth0.com',
+                options
+        );
+        lock.on("authenticated", function(authResult) {
+            console.log("authenticated");
+            console.log(authResult);
+            // Use the token in authResult to getUserInfo() and save it to localStorage
+            lock.getUserInfo(authResult.accessToken, function(error, profile) {
+                if (error) {
+                    // Handle error
+                    return;
+                }
+                console.log(profile);
+                // document.getElementById('nick').textContent = profile.nickname;
+
+                localStorage.setItem('accessToken', authResult.accessToken);
+                localStorage.setItem('profile', JSON.stringify(profile));
+            });
+        });
+        document.getElementById('btn-login').addEventListener('click', function() {
+            lock.show();
+        });
+    </script>
+</div>
+
 <extstats-admin></extstats-admin>
 
 <script src="adminWidget/runtime.js" type="text/javascript"></script>

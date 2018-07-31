@@ -28,6 +28,7 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
       headers: new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ")
     };
     const body: GeekGameQuery = {
+      query: "all(played(ME), rated(ME))",
       geek: this.geek
     };
     console.log(body);

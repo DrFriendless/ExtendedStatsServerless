@@ -32,7 +32,8 @@ export class UserCollectionComponent implements OnDestroy, AfterViewInit {
       headers: new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ")
     };
     const body: GeekGameQuery = {
-      geek: this.geek
+      geek: this.geek,
+      query: "owned(ME)"
     };
     console.log(body);
     this.loadData$ = this.http.post("https://api.drfriendless.com/v1/collection", body, options);

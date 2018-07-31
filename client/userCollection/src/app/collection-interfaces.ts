@@ -1,5 +1,6 @@
 export interface GeekGameQuery {
   geek: string;
+  query: string;
 }
 
 export interface GeekGame {
