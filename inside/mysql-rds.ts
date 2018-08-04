@@ -334,21 +334,17 @@ export async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string,
     const notExist = await getGamesThatDontExist(conn);
     for (const game of games) {
         if (notExist.indexOf(game.gameId) >= 0) continue;
-        await doInsertOrUpdateGeekgame(conn, geekId, game);
+        await doUpdateGeekgame(conn, geekId, game);
     }
 }
 
-async function doInsertOrUpdateGeekgame(conn: mysql.Connection, geekId: number, game: CollectionGame) {
+async function doUpdateGeekgame(conn: mysql.Connection, geekId: number, game: CollectionGame) {
+    const deleteSql = "delete from geekgames where game = ? and geekid = ?";
     const insertSql = "insert into geekgames (geekId, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    const updateSql = "update geekgames set rating = ?, owned = ?, want = ?, wish = ?, trade = ?, prevowned = ?, wanttobuy = ?, wanttoplay = ?, preordered = ? where geekid = ? and game = ?";
-    try {
-        await conn.query(insertSql, [geekId, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
-            game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
-        console.log("Added game " + game.gameId + " for " + geekId);
-    } catch (e) {
-        await conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade,
-            game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered, geekId, game.gameId]);
-    }
+    await conn.query(deleteSql, [game.gameId, geekId]);
+    await conn.query(insertSql, [geekId, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
+        game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
+    console.log("Added game " + game.gameId + " for " + geekId);
 }
 
 export async function doEnsureProcessPlaysFiles(conn: mysql.Connection, geek: string, months: MonthPlayed[]) {
