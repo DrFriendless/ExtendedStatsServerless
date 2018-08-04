@@ -16,7 +16,8 @@ import {
     count, extractNormalisedPlayFromPlayRow, listMinus, playDate
 } from "./library";
 import * as _ from "lodash";
-import {inferExtraPlays, ExpansionData} from "./plays";
+import {inferExtraPlays} from "./plays";
+import {ExpansionData} from "./expansion-data";
 
 export async function doUpdateMetadata(conn: mysql.Connection, series: SeriesMetadata[], rules: MetadataRule[]) {
     await doUpdateSeries(conn, series);

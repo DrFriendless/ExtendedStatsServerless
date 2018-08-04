@@ -153,11 +153,6 @@ export interface WorkingNormalisedPlays extends NormalisedPlays {
     isExpansion: boolean;
 }
 
-export interface ExpansionRow {
-    basegame: number;
-    expansion: number;
-}
-
 export interface SeriesMetadata {
     name: string;
     games: number[];
