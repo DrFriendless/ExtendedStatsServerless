@@ -11,7 +11,7 @@ const tokens = {
     lparen:     '(',
     rparen:     ')',
     comma:      ',',
-    keyword:    ['ME'],
+    keyword:    /[A-Z][A-Z0-9]*/,
 };
 
 export enum Argument {

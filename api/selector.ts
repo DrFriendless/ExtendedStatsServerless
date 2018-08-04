@@ -65,7 +65,7 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
             if (typeof geek === 'string') {
                 geek = await getGeekId(conn, geek as string);
             }
-            const sql = "select game from geekgames where geek = ? and rating > 0";
+            const sql = "select game from geekgames where geekid = ? and rating > 0";
             return (await conn.query(sql, [geek])).map(row => row["game"]);
         }
         case "played": {
@@ -81,7 +81,7 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
             if (typeof geek === 'string') {
                 geek = await getGeekId(conn, geek as string);
             }
-            const sql = "select game from geekgames where geek = ? and owned > 0";
+            const sql = "select game from geekgames where geekid = ? and owned > 0";
             console.log("geek = " + geek);
             return (await conn.query(sql, [geek])).map(row => row["game"]);
         }
@@ -136,18 +136,22 @@ async function selectMechanic(conn: mysql.Connection, cat: string): Promise<numb
 function evaluateSimpleArg(arg: Arg, query: GeekGameQuery): string | number {
     switch (arg.kind) {
         case Argument.Integer: return (arg as Integer).value;
-        case Argument.StringValue: return (arg as StringValue).value;
+        case Argument.StringValue: {
+            let s = (arg as StringValue).value;
+            return s.slice(1, -1);
+        }
         case Argument.Keyword: {
             const kw = arg as Keyword;
             if (kw.keyword === 'ME') {
                 return query.geek;
             }
-            console.log("keyword " + kw.keyword + " unknown");
-            return undefined;
+            if (query.vars && query.vars[kw.keyword]) {
+                return query.vars[kw.keyword];
+            }
+            throw new Error("No value for keyword " + kw.keyword);
         }
         default: {
-            console.log("Can't evaluate " + arg);
-            return undefined;
+            throw new Error("Can't evaluate " + arg);
         }
     }
 }
@@ -158,8 +162,8 @@ async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGam
 }
 
 async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGame[]> {
-    const sqlOne = "select * from geekgames where geek = ? and game = ?";
-    const sqlMany = "select * from geekgames where geek = ? and game in (?)";
+    const sqlOne = "select * from geekgames where geekid = ? and game = ?";
+    const sqlMany = "select * from geekgames where geekid = ? and game in (?)";
     if (ids.length === 0) return [];
     const geekId = await getGeekId(conn, geek);
     if (ids.length === 1) {

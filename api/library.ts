@@ -30,5 +30,7 @@ export async function countTableRows(conn: mysql.Connection, tableName: string):
 
 export async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {
     const getIdSql = "select id from geeks where geeks.username = ?";
-    return (await conn.query(getIdSql, [geek]))[0]['id'];
+    const results = await conn.query(getIdSql, [geek]);
+    if (!results.length) throw new Error("Geek " + geek + " does not seem to be in Extended Stats");
+    return results[0]['id'];
 }
