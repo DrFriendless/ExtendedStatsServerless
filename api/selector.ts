@@ -115,12 +115,12 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
 
 async function selectDesigner(conn: mysql.Connection, designer: number): Promise<number[]> {
     const sql = "select game from game_designers where designer = ?";
-    return (await conn.query(sql)).map(row => row["game"]);
+    return (await conn.query(sql, [designer])).map(row => row["game"]);
 }
 
 async function selectPublisher(conn: mysql.Connection, publisher: number): Promise<number[]> {
     const sql = "select game from game_publishers where publisher = ?";
-    return (await conn.query(sql)).map(row => row["game"]);
+    return (await conn.query(sql, [publisher])).map(row => row["game"]);
 }
 
 async function selectCategory(conn: mysql.Connection, cat: string): Promise<number[]> {
