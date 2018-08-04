@@ -1,0 +1,103 @@
+<div class="selector-test-table" *ngIf="!!rows">
+
+  <form #selectorForm="ngForm">
+    <div class="form-group">
+      <label for="selector">Selector:</label>
+      <input type="text" class="form-control" size="80" id="selector" required [(ngModel)]="selector" name="selector">
+      <br>
+      <label for="me">ME:</label>
+      <input type="text" class="form-control" size="20" id="me" [(ngModel)]="me" name="me">
+      <br>
+      <label for="them">THEM:</label>
+      <input type="text" class="form-control" size="20" id="them" [(ngModel)]="them" name="them">
+      <br>
+      <button type="submit" class="btn btn-success" (click)="test()">TEST</button>
+    </div>
+  </form>
+
+  <P></P>
+  <button (click)="showDoc = true;" *ngIf="!showDoc" tooltip="Show Selectors Documentation">Show Doc</button>
+  <div *ngIf="showDoc">
+    <button (click)="showDoc = false;" tooltip="Hide the documentation to see the results!">Hide Doc</button>
+
+    <h2>Selectors Documentation</h2>
+
+    <P>Selectors are the rules used to choose which games to show in a particular view.
+      Selectors are used by you to choose what games you see stats about.
+      They're just text, and look a bit like a computer program, e.g. <i>all(owned("Friendless"), played(ME))</i>.
+    </P>
+    <ul>
+      <li><i>owned("Friendless")</i> means "games owned by Friendless".</li>
+      <li><i>played(ME)</i> means "games played by me".</li>
+      <li><i>all(some selectors)</i> means "games which are selected by all of these selectors".</li>
+    </ul>
+    <p>
+      So <i>all(owned("Friendless"), played(ME))</i> means "games owned by Friendless which I have played".
+    </p>
+    <P>
+      But who's ME?
+      ME is a special symbol which means "the person whose page this is".
+      You can tell it's special because it's all in capitals and doesn't have quotes around it.
+      So when anyone uses that selector, it means "games owned by Friendless which they have played."
+      That allows selectors to be written so that they can be easily shared amongst users.
+    </P>
+    <p>
+      And that's pretty much all there is to selectors.
+      The devil is in the detail of all the functions, so the rest of this documentation will just be a list of what those mean.
+      To try things out, you can fill in details in the form above and click TEST, and the results will appear in the table below.
+      So that you can see the form and the results at the same time, click the "Hide Doc" button to hide this text.
+      If it's not working, you can open the JavaScript console to see some debugging information.
+    </p>
+    <h3>Special Symbols</h3>
+    <p>Special symbols are fully capitalised words.
+      Usually their meaning is defined by the page you're on, but I'll try to keep those meanings consistent so that selectors are portable across pages.
+    </p>
+    <dl>
+      <dt>ME</dt><dd>The geek who this page is about.</dd>
+      <dt>THEM</dt><dd>Some other geek who is being compared to ME.</dd>
+    </dl>
+    <h3>Functions</h3>
+    <p>
+      Note that when a function applies to a geek, the geek may be ME or THEM or any BGG username in quotes, e.g. "Aldie",
+      as long as that user is in Extended Stats.
+    </p>
+    <dl>
+      <dt>all(A, B...)</dt><dd>Games which are in all of the listed selections.</dd>
+      <dt>any(A, B...)</dt><dd>Games which are in any of the listed selections.</dd>
+      <dt>books()</dt><dd>All games in the category "Book".</dd>
+      <dt>category(name)</dt><dd>All games in the named category.</dd>
+      <dt>designer(number)</dt><dd>All games designed by the designer, denoted by their number on BGG.</dd>
+      <dt>expansions()</dt><dd>All games which are expansions of some other game.</dd>
+      <dt>mechanic(name)</dt><dd>All games which have the named mechanic.</dd>
+      <dt>minus(A, B...)</dt><dd>Games which are in selection A but not in any of the other selections.</dd>
+      <dt>owned(geek)</dt><dd>Games owned by that geek.</dd>
+      <dt>played(geek)</dt><dd>Games ever played by that geek.</dd>
+      <dt>publisher(number)</dt><dd>All games published by the publisher, denoted by their number on BGG.</dd>
+      <dt>rated(geek)</dt><dd>Games rated by that geek.</dd>
+    </dl>
+  </div>
+  <p></p>
+
+  <table class="table table-striped extstats-table" [mfData]="rows" #selectorTestTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'name'" [mfSortOrder]="'asc'">
+    <thead>
+    <tr>
+      <th><mfDefaultSorter by="name">Game</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="rating" tooltip="Your rating for this game.">Rating</mfDefaultSorter></th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let row of selectorTestTable.data">
+      <td><a href="https://boardgamegeek.com/boardgame/{{row.bggid}}">{{row.name}}</a></td>
+      <td>{{row.rating}}</td>
+    </tr>
+    </tbody>
+    <tfoot>
+    <tr>
+      <td colspan="4">
+        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]" [mfTable]="selectorTestTable"></mfBootstrapPaginator>
+      </td>
+    </tr>
+    </tfoot>
+  </table>
+</div>
+

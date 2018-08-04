@@ -8,6 +8,7 @@ import {GeekGame, GeekGameQuery} from "../collection-interfaces";
 import {fromExtStatsStorage} from "../extstats-storage";
 import {Collection, GameData} from "../../../../../api/collection-interfaces";
 import {UserCollectionRow} from "./interfaces";
+import {Observable} from "rxjs/Observable";
 
 @Component({
   selector: 'user-collection',
@@ -17,7 +18,7 @@ import {UserCollectionRow} from "./interfaces";
 })
 export class UserCollectionComponent implements OnDestroy, AfterViewInit {
   private geek: string;
-  private loadData$;
+  private loadData$: Observable<Object>;
   private data: Collection;
   public rows = [] as UserCollectionRow[];
   private subscription: Subscription;
@@ -38,7 +39,7 @@ export class UserCollectionComponent implements OnDestroy, AfterViewInit {
     console.log(body);
     this.loadData$ = this.http.post("https://api.drfriendless.com/v1/collection", body, options);
     this.subscription = this.loadData$.subscribe(result => {
-      this.data = result;
+      this.data = result as Collection;
       console.log(this.data);
       this.rows = UserCollectionComponent.makeRows(this.data.collection, this.data.games);
     });

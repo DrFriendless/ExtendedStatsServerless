@@ -53,7 +53,6 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
       const ly = lastYearIndex[gg.bggid] || { plays: 0, expansion: false, game: gg.bggid, distinctMonths: 0, distinctYears: 0 } as GamePlays;
       const game = gamesIndex[gg.bggid] || { name: "Unknown", bggRanking: 1000000, bggRating: 1.0 } as GameData;
       const hoursPlayed = gp.plays * game.playTime / 60;
-      // (rating * 5 + plays + months played * 4 + hours played)
       const friendlessHappiness = (!gg.rating) ? undefined : Math.floor((gg.rating * 5 + gp.plays + gp.distinctMonths * 4 + hoursPlayed) * 10) / 10;
       const huberHappiness = (!gg.rating) ? undefined : Math.floor((gg.rating - HUBER_BASELINE) * hoursPlayed);
       let huberHeat = undefined;
@@ -65,15 +64,6 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
         huberHeat = Math.floor(huberHeat * 10) / 10;
       }
       let ruhm = 0;
-    //   if t.lastPlay is not None and t.firstPlay is not None and t.monthsPlayed > 0 and t.rating > 0:
-    //   t.flash = library.daysBetween(t.firstPlay,  t.lastPlay)
-    //   t.lag = library.daysBetween(t.lastPlay,  datetime.date.today())
-    //   t.flmr = t.flash * 1.0 / t.lag * t.monthsPlayed * t.rating
-    //   if t.flmr <= 1:
-    //   t.log = 0
-    // else:
-    //   t.log = math.log(t.flmr)
-    //   t.randyCox = int(t.log * 100)/100.0
       if (gp.distinctMonths > 0 && gg.rating) {
         const firstDate = FavouritesComponent.intToDate(gp.firstPlay);
         const lastDate = FavouritesComponent.intToDate(gp.lastPlay);
@@ -142,6 +132,5 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
     const difference_ms = Math.abs(date1Ms - date2Ms);
     // Convert back to days and return
     return Math.round(difference_ms/ONE_DAY);
-
   }
 }
