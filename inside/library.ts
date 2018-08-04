@@ -1,20 +1,6 @@
 import mysql = require('promise-mysql');
 import {Callback} from 'aws-lambda';
-
-export function withConnection(func: (conn: mysql.Connection) => Promise<any>): Promise<any> {
-    let connection;
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => func(conn))
-        .then(() => connection.destroy())
-        .catch(err => {
-            connection.destroy();
-            throw err;
-        });
-}
+import {NormalisedPlays} from "./interfaces";
 
 export async function withConnectionAsync(func: (conn: mysql.Connection) => Promise<any>) {
     let connection = await getConnection();
@@ -63,3 +49,18 @@ export function promiseToCallback<T extends object>(promise: Promise<T>, callbac
         .then(v => callback(undefined, v))
         .catch(err => callback(err));
 }
+
+export function listMinus(ints: number[], takeaway: number[]): number[] {
+    return ints.filter(x => takeaway.indexOf(x) < 0);
+}
+
+export function playDate(play: NormalisedPlays): number {
+    return play.year * 10000 + play.month * 100 + play.date;
+}
+
+export function extractNormalisedPlayFromPlayRow(row: object, geek: number, month: number, year: number): NormalisedPlays {
+    const playDate = row["playDate"].toString();
+    const date = parseInt(playDate.split(" ")[2]);
+    return { month, year, geek, date, game: row["game"], quantity: row["quantity"] } as NormalisedPlays;
+}
+

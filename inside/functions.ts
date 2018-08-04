@@ -1,21 +1,8 @@
+// Lambda functions
+// Functions in this file are responsible for marshalling data in and out and dealing with the callback.
+// Functions in this file may not access a database connection.
+
 import {Callback} from 'aws-lambda';
-import {
-    doNormalisePlaysForMonth,
-    doSetGeekPlaysForMonth, doUpdateMetadata, doUpdateRankings,
-    ensureGames, ensureMonthsPlayed, ensurePlaysGames, ensureProcessPlaysFiles,
-    ensureUsers, getGeekId,
-    listToProcess,
-    listToProcessByMethod, loadExpansionData,
-    markGameDoesNotExist,
-    markUrlProcessed, markUrlProcessedWithUpdate, markUrlTryTomorrow,
-    markUrlUnprocessed, recordGameExpansions,
-    restrictCollectionToGames,
-    updateFrontPageGeek,
-    updateGame,
-    updateGamesForGeek,
-    updateLastScheduledForUrls,
-    updateUserValues
-} from "./mysql-rds";
 import {
     CleanUpCollectionResult,
     FileToProcess, Metadata,
@@ -23,7 +10,21 @@ import {
     ProcessGameResult, ProcessMonthsPlayedResult, ProcessPlaysResult,
     ProcessUserResult
 } from "./interfaces";
-import {getConnection, promiseToCallback, withConnection} from "./library";
+import {getConnection} from "./library";
+import {
+    runEnsureGames,
+    runEnsureUsers,
+    runListToProcess,
+    runMarkGameDoesNotExist,
+    runMarkUrlProcessed,
+    runMarkUrlTryTomorrow,
+    runMarkUrlUnprocessed, runProcessCollectionCleanup,
+    runProcessGameResult,
+    runProcessPlayedMonths,
+    runProcessPlaysResult,
+    runProcessUserResult,
+    runUpdateGamesForGeek, runUpdateMetadata, runUpdateRankings
+} from "./service";
 
 
 export async function processGameResult(event, context, callback: Callback) {
@@ -31,10 +32,8 @@ export async function processGameResult(event, context, callback: Callback) {
     console.log(event);
     const data = event as ProcessGameResult;
     try {
-        await updateGame(data);
-        await recordGameExpansions(data.gameId, data.expansions);
-        await markUrlProcessed("processGame", data.url);
-        callback(null, null);
+        await runProcessGameResult(data);
+        callback();
     } catch (e) {
         console.log(e);
         callback(e);
@@ -45,9 +44,8 @@ export async function processUserResult(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const data = event as ProcessUserResult;
     try {
-        await updateUserValues(data.geek, data.bggid, data.country);
-        await markUrlProcessed("processUser", data.url);
-        callback(null, null);
+        await runProcessUserResult(data.geek, data.bggid, data.country, data.url);
+        callback();
     } catch (e) {
         console.log(e);
         callback(e);
@@ -61,8 +59,8 @@ export async function updateUserList(event, context, callback: Callback) {
     const usernames = body.split(/\r?\n/);
     console.log("checking for " + usernames.length + " users");
     try {
-        await ensureUsers(usernames);
-        callback(null, null);
+        await runEnsureUsers(usernames);
+        callback();
     } catch (e) {
         console.log(e);
         callback(e);
@@ -73,8 +71,8 @@ export async function updateMetadata(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const body = event as Metadata;
     try {
-        await withConnection(conn => doUpdateMetadata(conn, body.series, body.rules));
-        callback(null, null);
+        await runUpdateMetadata(body.series, body.rules);
+        callback();
     } catch (e) {
         console.log(e);
         callback(e);
@@ -82,39 +80,28 @@ export async function updateMetadata(event, context, callback: Callback) {
 }
 
 // Lambda to retrieve some number of files that need processing
-export function getToProcessList(event, context, callback: Callback) {
+export async function getToProcessList(event, context, callback: Callback) {
     // updateLastScheduled cannot be set from the URL
     context.callbackWaitsForEmptyEventLoop = false;
     const countParam = (event.query && event.query.count) || event.count;
     let count = parseInt(countParam);
     if (!count || count < 1 || count > 1000) count = 10;
-    let query;
-    if (event.processMethod) {
-        query = listToProcessByMethod(count, event.processMethod);
-    } else {
-        query =  listToProcess(count);
+    try {
+        const result = await runListToProcess(count, event.processMethod, event.updateLastScheduled);
+        callback(undefined, result);
+    } catch (e) {
+        console.log(e);
+        callback(e);
     }
-    const promise = query
-        .then(elements => {
-            const urls = elements.map(row => row.url);
-            if (event.updateLastScheduled) {
-                return updateLastScheduledForUrls(urls).then(() => elements);
-            } else {
-                return Promise.resolve(elements);
-            }
-        });
-    promiseToCallback(promise, callback);
 }
 
 export async function processCollectionCleanup(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as CleanUpCollectionResult;
-    console.log("processCollectionCleanup");
+    console.log(params);
     try {
-        await restrictCollectionToGames(params.geek, params.items);
-        await markUrlProcessed("processCollection", params.url);
-        await updateFrontPageGeek(params.geek);
-        callback(null, null);
+        await runProcessCollectionCleanup(params.geek, params.items, params.url);
+        callback();
     } catch (e) {
         console.log(e);
         callback(e);
@@ -123,25 +110,23 @@ export async function processCollectionCleanup(event, context, callback: Callbac
 
 export async function processCollectionUpdateGames(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-   const params = event as ProcessCollectionResult;
-   try {
-       await ensureGames(params.items);
-       await updateGamesForGeek(params.geek, params.items);
-       callback(null, null);
-   } catch (e) {
-       console.log(e);
-       callback(e);
-   }
+    const params = event as ProcessCollectionResult;
+    try {
+        await runEnsureGames(params.items);
+        await runUpdateGamesForGeek(params.geek, params.items);
+        callback();
+    } catch (e) {
+        console.log(e);
+        callback(e);
+    }
 }
 
 export async function processPlayedMonths(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as ProcessMonthsPlayedResult;
     try {
-        await ensureMonthsPlayed(params.geek, params.monthsPlayed);
-        await ensureProcessPlaysFiles(params.geek, params.monthsPlayed);
-        await markUrlProcessed("processPlayed", params.url);
-        callback(null, null);
+        await runProcessPlayedMonths(params.geek, params.monthsPlayed, params.url);
+        callback();
     } catch (e) {
         console.log(e);
         callback(e);
@@ -154,30 +139,8 @@ export async function processPlaysResult(event, context, callback: Callback) {
     console.log(params);
     const conn = await getConnection();
     try {
-        const gameIds = [];
-        for (const play of params.plays) {
-            if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
-        }
-        const geekId = await getGeekId(conn, params.geek);
-        console.log("geekId = " + geekId);
-        const expansionData = await loadExpansionData(conn);
-        await ensurePlaysGames(gameIds);
-        await doSetGeekPlaysForMonth(conn, geekId, params.month, params.year, params.plays);
-        await doNormalisePlaysForMonth(conn, geekId, params.month, params.year, expansionData);
-        const now = new Date();
-        const nowMonth = now.getFullYear() * 12 + now.getMonth();
-        const thenMonth = params.year * 12 + params.month;
-        let delta;
-        if (nowMonth - thenMonth > 6) {
-            delta = '838:00:00';
-        } else if (nowMonth - thenMonth > 2) {
-            delta = '168:00:00';
-        } else {
-            delta = '72:00:00';
-        }
-        await markUrlProcessedWithUpdate("processPlays", params.url, delta);
-        console.log("processPlaysResult success");
-        callback(null, null);
+        await runProcessPlaysResult(params);
+        callback();
     } catch (e) {
         console.log(e);
         callback(e);
@@ -190,8 +153,8 @@ export async function updateUrlAsProcessed(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
     try {
-        await markUrlProcessed(params.processMethod, params.url);
-        callback(null, null);
+        await runMarkUrlProcessed(params.processMethod, params.url);
+        callback();
     } catch (e) {
         callback(e);
     }
@@ -201,8 +164,8 @@ export async function updateUrlAsUnprocessed(event, context, callback: Callback)
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
     try {
-        await markUrlUnprocessed(params.processMethod, params.url);
-        callback(null, null);
+        await runMarkUrlUnprocessed(params.processMethod, params.url);
+        callback();
     } catch (e) {
         callback(e);
     }
@@ -212,8 +175,8 @@ export async function updateUrlAsTryTomorrow(event, context, callback: Callback)
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as FileToProcess;
     try {
-        await markUrlTryTomorrow(params.processMethod, params.url);
-        callback(null, null);
+        await runMarkUrlTryTomorrow(params.processMethod, params.url);
+        callback();
     } catch (e) {
         callback(e);
     }
@@ -222,8 +185,8 @@ export async function updateUrlAsTryTomorrow(event, context, callback: Callback)
 export async function updateGameAsDoesNotExist(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     try {
-        await markGameDoesNotExist(event.bggid);
-        callback(null, null);
+        await runMarkGameDoesNotExist(event.bggid);
+        callback();
     } catch (e) {
         callback(e);
     }
@@ -231,10 +194,9 @@ export async function updateGameAsDoesNotExist(event, context, callback: Callbac
 
 export async function updateRankings(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    console.log("updateRankings");
     try {
-        await withConnection(async conn => await doUpdateRankings(conn));
-        callback(null, null);
+        await runUpdateRankings();
+        callback();
     } catch (e) {
         callback(e);
     }
