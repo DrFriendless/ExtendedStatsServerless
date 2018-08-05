@@ -32,6 +32,16 @@ custom:
     certificateName: "api.drfriendless.com"
 
 functions:
+  authorize:
+    handler: auth.authenticate
+    timeout: 30
+    events:
+      - http:
+          path: authenticate
+          method: get
+          cors: true
+          integration: lambda
+          private: false
   adminGatherSystemStats:
     handler: functions.adminGatherSystemStats
     environment:
