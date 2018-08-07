@@ -1,5 +1,6 @@
 import {Callback} from "aws-lambda";
 import jwt = require('jsonwebtoken');
+import {findOrCreateUser} from "./users";
 // import jwksClient = require('jwks-rsa');
 // import {Jwk} from "jwks-rsa";
 //
@@ -22,7 +23,7 @@ const jwks = {
     ]
 };
 
-export function authenticate(event, context, callback: Callback) {
+export async function authenticate(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     let token = event["headers"]["Authorization"] as string;
     if (token.slice(0, 7) === "Bearer ") {
@@ -30,27 +31,30 @@ export function authenticate(event, context, callback: Callback) {
     } else {
         throw new Error("No Authorization header");
     }
-    const result = {
-        "username": "Robert",
-        "decoded": undefined
-    };
     const options = {
         algorithms: ["RS256"],
         issuer: ["https://drfriendless.au.auth0.com/"],
         audience: ["z7FL2jZnXI9C66WcmCMC7V1STnQbFuQl"] // this is the ID of the application in auth0
         // TODO check token is not expired
     };
+    let decoded = null;
     try {
-        jwt.verify(token, getKey, options, function (err, decoded) {
+        jwt.verify(token, getKey, options, function (err, d) {
             if (err) {
                 console.log(err);
                 throw err;
             } else {
-                result["jwt"] = decoded;
-                console.log("identity is " + decoded["sub"]);
-                callback(undefined, result);
+                console.log(d);
+                decoded = d;
             }
         });
+        const result = { jwt: decoded };
+        const nickname = decoded["nickname"];
+        const identity = decoded["sub"];
+        const user = await findOrCreateUser(identity, nickname);
+        result["user"] = user;
+        result["username"] = user.getUsername();
+        callback(undefined, result);
     } catch (err) {
         console.log(err);
         callback(new Error("Computer says no."));
