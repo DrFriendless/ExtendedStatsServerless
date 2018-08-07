@@ -90,8 +90,8 @@ export async function gatherSystemStats(): Promise<SystemStats> {
 
 async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats> {
     const countFileRows = "select processMethod, count(url) from files group by processMethod";
-    const countWaitingFileRows = "select processMethod, count(url) from files where lastUpdate is null or nextUpdate is null or nextUpdate < now() group by processMethod";
-    const countUnprocessedFileRows = "select processMethod, count(url) from files where lastUpdate is null or nextUpdate is null group by processMethod";
+    const countWaitingFileRows = "select processMethod, count(url) from files where lastUpdate is null or (nextUpdate is not null && nextUpdate < now()) group by processMethod";
+    const countUnprocessedFileRows = "select processMethod, count(url) from files where lastUpdate is null or (nextUpdate is not null && nextUpdate < now()) group by processMethod";
     const countGeekGamesOwnedByZero = "select count(*) from geekgames where geekid = 0";
     const countGGOwners = "select count(distinct(geekid)) c from geekgames";
     const userRows = await countTableRows(conn, "geeks");

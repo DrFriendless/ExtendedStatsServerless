@@ -447,12 +447,12 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
 }
 
 async function doListToProcessAll(conn: mysql.Connection, count: number): Promise<ToProcessElement[]> {
-    const sql = "select * from files where (lastUpdate is null || nextUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    const sql = "select * from files where (lastUpdate is null || (nextUpdate is not null && nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
     return (await conn.query(sql, [count])).map(row => row as ToProcessElement);
 }
 
 async function doListToProcessByMethod(conn: mysql.Connection, count: number, processMethod: string): Promise<ToProcessElement[]> {
-    const sql = "select * from files where processMethod = ? and (lastUpdate is null || nextUpdate < now()) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 15) limit ?";
+    const sql = "select * from files where processMethod = ? and (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 15) limit ?";
     return (await conn.query(sql, [processMethod, count])).map(row => row as ToProcessElement);
 }
 
