@@ -61,6 +61,9 @@ export function playDate(play: NormalisedPlays): number {
 export function extractNormalisedPlayFromPlayRow(row: object, geek: number, month: number, year: number): NormalisedPlays {
     const playDate = row["playDate"].toString();
     const date = parseInt(playDate.split(" ")[2]);
+    if (isNaN(date)) {
+        throw new Error("could not extract date from " + playDate);
+    }
     return { month, year, geek, date, game: row["game"], quantity: row["quantity"] } as NormalisedPlays;
 }
 
