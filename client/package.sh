@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+mkdir -p static
 cp src/*.css static
 for F in src/*.mustache
     do
