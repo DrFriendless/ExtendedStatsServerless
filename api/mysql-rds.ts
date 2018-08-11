@@ -79,8 +79,7 @@ async function getLastYearOfPlays(conn: mysql.Connection, geek: string): Promise
     const geekId = await getGeekId(conn, geek);
     const rows = await conn.query(playsSql, [geekId, today]);
     return rows.map(row => {
-        return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], firstPlay: undefined, lastPlay: undefined,
-            distinctMonths: row["months"], distinctYears: 0 } as GamePlays;
+        return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], distinctMonths: row["months"], distinctYears: 0 } as GamePlays;
     });
 }
 

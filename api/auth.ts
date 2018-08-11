@@ -1,6 +1,7 @@
 import {Callback} from "aws-lambda";
 import jwt = require('jsonwebtoken');
-import {findOrCreateUser} from "./users";
+import {findOrCreateUser, retrieveAllData} from "./users";
+import {Decoded, PersonalData, UserData} from "./security-interfaces";
 // import jwksClient = require('jwks-rsa');
 // import {Jwk} from "jwks-rsa";
 //
@@ -23,13 +24,12 @@ const jwks = {
     ]
 };
 
-export async function authenticate(event, context, callback: Callback) {
-    context.callbackWaitsForEmptyEventLoop = false;
+async function withAuthentication(event, callback: (Error?, Decoded?) => Promise<void>): Promise<void> {
     let token = event["headers"]["Authorization"] as string;
     if (token.slice(0, 7) === "Bearer ") {
         token = token.substring(7);
     } else {
-        throw new Error("No Authorization header");
+        await callback(new Error("No Authorization header"));
     }
     const options = {
         algorithms: ["RS256"],
@@ -48,17 +48,43 @@ export async function authenticate(event, context, callback: Callback) {
                 decoded = d;
             }
         });
-        const result = { jwt: decoded };
-        const nickname = decoded["nickname"];
-        const identity = decoded["sub"];
-        const user = await findOrCreateUser(identity, nickname);
-        result["user"] = user;
-        result["username"] = user.getUsername();
-        callback(undefined, result);
+        await callback(undefined, decoded);
     } catch (err) {
-        console.log(err);
-        callback(new Error("Computer says no."));
+        await callback(err);
     }
+}
+
+export async function authenticate(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    await withAuthentication(event, async (error, decoded) => {
+        if (error) {
+            console.log(error);
+            callback(new Error("Computer says no."));
+        } else {
+            callback(undefined, await getUserData(decoded));
+        }
+    });
+}
+
+async function getUserData(decoded: Decoded): Promise<UserData> {
+    const user = await findOrCreateUser(decoded.sub, decoded.nickname);
+    return { jwt: decoded, username: user.getUsername(), first: user.isFirstLogin(), config: user.getConfig() };
+}
+
+async function getPersonalData(decoded: Decoded): Promise<PersonalData> {
+    return { userData: await getUserData(decoded), allData: await retrieveAllData(decoded.sub) };
+}
+
+export async function personal(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    await withAuthentication(event, async (error, decoded) => {
+        if (error) {
+            console.log(error);
+            callback(new Error("Computer says no."));
+        } else {
+            callback(undefined, await getPersonalData(decoded));
+        }
+    });
 }
 
 function getKey(header, callback) {
