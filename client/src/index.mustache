@@ -15,18 +15,19 @@
 </head>
 
 <body>
-<script>
-    // hack for Auth0 problem with Angular 6.
-    window.global = window;
-</script>
-
+{{> windowhack}}
 {{> gtmbody}}
-{{> navbar}}
-<h1>Extended Stats Admin Stats Page</h1>
 
-<extstats-login></extstats-login>
+<main role="main">
+    <div class="container">
+        {{> navbar}}
+        <h1>Extended Stats Admin Stats Page</h1>
+        {{> loginbutton }}
 
-<extstats-admin></extstats-admin>
+        <extstats-admin></extstats-admin>
+
+    </div>
+</main>
 
 {{> loginwidget}}
 <script src="adminWidget/runtime.js" type="text/javascript"></script>
@@ -34,5 +35,4 @@
 <!--<script src="adminWidget/polyfills.js" type="text/javascript"></script>-->
 <script src="adminWidget/main.js" type="text/javascript"></script>
 </body>
-
 </html>

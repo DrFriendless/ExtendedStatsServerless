@@ -1,0 +1,13 @@
+.extstats-login-btn {
+  background-color: #785549;
+  border-color: #785549;
+  color: #fff;
+}
+.extstats-login, .extstats-logout {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  height: 80px;
+  width: 100px;
+}

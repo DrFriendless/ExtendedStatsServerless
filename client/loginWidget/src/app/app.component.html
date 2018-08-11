@@ -1,9 +1,12 @@
-<div class="login">
-  <button id="btn-login" class="btn btn-primary btn-margin" (click)="login()" *ngIf="showLogin">
+<div class="extstats-login" *ngIf="!username">
+  <button id="btn-login" class="btn btn-primary btn-margin extstats-login-btn" (click)="login()">
     Log In
   </button>
+</div>
 
-  <button id="btn-logout" class="btn btn-primary btn-margin" *ngIf="showLogout">
+<div class="extstats-logout" *ngIf="!!username">
+  <button id="btn-logout" class="btn btn-primary btn-margin extstats-login-btn" (click)="logout()">
     Log Out
   </button>
+  <span><a href="/user.html">{{username}}</a></span>
 </div>

@@ -14,6 +14,7 @@ import {HttpClient, HttpHeaders} from "@angular/common/http";
 export class LoginComponent implements OnDestroy {
   public showLogin = true;
   public showLogout = false;
+  public username: string;
   private logins = new Subject<Identity>();
   private logins$ = this.logins.asObservable();
   private userdata = new Subject<UserData>();
@@ -38,7 +39,7 @@ export class LoginComponent implements OnDestroy {
   );
 
   public constructor(private http: HttpClient) {
-    console.log(this.lock);
+    this.username = localStorage.getItem("username");
     const logins = this.logins;
     this.lock.on("authenticated", authResult => {
       console.log("authenticated");
@@ -53,7 +54,13 @@ export class LoginComponent implements OnDestroy {
         this.userdata.next(userData);
       });
     this.userDataSubscription = this.userdata.asObservable().subscribe(userData => {
-      console.log("Welcome " + userData.username);
+      if (userData) {
+        localStorage.setItem("username", userData.username);
+        console.log("Welcome " + userData.username);
+        this.username = userData.username;
+      } else {
+        console.log("Logged out");
+      }
     });
   }
 
@@ -71,6 +78,13 @@ export class LoginComponent implements OnDestroy {
 
   public login() {
     this.lock.show();
+  }
+
+  public logout() {
+    localStorage.removeItem("username");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("identity");
+    this.username = undefined;
   }
 }
 
