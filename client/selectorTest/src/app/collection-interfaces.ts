@@ -51,13 +51,13 @@ export interface WarTableRow {
 }
 
 export interface GamePlays {
-    game: number;
-    plays: number;
-    expansion: boolean;
-    firstPlay: number;
-    lastPlay: number;
-    distinctYears: number;
-    distinctMonths: number;
+  game: number;
+  plays: number;
+  expansion: boolean;
+  firstPlay: number | undefined;
+  lastPlay: number | undefined;
+  distinctYears: number;
+  distinctMonths: number;
 }
 
 export interface Collection {

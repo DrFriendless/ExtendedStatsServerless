@@ -53,8 +53,8 @@ export interface GamePlays {
   game: number;
   plays: number;
   expansion: boolean;
-  firstPlay: number;
-  lastPlay: number;
+  firstPlay: number | undefined;
+  lastPlay: number | undefined;
   distinctYears: number;
   distinctMonths: number;
 }

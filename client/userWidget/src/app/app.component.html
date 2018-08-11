@@ -1,0 +1,30 @@
+<button (click)="refresh()">Refresh</button>
+
+<div *ngIf="!username">
+  <p>
+    Extended Stats uses data from boardgamegeek.com. This data is available to everybody, without logging in.
+    You don't need to log in to see your boardgame statistics.
+    However there are advantages to logging in - the site will remember your BGG username and favourite page configurations and so on.
+    If you would like to do that, please log in or sign up using the button on the right.
+    You will then be able to use this page to configure your preferences.
+  </p>
+</div>
+
+<div class="user-config-form" *ngIf="!!username">
+  <form #userForm="ngForm">
+    <div class="form-group">
+      <label for="geekname">BGG User Name</label>
+      <input type="text" class="form-control" size="80" id="geekname" required [(ngModel)]="geekname" name="geekname">
+      <br>
+      <button type="submit" class="btn btn-success" (click)="save()">Save</button>
+    </div>
+  </form>
+
+  <div>
+    <h4>Your Personal Data</h4>
+    <p>This is the data which Extended Stats stores about you.</p>
+    <textarea class="personal-data" readonly>
+      {{personalData.toString()}}
+    </textarea>
+  </div>
+</div>

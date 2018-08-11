@@ -5,6 +5,7 @@ import {Subscription} from "rxjs/internal/Subscription";
 import {Observable} from "rxjs/internal/Observable";
 import {flatMap} from "rxjs/operators";
 import {HttpClient, HttpHeaders} from "@angular/common/http";
+import {Identity, UserData} from "./security-interfaces";
 
 @Component({
   selector: 'extstats-login',
@@ -49,8 +50,11 @@ export class LoginComponent implements OnDestroy {
       logins.next({ jwt: authResult.idToken } as Identity);
     });
     this.loginSubscription = this.logins$
-      .pipe(flatMap(identity => this.loadUserData(identity)))
-      .subscribe(userData => {
+      .pipe(flatMap((identity: Identity) => {
+        localStorage.setItem("jwt", identity.jwt);
+        return this.loadUserData();
+      }))
+      .subscribe((userData: UserData) => {
         this.userdata.next(userData);
       });
     this.userDataSubscription = this.userdata.asObservable().subscribe(userData => {
@@ -64,9 +68,10 @@ export class LoginComponent implements OnDestroy {
     });
   }
 
-  private loadUserData(identity: Identity): Observable<UserData> {
+  private loadUserData(): Observable<UserData> {
+    const jwt = localStorage.getItem("jwt");
     const options = {
-        headers: new HttpHeaders().set("Authorization", "Bearer " + identity.jwt)
+        headers: new HttpHeaders().set("Authorization", "Bearer " + jwt)
     };
     return this.http.get("https://api.drfriendless.com/v1/authenticate", options) as Observable<UserData>;
   }
@@ -84,14 +89,9 @@ export class LoginComponent implements OnDestroy {
     localStorage.removeItem("username");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("identity");
+    localStorage.removeItem("jwt");
     this.username = undefined;
   }
 }
 
-interface Identity {
-  jwt: string;
-}
 
-interface UserData {
-  username: string;
-}
