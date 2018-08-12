@@ -172,6 +172,11 @@ export class NoSuchGameError {
 export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<PlayData[]> {
     const dom = await xml2js(fileContents, {trim: true});
     const result: PlayData[] = [];
+    if (!dom || !dom.plays || !dom.plays.play) {
+        console.log("Plays not found");
+        console.log(dom);
+        return result;
+    }
     dom.plays.play.forEach(play => {
         const date = play.$.date;
         const items = play.item;

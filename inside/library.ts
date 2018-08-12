@@ -54,15 +54,19 @@ export function listMinus(ints: number[], takeaway: number[]): number[] {
     return ints.filter(x => takeaway.indexOf(x) < 0);
 }
 
+export function listIntersect(ints: number[], other: number[]): number[] {
+    return ints.filter(x => other.indexOf(x) >= 0);
+}
+
 export function playDate(play: NormalisedPlays): number {
     return play.year * 10000 + play.month * 100 + play.date;
 }
 
 export function extractNormalisedPlayFromPlayRow(row: object, geek: number, month: number, year: number): NormalisedPlays {
     const playDate = row["playDate"].toString();
-    const date = parseInt(playDate.split(" ")[2]);
+    let date = parseInt(playDate.split(" ")[2]);
     if (isNaN(date)) {
-        throw new Error("could not extract date from " + playDate);
+        date = 0;
     }
     return { month, year, geek, date, game: row["game"], quantity: row["quantity"] } as NormalisedPlays;
 }
