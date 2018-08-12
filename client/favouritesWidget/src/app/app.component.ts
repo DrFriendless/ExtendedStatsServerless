@@ -32,6 +32,23 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
     this.chartSet.add(new ChartDefinition("ratingVsMonths", "Rating vs Distinct Months", "circle",
       "Your Rating", "Number of months in which you have played this game",
       FavouritesComponent.extractRatingVsMonths));
+    this.chartSet.add(new ChartDefinition("fhmVsYearPublished", "FHM vs Year Published", "circle",
+      "Year Published", "Friendless Happiness Metric",
+      FavouritesComponent.fhmVsYearPublished));
+  }
+
+  private static fhmVsYearPublished(data: CollectionWithPlays): object {
+    const values = [];
+    const gameById = {};
+    for (const gd of data.games) {
+      gameById[gd.bggid] = gd;
+    }
+    for (const gg of data.collection) {
+      if (gg["fhm"] > 0 && gameById[gg.bggid].yearPublished >= 1990) {
+        values.push({ x: gameById[gg.bggid].yearPublished, y: gg["fhm"], tooltip: gameById[gg.bggid].name });
+      }
+    }
+    return { values };
   }
 
   private static extractAvgVsRating(data: CollectionWithPlays): object {
@@ -155,6 +172,10 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
         const log = (flmr < 1) ? 0 : Math.log(flmr);
         ruhm = Math.round(log * 100) / 100;
       }
+      gg["fhm"] = friendlessHappiness;
+      gg["hhm"] = huberHappiness;
+      gg["hh"] = huberHeat;
+      gg["ruhm"] = ruhm;
       const row = { gameName: game.name, game: gg.bggid, rating: gg.rating, plays: gp.plays, bggRanking: game.bggRanking,
         bggRating: game.bggRating, firstPlayed: FavouritesComponent.toDateString(gp.firstPlay),
         lastPlayed: FavouritesComponent.toDateString(gp.lastPlay), monthsPlayed: gp.distinctMonths, yearsPlayed: gp.distinctYears,
