@@ -44,7 +44,6 @@ async function withAuthentication(event, callback: (Error?, Decoded?) => Promise
                 console.log(err);
                 throw err;
             } else {
-                console.log(d);
                 decoded = d;
             }
         });

@@ -82,7 +82,6 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
                 geek = await getGeekId(conn, geek as string);
             }
             const sql = "select game from geekgames where geekid = ? and owned > 0";
-            console.log("geek = " + geek);
             return (await conn.query(sql, [geek])).map(row => row["game"]);
         }
         case "expansions": {

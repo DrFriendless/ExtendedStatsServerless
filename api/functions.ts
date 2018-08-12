@@ -20,7 +20,6 @@ export async function adminGatherSystemStats(event, context, callback: Callback)
 
 // Lambda to retrieve the list of users
 export async function getUserList(event, context, callback: Callback) {
-    console.log("getUserList");
     context.callbackWaitsForEmptyEventLoop = false;
     try {
         callback(null, await listUsers());
@@ -32,7 +31,6 @@ export async function getUserList(event, context, callback: Callback) {
 
 // Lambda to retrieve the data for the war table.
 export async function getWarTable(event, context, callback: Callback) {
-    console.log("getWarTable");
     context.callbackWaitsForEmptyEventLoop = false;
     try {
         callback(null, await listWarTable());
@@ -43,7 +41,6 @@ export async function getWarTable(event, context, callback: Callback) {
 }
 
 export async function getCollection(event, context, callback: Callback) {
-    console.log(event);
     context.callbackWaitsForEmptyEventLoop = false;
     if (event && event.body) {
         const query = event.body as GeekGameQuery;
@@ -60,7 +57,6 @@ export async function getCollection(event, context, callback: Callback) {
 }
 
 export async function getCollectionWithPlays(event, context, callback: Callback) {
-    console.log(event);
     if (event && event.body) {
         const query = event.body as GeekGameQuery;
         try {
@@ -76,8 +72,6 @@ export async function getCollectionWithPlays(event, context, callback: Callback)
 }
 
 export async function getRankings(event, context, callback: Callback) {
-    console.log("getRankings");
-    console.log(event);
     context.callbackWaitsForEmptyEventLoop = false;
     if (event && event.body) {
         const query = {}; // TODO
