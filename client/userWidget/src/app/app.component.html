@@ -21,9 +21,9 @@
   </form>
 
   <div>
-    <h4>Your Personal Data</h4>
+    <a name="personal"><h4>Your Personal Data</h4></a>
     <p>This is the data which Extended Stats stores about you.</p>
-    <textarea class="personal-data" readonly>
+    <textarea class="personal-data" readonly [rows]="8">
       {{personalData.toString()}}
     </textarea>
   </div>

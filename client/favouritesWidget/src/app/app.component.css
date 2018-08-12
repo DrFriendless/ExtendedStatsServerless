@@ -22,8 +22,9 @@
   background-color: white;
 }
 
-.favourites-table div.extstats-doc button {
+.table-button {
   border: solid 1px #fd9727;
+  margin: 4px;
 }
 .favourites-table div.extstats-doc li.nav-item a.nav-link.active {
   color: #fd9727;
@@ -35,5 +36,10 @@
 }
 .favourites-table div.collapse {
   margin-top: 1rem;
+}
+
+.chart-button {
+  border: solid 1px #617d8a;
+  margin: 4px;
 }
 

@@ -1,9 +1,14 @@
 <div class="favourites-table" *ngIf="!!rows">
 
   <div class="extstats-doc">
-    <button type="button" class="btn" (click)="docCollapsed = !docCollapsed" [attr.aria-expanded]="!docCollapsed" aria-controls="collapseExample">
-      Documentation
-    </button>
+    <button type="button" class="btn table-button" (click)="toggle('doc')">Documentation</button>
+    <button type="button" class="btn table-button" (click)="toggle('charts')">Charts</button>
+
+    <div id="favouritesTableCharts" [ngbCollapse]="chartsCollapsed">
+      <button type="button" class="btn chart-button" *ngFor="let chart of chartSet.charts" [extstatsChart]="chart" [chartData]="data" [chartPane]="chartPane"></button>
+    </div>
+
+    <extstats-chartpane #chartPane></extstats-chartpane>
 
     <div id="favouritesTableDoc" [ngbCollapse]="docCollapsed">
       <ngb-tabset>
@@ -54,7 +59,7 @@
     </div>
   </div>
 
-  <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'gameName'" [mfSortOrder]="'asc'">
+  <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'fhm'" [mfSortOrder]="'desc'">
     <thead>
     <tr>
       <th><mfDefaultSorter by="gameName">Game</mfDefaultSorter></th>

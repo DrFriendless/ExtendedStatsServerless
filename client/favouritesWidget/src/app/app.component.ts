@@ -4,6 +4,7 @@ import {CollectionWithPlays, GameData, GamePlays, GeekGameQuery} from "./collect
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
 import {FavouritesRow} from "./interfaces";
+import {ChartDefinition, ChartSet} from "./charts";
 
 @Component({
   selector: 'extstats-favourites',
@@ -13,13 +14,62 @@ import {FavouritesRow} from "./interfaces";
 export class FavouritesComponent implements OnDestroy, AfterViewInit {
   private readonly geek: string;
   private loadData$;
-  private data: CollectionWithPlays;
+  public data: CollectionWithPlays;
   public rows: FavouritesRow[];
   private subscription: Subscription;
   public docCollapsed = true;
+  public chartsCollapsed = true;
+  public chartSet = new ChartSet();
 
   constructor(private http: HttpClient) {
     this.geek = fromExtStatsStorage(storage => storage.geek);
+    this.chartSet.add(new ChartDefinition("avgVsRating", "Average vs Rating", "point", FavouritesComponent.extractAvgVsRating));
+    this.chartSet.add(new ChartDefinition("ratingVsPlays", "Rating vs Plays", "circle", FavouritesComponent.extractRatingVsPlays));
+    this.chartSet.add(new ChartDefinition("ratingVsMonths", "Rating vs Distinct Months", "circle", FavouritesComponent.extractRatingVsMonths));
+  }
+
+  private static extractAvgVsRating(data: CollectionWithPlays): object {
+    const values = [];
+    const averageByGame = {};
+    for (const gd of data.games) {
+      averageByGame[gd.bggid] = gd.bggRating;
+    }
+    for (const gg of data.collection) {
+      if (gg.rating > 0 && averageByGame[gg.bggid]) {
+        values.push({ x: gg.rating, y: averageByGame[gg.bggid] });
+      }
+    }
+    return { values };
+  }
+
+  private static extractRatingVsPlays(data: CollectionWithPlays): object {
+    const values = [];
+    const playsByGame = {};
+    for (const gp of data.plays) {
+      playsByGame[gp.game] = gp.plays;
+    }
+    for (const gg of data.collection) {
+      if (gg.rating > 0) {
+        const plays = playsByGame[gg.bggid] || 0;
+        values.push({ x: gg.rating, y: plays });
+      }
+    }
+    return { values };
+  }
+
+  private static extractRatingVsMonths(data: CollectionWithPlays): object {
+    const values = [];
+    const monthsByGame = {};
+    for (const gp of data.plays) {
+      monthsByGame[gp.game] = gp.distinctMonths;
+    }
+    for (const gg of data.collection) {
+      if (gg.rating > 0) {
+        const plays = monthsByGame[gg.bggid] || 0;
+        values.push({ x: gg.rating, y: plays });
+      }
+    }
+    return { values };
   }
 
   public ngAfterViewInit(): void {
@@ -38,6 +88,16 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
       console.log(this.data);
       this.rows = FavouritesComponent.makeRows(this.data);
     })
+  }
+
+  public toggle(name: string) {
+    if ("doc" === name) {
+      this.docCollapsed = !this.docCollapsed;
+      if (!this.docCollapsed) this.chartsCollapsed = true;
+    } else if ("charts" === name) {
+      this.chartsCollapsed = !this.chartsCollapsed;
+      if (!this.chartsCollapsed) this.docCollapsed = true;
+    }
   }
 
   private static makeRows(data: CollectionWithPlays): FavouritesRow[] {

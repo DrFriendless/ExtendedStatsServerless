@@ -12,6 +12,7 @@
     "typeRoots": [
       "node_modules/@types"
     ],
+    "allowSyntheticDefaultImports": true, // required for vega-lite
     "lib": [
       "es2017",
       "dom"
