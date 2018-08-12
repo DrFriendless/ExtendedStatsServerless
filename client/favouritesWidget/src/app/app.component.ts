@@ -23,20 +23,26 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
 
   constructor(private http: HttpClient) {
     this.geek = fromExtStatsStorage(storage => storage.geek);
-    this.chartSet.add(new ChartDefinition("avgVsRating", "Average vs Rating", "point", FavouritesComponent.extractAvgVsRating));
-    this.chartSet.add(new ChartDefinition("ratingVsPlays", "Rating vs Plays", "circle", FavouritesComponent.extractRatingVsPlays));
-    this.chartSet.add(new ChartDefinition("ratingVsMonths", "Rating vs Distinct Months", "circle", FavouritesComponent.extractRatingVsMonths));
+    this.chartSet.add(new ChartDefinition("avgVsRating", "Average vs Rating", "circle",
+      "Your Rating", "BGG Average",
+      FavouritesComponent.extractAvgVsRating));
+    this.chartSet.add(new ChartDefinition("ratingVsPlays", "Rating vs Plays (max 50)", "point",
+      "Your Rating", "Number of Plays",
+      FavouritesComponent.extractRatingVsPlays));
+    this.chartSet.add(new ChartDefinition("ratingVsMonths", "Rating vs Distinct Months", "circle",
+      "Your Rating", "Number of months in which you have played this game",
+      FavouritesComponent.extractRatingVsMonths));
   }
 
   private static extractAvgVsRating(data: CollectionWithPlays): object {
     const values = [];
-    const averageByGame = {};
+    const gameById = {};
     for (const gd of data.games) {
-      averageByGame[gd.bggid] = gd.bggRating;
+      gameById[gd.bggid] = gd;
     }
     for (const gg of data.collection) {
-      if (gg.rating > 0 && averageByGame[gg.bggid]) {
-        values.push({ x: gg.rating, y: averageByGame[gg.bggid] });
+      if (gg.rating > 0 && gameById[gg.bggid].bggRating) {
+        values.push({ x: gg.rating, y: gameById[gg.bggid].bggRating, tooltip: gameById[gg.bggid].name });
       }
     }
     return { values };
@@ -44,15 +50,27 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
 
   private static extractRatingVsPlays(data: CollectionWithPlays): object {
     const values = [];
+    const doneKeys = [];
     const playsByGame = {};
     for (const gp of data.plays) {
       playsByGame[gp.game] = gp.plays;
     }
+    const sizeSoFar = {};
     for (const gg of data.collection) {
       if (gg.rating > 0) {
-        const plays = playsByGame[gg.bggid] || 0;
-        values.push({ x: gg.rating, y: plays });
+        const plays = Math.min(playsByGame[gg.bggid] || 0, 50);
+        const key = "" + gg.rating + "+" + plays;
+        sizeSoFar[key] = (sizeSoFar[key] || 0) + 1;
+        const xy = { x: gg.rating, y: plays };
+        if (doneKeys.indexOf(key) < 0) {
+          values.push(xy);
+          doneKeys.push(key);
+        }
       }
+    }
+    for (const xy of values) {
+      const key = "" + xy.x + "+" + xy.y;
+      xy.size = sizeSoFar[key];
     }
     return { values };
   }
@@ -63,10 +81,14 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
     for (const gp of data.plays) {
       monthsByGame[gp.game] = gp.distinctMonths;
     }
+    const gameById = {};
+    for (const game of data.games) {
+      gameById[game.bggid] = game;
+    }
     for (const gg of data.collection) {
       if (gg.rating > 0) {
         const plays = monthsByGame[gg.bggid] || 0;
-        values.push({ x: gg.rating, y: plays });
+        values.push({ x: gg.rating, y: plays, tooltip: gameById[gg.bggid].name });
       }
     }
     return { values };

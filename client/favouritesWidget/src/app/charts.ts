@@ -1,7 +1,8 @@
 import {CollectionWithPlays} from "./collection-interfaces";
 
 export class ChartDefinition {
-  constructor(private key: string, private name: string, private mark: string, private extract: (CollectionWithPlays) => object) {
+  constructor(private key: string, private name: string, private mark: string, private xAxisName: string, private yAxisName: string,
+              private extract: (CollectionWithPlays) => object) {
   }
 
   public getMark(): string {
@@ -18,6 +19,14 @@ export class ChartDefinition {
 
   public extractData(source: CollectionWithPlays): object {
     return this.extract(source);
+  }
+
+  public getXAxisName(): string {
+    return this.xAxisName;
+  }
+
+  public getYAxisName(): string {
+    return this.yAxisName;
   }
 }
 

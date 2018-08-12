@@ -31,21 +31,46 @@ export class ChartDirective implements AfterViewInit {
 
   @HostListener('click') onClick() {
     console.log("should show the chart " + this.definition.getName());
+    const chartData = this.definition.extractData(this.data);
+    console.log(chartData);
+    const encoding = {
+      "x": {
+        "field": "x",
+        "type": "ordinal",
+        "axis": {
+          "title": this.definition.getXAxisName()
+        }
+      },
+      "y": {
+        "field": "y",
+        "type": "quantitative",
+        "axis": {
+          "title": this.definition.getYAxisName()
+        }
+      }
+    };
+    if (chartData["values"].length > 0) {
+      const sample = chartData["values"][0];
+      console.log(sample);
+      if (sample.hasOwnProperty("size")) {
+        encoding["size"] = {"field": "size", "type": "quantitative"};
+      }
+      if (sample.hasOwnProperty("tooltip")) {
+        encoding["tooltip"] = {"field": "tooltip", "type": "ordinal"};
+      }
+    }
     const spec = {
       "$schema": "https://vega.github.io/schema/vega-lite/v2.json",
-      "description": this.definition.getName(),
+      "title": this.definition.getName(),
       "autosize": {
         "type": "pad",
         "resize": "true"
       },
       "width": 600,
       "height": 600,
-      "data": this.definition.extractData(this.data),
+      "data": chartData,
       "mark": this.definition.getMark(),
-      "encoding": {
-        "x": {"field": "x", "type": "ordinal"},
-        "y": {"field": "y", "type": "quantitative"}
-      }
+      "encoding": encoding
     };
 
     embed(this.pane.getTarget(), spec, { actions: false });
