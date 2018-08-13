@@ -14,6 +14,49 @@ export interface GeekGame {
     prevOwned: boolean;
 }
 
+export interface SelectorMetadata {
+    game: number;
+    colour?: string;
+    owner?: string;
+    player?: string;
+    rater?: string;
+}
+
+export class SelectorMetadataSet {
+    private metadata: { [bggid: string]: SelectorMetadata } = {};
+
+    public lookup(id: number): SelectorMetadata | undefined {
+        return this.metadata[id.toString()];
+    }
+
+    public restrictTo(ids: number[]) {
+        const newMetadata = {};
+        ids.forEach(id => {
+           const sid = id.toString();
+           if (this.metadata[sid]) {
+               newMetadata[sid] = this.metadata[sid];
+           }
+        });
+        this.metadata = newMetadata;
+    }
+
+    public add(game: number, key: string, value: string) {
+        const sid = game.toString();
+        if (!this.metadata[sid]) this.metadata[sid] = { game };
+        this.metadata[sid][key] = value;
+    }
+
+    public addIfNotPresent(game: number, key: string, value: string) {
+        const sid = game.toString();
+        if (this.metadata[sid] && !this.metadata[sid][key]) this.metadata[sid][key] = value;
+    }
+}
+
+export interface GeekGameQueryResult {
+    metadata: SelectorMetadataSet;
+    geekGames: GeekGame[];
+}
+
 export interface GameData {
     bggid: number;
     name: string;
@@ -63,6 +106,7 @@ export interface GamePlays {
 export interface Collection {
     collection: GeekGame[];
     games: GameData[];
+    metadata: SelectorMetadataSet;
 }
 
 export interface CollectionWithPlays {
@@ -70,4 +114,5 @@ export interface CollectionWithPlays {
     plays: GamePlays[];
     lastYearPlays: GamePlays[];
     games: GameData[];
+    metadata: SelectorMetadataSet;
 }

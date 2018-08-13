@@ -48,18 +48,18 @@ function extractGameData(row: object, expansionData: ExpansionData): GameData {
 }
 
 export async function doGetCollection(conn: mysql.Connection, query: GeekGameQuery): Promise<Collection> {
-    const geekGames = await selectGames(conn, query);
-    const games = await doRetrieveGames(conn, geekGames.map(gg => gg.bggid));
-    return { collection: geekGames, games } as Collection;
+    const queryResult = await selectGames(conn, query);
+    const games = await doRetrieveGames(conn, queryResult.geekGames.map(gg => gg.bggid));
+    return { collection: queryResult.geekGames, games, metadata: queryResult.metadata } as Collection;
 }
 
 export async function doGetCollectionWithPlays(conn: mysql.Connection, query: GeekGameQuery): Promise<CollectionWithPlays> {
-    const collection = await selectGames(conn, query);
-    const geekGames = collection.map(gg => gg.bggid);
+    const queryResult = await selectGames(conn, query);
+    const geekGames = queryResult.geekGames.map(gg => gg.bggid);
     const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
     const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
     const games = await doRetrieveGames(conn, geekGames);
-    return { collection, plays, games, lastYearPlays } as CollectionWithPlays;
+    return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata } as CollectionWithPlays;
 }
 
 async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {

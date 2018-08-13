@@ -1,19 +1,25 @@
-import {GeekGame, GeekGameQuery} from "./collection-interfaces";
+import {
+    GeekGame,
+    GeekGameQuery,
+    GeekGameQueryResult,
+    SelectorMetadataSet
+} from "./collection-interfaces";
 import mysql = require('promise-mysql');
 import {Arg, Argument, Expression, Integer, Keyword, parse, StringValue} from "./parser";
 import {getGeekId} from "./library";
 
-export async function selectGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGame[]> {
+export async function selectGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGameQueryResult> {
     const expr = parse(query.query);
     return await evaluate(conn, expr, query);
 }
 
-async function evaluateExpression(conn: mysql.Connection, expr: Expression, query: GeekGameQuery): Promise<number[]> {
+async function evaluateExpression(conn: mysql.Connection, expr: Expression, query: GeekGameQuery, metadata: SelectorMetadataSet):
+    Promise<number[]> {
     switch (expr.func) {
         case "all": {
             const args = [] as number[][];
             for (let arg of expr.args) {
-                const v = await evaluateExpression(conn, arg as Expression, query);
+                const v = await evaluateExpression(conn, arg as Expression, query, metadata);
                 args.push(v);
             }
             let result = undefined;
@@ -29,7 +35,7 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
         case "minus": {
             const args = [] as number[][];
             for (let arg of expr.args) {
-                const v = await evaluateExpression(conn, arg as Expression, query);
+                const v = await evaluateExpression(conn, arg as Expression, query, metadata);
                 args.push(v);
             }
             let result = undefined;
@@ -45,7 +51,7 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
         case "any": {
             const args = [] as number[][];
             for (let arg of expr.args) {
-                const v = await evaluateExpression(conn, arg as Expression, query);
+                const v = await evaluateExpression(conn, arg as Expression, query, metadata);
                 args.push(v);
             }
             let result = undefined;
@@ -66,23 +72,33 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
                 geek = await getGeekId(conn, geek as string);
             }
             const sql = "select game from geekgames where geekid = ? and rating > 0";
-            return (await conn.query(sql, [geek])).map(row => row["game"]);
+            const ids = (await conn.query(sql, [geek])).map(row => row["game"]);
+            ids.forEach(id => metadata.add(id, "rater", geek.toString()));
+            return ids;
         }
         case "played": {
             let geek = evaluateSimpleArg(expr.args[0] as Arg, query);
+            let strgeek;
             if (typeof geek === 'string') {
+                strgeek = geek;
                 geek = await getGeekId(conn, geek as string);
             }
             const sql = "select distinct game from plays_normalised where geek = ?";
-            return (await conn.query(sql, [geek])).map(row => row["game"]);
+            const ids = (await conn.query(sql, [geek])).map(row => row["game"]) as number[];
+            if (strgeek) ids.forEach(id => metadata.add(id, "player", strgeek));
+            return ids;
         }
         case "owned": {
             let geek = evaluateSimpleArg(expr.args[0] as Arg, query);
+            let strgeek;
             if (typeof geek === 'string') {
+                strgeek = geek;
                 geek = await getGeekId(conn, geek as string);
             }
             const sql = "select game from geekgames where geekid = ? and owned > 0";
-            return (await conn.query(sql, [geek])).map(row => row["game"]);
+            const ids = (await conn.query(sql, [geek])).map(row => row["game"]);
+            if (strgeek) ids.forEach(id => metadata.add(id, "owner", strgeek));
+            return ids;
         }
         case "expansions": {
             return (await conn.query("select distinct expansion from expansions")).map(row => row["expansion"]);
@@ -105,6 +121,20 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
         case "mechanic" : {
             let mec = evaluateSimpleArg(expr.args[0] as Arg, query);
             return await selectMechanic(conn, mec as string);
+        }
+        case "colour": {
+            let colour = evaluateSimpleArg(expr.args[0] as Arg, query) as string;
+            // TODO - try to interpret non-string things as colours
+            const ids = await evaluateExpression(conn, expr.args[1] as Expression, query, metadata);
+            ids.forEach(id => metadata.add(id, "colour", colour));
+            return ids;
+        }
+        case "elseColour": {
+            let colour = evaluateSimpleArg(expr.args[0] as Arg, query) as string;
+            // TODO - try to interpret non-string things as colours
+            const ids = await evaluateExpression(conn, expr.args[1] as Expression, query, metadata);
+            ids.forEach(id => metadata.addIfNotPresent(id, "colour", colour));
+            return ids;
         }
         default: {
             throw new Error("Unknown function " + expr.func);
@@ -155,9 +185,11 @@ function evaluateSimpleArg(arg: Arg, query: GeekGameQuery): string | number {
     }
 }
 
-async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGameQuery): Promise<GeekGame[]> {
-    const ids = await evaluateExpression(conn, expr, query);
-    return await retrieveGeekGames(conn, ids, query.geek);
+async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGameQuery): Promise<GeekGameQueryResult> {
+    const metadata = new SelectorMetadataSet();
+    const ids = await evaluateExpression(conn, expr, query, metadata);
+    metadata.restrictTo(ids);
+    return { geekGames: await retrieveGeekGames(conn, ids, query.geek), metadata } as GeekGameQueryResult;
 }
 
 async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGame[]> {
@@ -171,7 +203,6 @@ async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: st
         return (await conn.query(sqlMany, [geekId, ids])).map(extractGeekGame);
     }
 }
-
 
 function extractGeekGame(row: object): GeekGame {
     return {
