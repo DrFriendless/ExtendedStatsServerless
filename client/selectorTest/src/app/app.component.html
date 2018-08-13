@@ -86,7 +86,7 @@
     </tr>
     </thead>
     <tbody>
-    <tr *ngFor="let row of selectorTestTable.data">
+    <tr *ngFor="let row of selectorTestTable.data" [extstats-row-colour]="row.colour">
       <td><a href="https://boardgamegeek.com/boardgame/{{row.bggid}}">{{row.name}}</a></td>
       <td>{{row.rating}}</td>
     </tr>
