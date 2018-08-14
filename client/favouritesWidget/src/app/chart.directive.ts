@@ -36,7 +36,7 @@ export class ChartDirective implements AfterViewInit {
     const encoding = {
       "x": {
         "field": "x",
-        "type": "ordinal",
+        "type": "quantitative",
         "axis": {
           "title": this.definition.getXAxisName()
         }
@@ -63,8 +63,8 @@ export class ChartDirective implements AfterViewInit {
       "$schema": "https://vega.github.io/schema/vega-lite/v2.json",
       "title": this.definition.getName(),
       "autosize": {
-        "type": "pad",
-        "resize": "true"
+        "type": "fit",
+        "resize": true
       },
       "width": 600,
       "height": 600,
@@ -72,8 +72,10 @@ export class ChartDirective implements AfterViewInit {
       "mark": this.definition.getMark(),
       "encoding": encoding
     };
+    console.log(this.pane.getTarget());
+    console.log(this.pane.getTarget());
 
-    embed(this.pane.getTarget(), spec, { actions: false });
+    embed(this.pane.getTarget(), spec, { actions: true });
     this.pane.show();
   }
 }
