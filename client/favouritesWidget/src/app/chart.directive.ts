@@ -19,7 +19,7 @@ export class ChartDirective implements AfterViewInit {
   @Input('extstatsChart') definition: ChartDefinition;
   @Input('chartData') data: CollectionWithPlays;
   @Input('chartPane') pane: ChartPaneComponent;
-  private button: any;
+  private button: HTMLElement;
 
   constructor(private el: ElementRef) {
     this.button = el.nativeElement;

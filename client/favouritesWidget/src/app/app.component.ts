@@ -118,7 +118,8 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
     };
     const body: GeekGameQuery = {
       query: "all(played(ME), rated(ME))",
-      geek: this.geek
+      geek: this.geek,
+      vars: {}
     };
     console.log(body);
     this.loadData$ = this.http.post("https://api.drfriendless.com/v1/collectionWithPlays", body, options);
@@ -163,7 +164,7 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
         huberHeat = Math.floor(huberHeat * 10) / 10;
       }
       let ruhm = 0;
-      if (gp.distinctMonths > 0 && gg.rating) {
+      if (gp.distinctMonths > 0 && gg.rating && gp.firstPlay && gp.lastPlay) {
         const firstDate = FavouritesComponent.intToDate(gp.firstPlay);
         const lastDate = FavouritesComponent.intToDate(gp.lastPlay);
         const flash = FavouritesComponent.daysBetween(lastDate, firstDate);
