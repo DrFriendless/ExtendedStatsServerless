@@ -1,6 +1,6 @@
 import mysql = require('promise-mysql');
 import {asyncReturnWithConnection} from "./library";
-import {UserConfig} from "./security-interfaces";
+import {UserConfig} from "extstats-core";
 
 export class User {
     private identity: string;

@@ -1,7 +1,7 @@
 import {Callback} from "aws-lambda";
 import jwt = require('jsonwebtoken');
 import {findOrCreateUser, retrieveAllData} from "./users";
-import {Decoded, PersonalData, UserData} from "./security-interfaces";
+import {Decoded, UserData, PersonalData} from "extstats-core";
 // import jwksClient = require('jwks-rsa');
 // import {Jwk} from "jwks-rsa";
 //

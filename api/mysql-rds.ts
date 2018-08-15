@@ -1,16 +1,8 @@
 import mysql = require('promise-mysql');
-import {SystemStats, TypeCount} from "./admin-interfaces"
-import {
-    Collection,
-    CollectionWithPlays, GameData,
-    GamePlays,
-    GeekGameQuery,
-    WarTableRow
-} from "./collection-interfaces";
 import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
-import {RankingTableRow} from "./ranking-interfaces";
-import {ExpansionData} from "./expansion-data";
 import {selectGames} from "./selector";
+import {RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
+    TypeCount, WarTableRow} from "extstats-core";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return asyncReturnWithConnection(async conn => doRankGames(conn, query));

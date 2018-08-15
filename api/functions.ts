@@ -6,8 +6,8 @@ import {
     listWarTable,
     rankGames
 } from "./mysql-rds";
-import {GeekGameQuery} from "./collection-interfaces";
 import {asyncReturnWithConnection} from "./library";
+import {GeekGameQuery} from "extstats-core";
 
 export async function adminGatherSystemStats(event, context, callback: Callback) {
     try {
