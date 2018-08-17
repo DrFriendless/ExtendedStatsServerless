@@ -16,7 +16,7 @@
     "mysql": "^2.15.0",
     "promise-mysql": "^3.2.1",
     "serverless": "^1.28.0",
-    "extstats-core": "^0.0.1"
+    "extstats-core": "^0.1.1"
   },
   "devDependencies": {
     "@types/node": "^8.5.2",
