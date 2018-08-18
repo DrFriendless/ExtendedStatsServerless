@@ -1,6 +1,6 @@
 import {Callback} from 'aws-lambda';
 import {
-    doGetCollection, doGetCollectionWithPlays,
+    doGetCollection, doGetCollectionWithPlays, gatherGeekSummary,
     gatherSystemStats,
     listUsers,
     listWarTable,
@@ -8,6 +8,15 @@ import {
 } from "./mysql-rds";
 import {asyncReturnWithConnection} from "./library";
 import {GeekGameQuery} from "extstats-core";
+
+export async function getGeekSummary(event, context, callback: Callback) {
+    try {
+        callback(null, await gatherGeekSummary(event["query"]["geek"]));
+    } catch (err) {
+        console.log(err);
+        callback(err);
+    }
+}
 
 export async function adminGatherSystemStats(event, context, callback: Callback) {
     try {

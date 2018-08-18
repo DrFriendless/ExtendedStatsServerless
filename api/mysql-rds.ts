@@ -2,10 +2,10 @@ import mysql = require('promise-mysql');
 import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
 import {selectGames} from "./selector";
 import {RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
-    TypeCount, WarTableRow} from "extstats-core";
+    TypeCount, WarTableRow, GeekSummary} from "extstats-core";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
-    return asyncReturnWithConnection(async conn => doRankGames(conn, query));
+    return await asyncReturnWithConnection(async conn => await doRankGames(conn, query));
 }
 
 async function doRankGames(conn: mysql.Connection, query: object): Promise<RankingTableRow[]> {
@@ -76,7 +76,17 @@ async function getLastYearOfPlays(conn: mysql.Connection, geek: string): Promise
 }
 
 export async function gatherSystemStats(): Promise<SystemStats> {
-    return asyncReturnWithConnection(doGatherSystemStats);
+    return await asyncReturnWithConnection(doGatherSystemStats);
+}
+
+export async function gatherGeekSummary(geek: string): Promise<GeekSummary> {
+    return await asyncReturnWithConnection(async conn => await doGetGeekSummary(conn, geek));
+}
+
+async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary> {
+    const geekId = await getGeekId(conn, geek);
+    const warTableRow = await getWarTableRow(geekId);
+    return { warData: warTableRow };
 }
 
 async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats> {
@@ -132,6 +142,11 @@ function gatherTypeCount(row: any): TypeCount {
 export async function listWarTable(): Promise<WarTableRow[]> {
     const sql = "select * from war_table order by lower(geekName) asc";
     return asyncReturnWithConnection(conn => conn.query(sql));
+}
+
+export async function getWarTableRow(geekId: number): Promise<WarTableRow> {
+    const sql = "select * from war_table where geek = ?";
+    return asyncReturnWithConnection(conn => conn.query(sql, [geekId]));
 }
 
 export async function listUsers(): Promise<string[]> {
