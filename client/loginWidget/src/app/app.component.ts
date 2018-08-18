@@ -5,7 +5,7 @@ import {Subscription} from "rxjs/internal/Subscription";
 import {Observable} from "rxjs/internal/Observable";
 import {flatMap} from "rxjs/operators";
 import {HttpClient, HttpHeaders} from "@angular/common/http";
-import {Identity, UserData} from "./security-interfaces";
+import {Identity, UserData} from "extstats-core";
 
 @Component({
   selector: 'extstats-login',

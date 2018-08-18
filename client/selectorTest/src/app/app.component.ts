@@ -1,12 +1,10 @@
 import {AfterViewInit, Component} from '@angular/core';
-import {Collection, GameData, GeekGame, GeekGameQuery, SelectorMetadataSet} from "./collection-interfaces";
 import {Subscription} from "rxjs/internal/Subscription";
 import {HttpClient, HttpHeaders} from "@angular/common/http";
-import {UserCollectionRow} from "./interfaces";
+import {UserCollectionRow, fromExtStatsStorage, Collection, GameData, GeekGame, GeekGameQuery, SelectorMetadataSet} from "extstats-core";
 import {Subject} from "rxjs/internal/Subject";
 import {Observable} from "rxjs/internal/Observable";
 import {flatMap, tap} from "rxjs/operators";
-import {fromExtStatsStorage} from "./extstats-storage";
 
 @Component({
   selector: 'extstats-selector-test',
@@ -16,7 +14,7 @@ import {fromExtStatsStorage} from "./extstats-storage";
 export class SelectorTestComponent implements AfterViewInit {
   private loadData$: Observable<Object>;
   public rows = [] as UserCollectionRow[];
-  private subscription: Subscription;
+  private readonly subscription: Subscription;
   public me: string = "";
   public them: string = "";
   public selector: string = "owned(ME)";

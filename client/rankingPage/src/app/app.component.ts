@@ -4,7 +4,7 @@ import {
 } from '@angular/core';
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
-import {RankingTableRow} from "./interfaces";
+import {RankingTableRow} from "extstats-core";
 
 @Component({
   selector: 'ranking-table',

@@ -8,8 +8,7 @@
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e",
-    "buildprod": "ng build --prod --output-hashing none --watch false --verbose",
-    "package": "ng build --prod --output-hashing none --watch false --verbose && ./package.sh"
+    "buildprod": "ng build --prod --output-hashing none --watch false --verbose"
   },
   "private": true,
   "dependencies": {
@@ -26,7 +25,8 @@
     "core-js": "^2.5.4",
     "hoek": "^4.2.1",
     "rxjs": "^6.0.0",
-    "zone.js": "^0.8.26"
+    "zone.js": "^0.8.26",
+    "extstats-core": "^0.1.1"
   },
   "devDependencies": {
     "@angular/compiler-cli": "^6.0.3",

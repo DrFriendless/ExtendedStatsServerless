@@ -26,7 +26,8 @@
     "extstats-datatable": "^0.8.0",
     "ngx-bootstrap": "^3.0.1",
     "rxjs": "^6.0.0",
-    "zone.js": "^0.8.26"
+    "zone.js": "^0.8.26",
+    "extstats-core": "^0.1.2"
   },
   "devDependencies": {
     "@angular/compiler-cli": "^6.0.3",

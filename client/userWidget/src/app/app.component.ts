@@ -4,7 +4,7 @@ import {flatMap, map, tap} from "rxjs/operators";
 import {Subscription} from "rxjs/internal/Subscription";
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Observable} from "rxjs/internal/Observable";
-import {PersonalData} from "./security-interfaces";
+import {PersonalData} from "extstats-core";
 import {of} from "rxjs/internal/observable/of";
 
 @Component({

@@ -1,7 +1,7 @@
 import {AfterViewInit, Component, OnDestroy, ViewEncapsulation} from '@angular/core';
 import {Subscription} from "rxjs/internal/Subscription";
 import {HttpClient, HttpHeaders} from "@angular/common/http";
-import {WarTableRow} from "./collection-interfaces";
+import {WarTableRow} from "extstats-core";
 
 @Component({
   selector: 'war-table',
