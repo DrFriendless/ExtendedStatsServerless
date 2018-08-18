@@ -116,3 +116,7 @@ export interface CollectionWithPlays {
     games: GameData[];
     metadata: SelectorMetadataSet;
 }
+
+export interface GeekSummary {
+    warData: WarTableRow;
+}
