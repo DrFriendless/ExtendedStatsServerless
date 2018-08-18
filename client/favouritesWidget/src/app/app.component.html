@@ -10,53 +10,7 @@
 
     <extstats-chartpane #chartPane></extstats-chartpane>
 
-    <div id="favouritesTableDoc" [ngbCollapse]="docCollapsed">
-      <ngb-tabset>
-        <ngb-tab title="Friendless Happiness Metric">
-          <ng-template ngbTabContent>
-            <!--(!gg.rating) ? undefined : Math.floor((gg.rating * 5 + gp.plays + gp.distinctMonths * 4 + hoursPlayed) * 10) / 10;-->
-            <p>This metric attempts to assess how much you love this game. It's RATING * 5 + PLAYS + MONTHS PLAYED IN * 4 + HOURS PLAYED.</p>
-          </ng-template>
-        </ngb-tab>
-        <ngb-tab title="Huber Happiness Metric">
-          <ng-template ngbTabContent>
-            <!--(!gg.rating) ? undefined : Math.floor((gg.rating - HUBER_BASELINE) * hoursPlayed);-->
-            <p>This metric also attempts to assess how much you love this game. It's (RATING - 4.5) * HOURS PLAYED. </p>
-          </ng-template>
-        </ngb-tab>
-        <ngb-tab title="Huber Heat">
-          <ng-template ngbTabContent>
-            <!--const s = 1 + ly.plays / gp.plays;-->
-            <!--const lyHours = ly.plays * game.playTime / 60;-->
-            <!--const lyHappiness = (gg.rating - HUBER_BASELINE) * lyHours;-->
-            <!--huberHeat = s * s * Math.sqrt(ly.plays) * lyHappiness;-->
-            <!--huberHeat = Math.floor(huberHeat * 10) / 10;-->
-            <p>The Huber Heat metric attempts to assess how much you love this game right now. It's complicated.
-              Let S be 1 + (PLAYS IN THE LAST YEAR) / (PLAYS EVER).
-              Let LAST YEAR HAPPINESS be (RATING - 4.5) * HOURS PLAYED IN THE LAST YEAR.
-              Then the Huber Heat is S^2 * sqrt(PLAYS IN THE LAST YEAR) * LAST YEAR HAPPINESS.
-            </p>
-          </ng-template>
-        </ngb-tab>
-        <ngb-tab title="Randy Cox Not Unhappiness Metric">
-          <!--const firstDate = FavouritesComponent.intToDate(gp.firstPlay);-->
-          <!--const lastDate = FavouritesComponent.intToDate(gp.lastPlay);-->
-          <!--const flash = FavouritesComponent.daysBetween(lastDate, firstDate);-->
-          <!--const lag = FavouritesComponent.daysBetween(new Date(), lastDate);-->
-          <!--const flmr = flash / lag * gp.distinctMonths * gg.rating;-->
-          <!--const log = (flmr < 1) ? 0 : Math.log(flmr);-->
-          <!--ruhm = Math.round(log * 100) / 100;-->
-          <ng-template ngbTabContent>
-            <p>The Randy Cox Not Unhappiness Metric attempts to assess not how much you love this game, but how much you don't hate it.
-              Let FL be (days between your first and last plays of it) divided by (days since you last played it).
-              Let FLMR be FL times the number of months you've played it in times your rating.
-              Then if that's less than 1, R!UHM is zero (which penalises games you've played recently), otherwise it's log(FLMR).
-              So R!UHM is high for games you've been playing for a long time and still rate highly.
-            </p>
-          </ng-template>
-        </ngb-tab>
-      </ngb-tabset>
-    </div>
+    <extstats-documentation id="favouritesTableDoc" [collapsed]="docCollapsed" [content]="doc"></extstats-documentation>
   </div>
 
   <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'fhm'" [mfSortOrder]="'desc'">

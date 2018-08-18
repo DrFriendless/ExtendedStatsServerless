@@ -3,6 +3,7 @@ import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
 import {CollectionWithPlays, FavouritesRow, fromExtStatsStorage, GeekGameQuery, GameData, GamePlays} from "extstats-core";
 import {ChartSet, ChartDefinition} from "extstats-angular";
+import {DocumentationContent} from "./extstats-documentation/documentation";
 
 @Component({
   selector: 'extstats-favourites',
@@ -18,6 +19,7 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
   public docCollapsed = true;
   public chartsCollapsed = true;
   public chartSet = new ChartSet();
+  public doc: DocumentationContent[];
 
   constructor(private http: HttpClient) {
     this.geek = fromExtStatsStorage(storage => storage.geek);
@@ -33,6 +35,12 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
     this.chartSet.add(new ChartDefinition("fhmVsYearPublished", "FHM vs Year Published", "circle",
       "Year Published", "Friendless Happiness Metric",
       FavouritesComponent.fhmVsYearPublished));
+
+    // trying to make the doc component generic
+    // this.doc = [{
+    //   title: "Friendless Happiness Metric",
+    //   text: ["This metric attempts to assess how much you love this game. It's RATING * 5 + PLAYS + MONTHS PLAYED IN * 4 + HOURS PLAYED."]
+    // }];
   }
 
   private static fhmVsYearPublished(data: CollectionWithPlays): object {
@@ -110,7 +118,10 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
   }
 
   public ngAfterViewInit(): void {
-    if (!this.geek) return;
+    if (!this.geek) {
+      console.log("There is no geek to gather data for.");
+      return;
+    }
     const options = {
       headers: new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ")
     };

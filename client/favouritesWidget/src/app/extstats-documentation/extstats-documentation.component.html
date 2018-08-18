@@ -1,0 +1,33 @@
+<div [ngbCollapse]="collapsed">
+  <ngb-tabset>
+    <ngb-tab title="Friendless Happiness Metric">
+      <ng-template ngbTabContent>
+        <p>This metric attempts to assess how much you love this game. It's RATING * 5 + PLAYS + MONTHS PLAYED IN * 4 + HOURS PLAYED.</p>
+      </ng-template>
+    </ngb-tab>
+    <ngb-tab title="Huber Happiness Metric">
+      <ng-template ngbTabContent>
+        <p>This metric also attempts to assess how much you love this game. It's (RATING - 4.5) * HOURS PLAYED. </p>
+      </ng-template>
+    </ngb-tab>
+    <ngb-tab title="Huber Heat">
+      <ng-template ngbTabContent>
+        <p>The Huber Heat metric attempts to assess how much you love this game right now. It's complicated.
+          Let S be 1 + (PLAYS IN THE LAST YEAR) / (PLAYS EVER).
+          Let LAST YEAR HAPPINESS be (RATING - 4.5) * HOURS PLAYED IN THE LAST YEAR.
+          Then the Huber Heat is S^2 * sqrt(PLAYS IN THE LAST YEAR) * LAST YEAR HAPPINESS.
+        </p>
+      </ng-template>
+    </ngb-tab>
+    <ngb-tab title="Randy Cox Not Unhappiness Metric">
+      <ng-template ngbTabContent>
+        <p>The Randy Cox Not Unhappiness Metric attempts to assess not how much you love this game, but how much you don't hate it.
+          Let FL be (days between your first and last plays of it) divided by (days since you last played it).
+          Let FLMR be FL times the number of months you've played it in times your rating.
+          Then if that's less than 1, R!UHM is zero (which penalises games you've played recently), otherwise it's log(FLMR).
+          So R!UHM is high for games you've been playing for a long time and still rate highly.
+        </p>
+      </ng-template>
+    </ngb-tab>
+  </ngb-tabset>
+</div>

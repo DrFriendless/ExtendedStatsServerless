@@ -7,10 +7,12 @@ import {DataTableModule} from "extstats-datatable";
 import {NgbModule} from "@ng-bootstrap/ng-bootstrap";
 import { TooltipModule } from 'ngx-bootstrap/tooltip';
 import {ExtstatsAngularModule} from "extstats-angular";
+import { ExtstatsDocumentationComponent } from './extstats-documentation/extstats-documentation.component';
 
 @NgModule({
   declarations: [
     FavouritesComponent,
+    ExtstatsDocumentationComponent,
   ],
   imports: [
     BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule
