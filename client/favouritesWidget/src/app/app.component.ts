@@ -7,8 +7,7 @@ import {DocumentationContent} from "./extstats-documentation/documentation";
 
 @Component({
   selector: 'extstats-favourites',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  templateUrl: './app.component.html'
 })
 export class FavouritesComponent implements OnDestroy, AfterViewInit {
   private readonly geek: string;

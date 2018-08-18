@@ -5,8 +5,7 @@ import {HttpClient, HttpHeaders} from "@angular/common/http";
 
 @Component({
   selector: 'extstats-admin',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  templateUrl: './app.component.html'
 })
 export class ExtStatsAdminComponent implements AfterViewInit, OnDestroy {
   public stats = {} as SystemStats;

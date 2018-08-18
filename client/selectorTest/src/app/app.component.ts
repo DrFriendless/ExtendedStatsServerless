@@ -8,8 +8,7 @@ import {flatMap, tap} from "rxjs/operators";
 
 @Component({
   selector: 'extstats-selector-test',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  templateUrl: './app.component.html'
 })
 export class SelectorTestComponent implements AfterViewInit {
   private loadData$: Observable<Object>;

@@ -9,8 +9,7 @@ import {of} from "rxjs/internal/observable/of";
 
 @Component({
   selector: 'extstats-user-config',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  templateUrl: './app.component.html'
 })
 export class UserConfigComponent implements OnDestroy {
   private usernames = new Subject<string>();

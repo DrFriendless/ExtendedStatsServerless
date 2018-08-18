@@ -9,8 +9,7 @@ import {Identity, UserData} from "extstats-core";
 
 @Component({
   selector: 'extstats-login',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  templateUrl: './app.component.html'
 })
 export class LoginComponent implements OnDestroy {
   public showLogin = true;
@@ -19,8 +18,8 @@ export class LoginComponent implements OnDestroy {
   private logins = new Subject<Identity>();
   private logins$ = this.logins.asObservable();
   private userdata = new Subject<UserData>();
-  private loginSubscription: Subscription;
-  private userDataSubscription: Subscription;
+  private readonly loginSubscription: Subscription;
+  private readonly userDataSubscription: Subscription;
   private authOptions = {
     auth: {
       responseType: 'token id_token',
@@ -29,7 +28,7 @@ export class LoginComponent implements OnDestroy {
     },
     autoclose: true,
     oidcConformant: true,
-    popupOptions: { width: 300, height: 400, left: 200, top: 300 },
+    popupOptions: { width: 300, height: 400 },
     usernameStyle: 'username'
   };
 

@@ -1,1 +1,24 @@
-/* You can add global styles to this file, and also import other style files */
+/* Styles for user-collection */
+
+extstats-selector-test .table.table-striped.extstats-table .pagination li:not(.active) a:hover {
+  background-color: #ddd;
+}
+extstats-selector-test .table.table-striped.extstats-table .pagination li.active {
+  background-color: #fdc02f;
+  border-color: #fdc02f;
+  color: white;
+}
+
+extstats-selector-test .table.extstats-table td,
+.table.extstats-table tbody,
+.table.extstats-table thead,
+.table.extstats-table.table thead th {
+  border-color: #fdc02f;
+}
+/* border colour modified to 16 saturation & 50% alpha */
+extstats-selector-test .table.table-striped.extstats-table tbody tr:nth-child(odd){
+  background-color: rgba(253, 241, 197, 0.5);
+}
+extstats-selector-test .table.table-striped.extstats-table tbody tr:nth-child(even){
+  background-color: white;
+}

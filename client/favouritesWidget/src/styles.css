@@ -1,1 +1,44 @@
-/* You can add global styles to this file, and also import other style files */
+/* Styles for favourites-table */
+
+.favourites-table table.extstats-table tfoot ul.pagination li:not(.active) a:hover {
+  background-color: #ddd;
+}
+.favourites-table table.extstats-table tfoot ul.pagination li.active a {
+  background-color: green;
+  color: white;
+}
+
+.favourites-table table.extstats-table td,
+.favourites-table table.extstats-table tbody,
+.favourites-table table.extstats-table thead,
+.favourites-table table.extstats-table.table thead th {
+  border-color: #2c992d;
+}
+/* border colour modified to 16 saturation */
+.favourites-table table.table-striped.extstats-table tbody tr:nth-child(odd){
+  background-color: rgba(129, 153, 129, 0.5);
+}
+.favourites-table table.table-striped.extstats-table tbody tr:nth-child(even){
+  background-color: white;
+}
+
+.table-button {
+  border: solid 1px #fd9727;
+  margin: 4px;
+}
+.favourites-table div.extstats-doc li.nav-item a.nav-link.active {
+  color: #fd9727;
+}
+.favourites-table div.extstats-doc li.nav-item a.nav-link {
+  color: #777777;
+  font-size: 14px;
+  border-radius: unset;
+}
+.favourites-table div.collapse {
+  margin-top: 1rem;
+}
+
+.chart-button {
+  border: solid 1px #617d8a;
+  margin: 4px;
+}

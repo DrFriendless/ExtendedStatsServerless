@@ -1,1 +1,39 @@
-/* You can add global styles to this file, and also import other style files */
+/* Styles for war-table */
+
+.war-table table.extstats-table tfoot ul.pagination li:not(.active) a:hover {
+  background-color: #ddd;
+}
+.war-table table.extstats-table tfoot ul.pagination li.active a {
+  background-color: green;
+  color: white;
+}
+
+.war-table table.extstats-table td,
+.war-table table.extstats-table tbody,
+.war-table table.extstats-table thead,
+.war-table table.extstats-table.table thead th {
+  border-color: #673fb4;
+}
+/* border colour modified to 16 saturation */
+.war-table table.table-striped.extstats-table tbody tr:nth-child(odd){
+  background-color: rgba(170, 146, 174, 0.5);
+}
+.war-table table.table-striped.extstats-table tbody tr:nth-child(even){
+  background-color: white;
+}
+
+.war-table div.extstats-doc button {
+  border: solid 1px #4054b2;
+}
+.war-table div.extstats-doc li.nav-item a.nav-link.active {
+  color: #4054b2;
+}
+.war-table div.extstats-doc li.nav-item a.nav-link {
+  color: #777777;
+  font-size: 14px;
+  border-radius: unset;
+}
+.war-table div.collapse {
+  margin-top: 1rem;
+}
+

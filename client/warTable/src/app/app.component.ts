@@ -6,7 +6,6 @@ import {WarTableRow} from "extstats-core";
 @Component({
   selector: 'war-table',
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css'],
   encapsulation: ViewEncapsulation.Emulated
 })
 export class WarTableComponent implements OnDestroy, AfterViewInit {

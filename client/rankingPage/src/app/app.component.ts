@@ -9,7 +9,6 @@ import {RankingTableRow} from "extstats-core";
 @Component({
   selector: 'ranking-table',
   templateUrl: "./app.component.html",
-  styleUrls: ["./app.component.css"],
   encapsulation: ViewEncapsulation.None
 })
 export class RankingTableComponent implements OnDestroy, AfterViewInit {
