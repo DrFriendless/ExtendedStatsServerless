@@ -6,17 +6,14 @@ import {HttpClientModule} from "@angular/common/http";
 import {DataTableModule} from "extstats-datatable";
 import {NgbModule} from "@ng-bootstrap/ng-bootstrap";
 import { TooltipModule } from 'ngx-bootstrap/tooltip';
-import { ChartDirective } from './chart.directive';
-import { ChartPaneComponent } from './chart-pane/chart-pane.component';
+import {ExtstatsAngularModule} from "extstats-angular";
 
 @NgModule({
   declarations: [
     FavouritesComponent,
-    ChartDirective,
-    ChartPaneComponent
   ],
   imports: [
-    BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot()
+    BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule
   ],
   providers: [],
   bootstrap: [FavouritesComponent]

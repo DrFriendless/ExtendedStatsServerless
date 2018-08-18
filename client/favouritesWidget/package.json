@@ -28,7 +28,9 @@
     "rxjs": "^6.0.0",
     "vega-embed": "^3.18.2",
     "vega-lite": "^3.0.0-rc3",
-    "zone.js": "^0.8.26"
+    "zone.js": "^0.8.26",
+    "extstats-core": "^0.1.1",
+    "extstats-angular": "^0.1.0"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "~0.6.8",

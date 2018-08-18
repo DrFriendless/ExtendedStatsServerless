@@ -1,10 +1,8 @@
 import {AfterViewInit, Component, OnDestroy} from '@angular/core';
-import {fromExtStatsStorage} from "./extstats-storage";
-import {CollectionWithPlays, GameData, GamePlays, GeekGameQuery} from "./collection-interfaces";
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
-import {FavouritesRow} from "./interfaces";
-import {ChartDefinition, ChartSet} from "./charts";
+import {CollectionWithPlays, FavouritesRow, fromExtStatsStorage, GeekGameQuery, GameData, GamePlays} from "extstats-core";
+import {ChartSet, ChartDefinition} from "extstats-angular";
 
 @Component({
   selector: 'extstats-favourites',
