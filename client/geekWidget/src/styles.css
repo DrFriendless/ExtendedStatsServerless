@@ -1,0 +1,20 @@
+/* You can add global styles to this file, and also import other style files */
+.geekPanel {
+  width: 200px;
+  height: 200px;
+  border: 2px transparent solid;
+  margin: 8px;
+  padding: 4px;
+}
+
+.geekPanel:hover {
+  border: 2px black solid;
+}
+
+.geekWidget {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-content: flex-start;
+}
