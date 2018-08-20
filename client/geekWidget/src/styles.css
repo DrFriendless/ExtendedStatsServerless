@@ -7,6 +7,14 @@
   padding: 4px;
 }
 
+.geekPanel h3 {
+  font-size: 32px;
+}
+
+.geekPanel h4 {
+  font-size: 24px;
+}
+
 .geekPanel:hover {
   border: 2px black solid;
 }
