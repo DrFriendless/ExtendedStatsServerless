@@ -8,7 +8,7 @@ import { Observer } from "rxjs";
   styleUrls: ['./collection-panel.component.css']
 })
 export class CollectionPanelComponent implements OnInit {
-  @Input('geekData') geek: GeekSummary;
+  @Input('geekData') data: GeekSummary;
 
   constructor() { }
 

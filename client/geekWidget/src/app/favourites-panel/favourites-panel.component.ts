@@ -7,7 +7,7 @@ import { GeekSummary } from "extstats-core";
   styleUrls: ['./favourites-panel.component.css']
 })
 export class FavouritesPanelComponent implements OnInit {
-  @Input('geekData') geek: GeekSummary;
+  @Input('geekData') data: GeekSummary;
 
   public constructor() { }
 

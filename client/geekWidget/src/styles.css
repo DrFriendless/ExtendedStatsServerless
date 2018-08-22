@@ -7,6 +7,10 @@
   padding: 4px;
 }
 
+a:link .geekPanel {
+  text-decoration: none;
+}
+
 .geekPanel h3 {
   font-size: 32px;
 }
