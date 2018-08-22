@@ -35,11 +35,28 @@ function loadUserData(jwt: string) {
         if (this.readyState == 4 && this.status == 200) {
             // Typical action to be performed when the document is ready:
             console.log(xhttp.responseText);
+            showAndHide();
         }
     };
-    xhttp.setRequestHeader("Authorization", "Bearer " + jwt);
     xhttp.open("GET", "https://api.drfriendless.com/v1/authenticate", true);
+    xhttp.setRequestHeader("Authorization", "Bearer " + jwt);
     xhttp.send();
+}
+
+function setUserFromLocalStorage() {
+    const geek = localStorage.getItem("username");
+    if (geek) username = geek;
+}
+
+function showAndHide() {
+    document.getElementById("user-link").innerHTML = username;
+    if (username) {
+        document.getElementById("btn-login").style.display = "none";
+        document.getElementById("extstats-logout").style.display = "block";
+    } else {
+        document.getElementById("btn-login").style.display = "block";
+        document.getElementById("extstats-logout").style.display = "none";
+    }
 }
 
 lock.on("authenticated", authResult => {
@@ -48,4 +65,9 @@ lock.on("authenticated", authResult => {
     localStorage.setItem('accessToken', authResult.accessToken);
     localStorage.setItem('identity', JSON.stringify(authResult.idTokenPayload));
     loadUserData(authResult.idToken);
+});
+
+window.addEventListener("load", () => {
+    setUserFromLocalStorage();
+    showAndHide();
 });
