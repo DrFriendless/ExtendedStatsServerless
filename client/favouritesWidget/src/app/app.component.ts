@@ -17,6 +17,7 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
   private subscription: Subscription;
   public docCollapsed = true;
   public chartsCollapsed = true;
+  public settingsCollapsed = true;
   public chartSet = new ChartSet();
   public doc: DocumentationContent[];
 
@@ -141,10 +142,22 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
   public toggle(name: string) {
     if ("doc" === name) {
       this.docCollapsed = !this.docCollapsed;
-      if (!this.docCollapsed) this.chartsCollapsed = true;
+      if (!this.docCollapsed) {
+        this.chartsCollapsed = true;
+        this.settingsCollapsed = true;
+      }
     } else if ("charts" === name) {
       this.chartsCollapsed = !this.chartsCollapsed;
-      if (!this.chartsCollapsed) this.docCollapsed = true;
+      if (!this.chartsCollapsed) {
+        this.docCollapsed = true;
+        this.settingsCollapsed = true;
+      }
+    } else if ("settings" === name) {
+      this.settingsCollapsed = !this.settingsCollapsed;
+      if (!this.settingsCollapsed) {
+        this.docCollapsed = true;
+        this.chartsCollapsed = true;
+      }
     }
   }
 

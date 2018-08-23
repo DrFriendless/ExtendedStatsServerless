@@ -3,6 +3,7 @@
   <div class="extstats-doc">
     <button type="button" class="btn table-button" (click)="toggle('doc')">Documentation</button>
     <button type="button" class="btn table-button" (click)="toggle('charts')">Charts</button>
+    <button type="button" class="btn table-button svg-button" (click)="toggle('settings')"><img src="/img/settings.svg"></button>
 
     <div id="favouritesTableCharts" [ngbCollapse]="chartsCollapsed">
       <button type="button" class="btn chart-button" *ngFor="let chart of chartSet.charts" [extstatsChart]="chart" [chartData]="data" [chartPane]="chartPane"></button>
@@ -11,6 +12,8 @@
     <extstats-chartpane #chartPane></extstats-chartpane>
 
     <extstats-documentation id="favouritesTableDoc" [collapsed]="docCollapsed" [content]="doc"></extstats-documentation>
+
+    <div id="favouritesTableSettings" [ngbCollapse]="settingsCollapsed"></div>
   </div>
 
   <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'fhm'" [mfSortOrder]="'desc'">

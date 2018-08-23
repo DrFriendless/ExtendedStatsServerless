@@ -23,8 +23,13 @@
 }
 
 .table-button {
-  border: solid 1px #fd9727;
+  border: solid 2px #fd9727;
   margin: 4px;
+  height: 32px;
+}
+.table-button.svg-button {
+  padding: 4px;
+  width: 32px;
 }
 .favourites-table div.extstats-doc li.nav-item a.nav-link.active {
   color: #fd9727;
@@ -39,6 +44,7 @@
 }
 
 .chart-button {
-  border: solid 1px #617d8a;
+  border: solid 2px #617d8a;
   margin: 4px;
+  height: 32px;
 }
