@@ -8,11 +8,17 @@ import {NgbModule} from "@ng-bootstrap/ng-bootstrap";
 import { TooltipModule } from 'ngx-bootstrap/tooltip';
 import {ExtstatsAngularModule} from "extstats-angular";
 import { ExtstatsDocumentationComponent } from './extstats-documentation/extstats-documentation.component';
+import { TableConfigComponent } from './table-config/table-config.component';
+import { ButtonGroupComponent } from './button-group/button-group.component';
+import { ButtonGroupButtonDirective } from './button-group-button.directive';
 
 @NgModule({
   declarations: [
     FavouritesComponent,
     ExtstatsDocumentationComponent,
+    TableConfigComponent,
+    ButtonGroupComponent,
+    ButtonGroupButtonDirective,
   ],
   imports: [
     BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule

@@ -1,19 +1,23 @@
 <div class="favourites-table" *ngIf="!!rows">
 
   <div class="extstats-doc">
-    <button type="button" class="btn table-button" (click)="toggle('doc')">Documentation</button>
-    <button type="button" class="btn table-button" (click)="toggle('charts')">Charts</button>
-    <button type="button" class="btn table-button svg-button" (click)="toggle('settings')"><img src="/img/settings.svg"></button>
+    <extstats-button-group #buttongroup>
+      <button type="button" class="btn table-button" [extstatsButtonGroup]="buttongroup" selector="doc">Documentation</button>
+      <button type="button" class="btn table-button" [extstatsButtonGroup]="buttongroup" selector="charts">Charts</button>
+      <button type="button" class="btn table-button svg-button" [extstatsButtonGroup]="buttongroup" selector="settings">
+        <img src="/img/settings.svg">
+      </button>
+    </extstats-button-group>
 
-    <div id="favouritesTableCharts" [ngbCollapse]="chartsCollapsed">
+    <div id="favouritesTableCharts" *ngIf="buttongroup.selected === 'charts'">
       <button type="button" class="btn chart-button" *ngFor="let chart of chartSet.charts" [extstatsChart]="chart" [chartData]="data" [chartPane]="chartPane"></button>
     </div>
 
     <extstats-chartpane #chartPane></extstats-chartpane>
 
-    <extstats-documentation id="favouritesTableDoc" [collapsed]="docCollapsed" [content]="doc"></extstats-documentation>
+    <extstats-documentation id="favouritesTableDoc" *ngIf="buttongroup.selected === 'doc'" [content]="doc"></extstats-documentation>
 
-    <div id="favouritesTableSettings" [ngbCollapse]="settingsCollapsed"></div>
+    <div id="favouritesTableSettings" *ngIf="buttongroup.selected === 'settings'"></div>
   </div>
 
   <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'fhm'" [mfSortOrder]="'desc'">
