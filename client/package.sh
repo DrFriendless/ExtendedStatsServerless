@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 mkdir -p static
+cp -R img static
 cp src/*.txt static
 cp src/*.css static
 for F in src/*.mustache
