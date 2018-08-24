@@ -146,7 +146,7 @@ export async function listWarTable(): Promise<WarTableRow[]> {
 
 export async function getWarTableRow(geekId: number): Promise<WarTableRow> {
     const sql = "select * from war_table where geek = ?";
-    return asyncReturnWithConnection(conn => conn.query(sql, [geekId]));
+    return asyncReturnWithConnection(async conn => (await conn.query(sql, [geekId]))[0]);
 }
 
 export async function listUsers(): Promise<string[]> {

@@ -21,8 +21,7 @@ export class GeekWidget implements AfterViewInit, OnDestroy {
     const options = {
       headers: new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ")
     };
-    const body = {};
-    this.loadData$ = this.http.post("https://api.drfriendless.com/v1/summary?geek=" + encodeURIComponent(this.geek), body, options);
+    this.loadData$ = this.http.get("https://api.drfriendless.com/v1/summary?geek=" + encodeURIComponent(this.geek), options);
     this.subscription = this.loadData$.subscribe(result => {
       this.data = result;
       console.log(this.data);
