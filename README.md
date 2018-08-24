@@ -42,7 +42,7 @@ This is http://api.drfriendless.com.
 
 The Client stack is JavaScript and HTML components hosted on S3.
 The JavaScript is currently Angular components, as that's what I know, but other technologies could be used.
-This is http://extstats.drfriendless.com.
+This is https://extstats.drfriendless.com.
 
 ## WWW
 
