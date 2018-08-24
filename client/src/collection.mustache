@@ -15,10 +15,18 @@
 </head>
 
 <body>
+{{> windowhack}}
 {{> gtmbody}}
-{{> navbar}}
-<h1>Extended Stats User Collection</h1>
-<user-collection></user-collection>
+
+<main role="main">
+    <div class="container">
+        {{> navbar}}
+        {{> loginButton }}
+        <h1>Your Collection</h1>
+
+        <user-collection></user-collection>
+    </div>
+</main>
 </body>
 
 {{> infrastructure}}

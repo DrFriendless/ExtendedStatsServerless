@@ -13,15 +13,22 @@
 </head>
 
 <body>
+{{> windowhack}}
 {{> gtmbody}}
-{{> navbar}}
-<h1>The War Table</h1>
 
-<war-table></war-table>
+<main role="main">
+    <div class="container">
+        {{> navbar}}
+        {{> loginButton }}
+        <h1>The War Table</h1>
 
+        <war-table></war-table>
+    </div>
+</main>
+</body>
+
+{{> infrastructure}}
 <script src="warTable/runtime.js" type="text/javascript"></script>
 <script src="warTable/polyfills.js" type="text/javascript"></script>
 <script src="warTable/main.js" type="text/javascript"></script>
-</body>
-
 </html>
