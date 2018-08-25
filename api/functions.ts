@@ -4,7 +4,7 @@ import {
     gatherSystemStats,
     listUsers,
     listWarTable,
-    rankGames
+    rankGames, updateFAQCount
 } from "./mysql-rds";
 import {asyncReturnWithConnection} from "./library";
 import {GeekGameQuery} from "extstats-core";
@@ -12,6 +12,15 @@ import {GeekGameQuery} from "extstats-core";
 export async function getGeekSummary(event, context, callback: Callback) {
     try {
         callback(null, await gatherGeekSummary(event["query"]["geek"]));
+    } catch (err) {
+        console.log(err);
+        callback(err);
+    }
+}
+
+export async function incFAQCount(event, context, callback: Callback) {
+    try {
+        callback(null, await updateFAQCount(event.body as number[]));
     } catch (err) {
         console.log(err);
         callback(err);

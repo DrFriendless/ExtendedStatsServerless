@@ -2,7 +2,8 @@ import mysql = require('promise-mysql');
 import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
 import {selectGames} from "./selector";
 import {RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
-    TypeCount, WarTableRow, GeekSummary} from "extstats-core";
+    TypeCount, WarTableRow, GeekSummary, FAQCount} from "extstats-core";
+import * as moment from 'moment';
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return await asyncReturnWithConnection(async conn => await doRankGames(conn, query));
@@ -87,6 +88,78 @@ async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<G
     const geekId = await getGeekId(conn, geek);
     const warTableRow = await getWarTableRow(geekId);
     return { warData: warTableRow };
+}
+
+export async function updateFAQCount(views: number[]): Promise<FAQCount[]> {
+    return await asyncReturnWithConnection(async conn => await doUpdateFAQCount(conn, views));
+}
+
+async function doUpdateFAQCount(conn: mysql.Connection, views: number[]): Promise<FAQCount[]> {
+    console.log(views);
+    const now = moment();
+    const today = now.year() * 10000 + now.month() * 100 + now.date();
+    for (const v of views) {
+        await doIncFAQCount(conn, v, today);
+    }
+    const countEverSql = "select faq_index, sum(count) c from faq_counts group by faq_index order by 1";
+    const countSql = "select faq_index, sum(count) c from faq_counts where date >= ? group by faq_index order by 1";
+    const everRows = await conn.query(countEverSql);
+    const result = [] as FAQCount[];
+    let index = 1;
+    everRows.forEach(row => {
+        while (index < row["faq_index"]) {
+            result.push({ day: 0, week: 0, month: 0, year: 0, ever: 0 });
+            index++;
+        }
+        result.push({ day: 0, week: 0, month: 0, year: 0, ever: row["c"] });
+    });
+    const yearRows = await conn.query(countSql, [today-10000]);
+    patchFAQCount(yearRows, "year", result);
+    const aMonthAgo = now.subtract(1, "month");
+    const aMonthAgoNumber = aMonthAgo.year() * 10000 + aMonthAgo.month() * 100 + aMonthAgo.date();
+    const monthRows = await conn.query(countSql, [aMonthAgoNumber]);
+    patchFAQCount(monthRows, "month", result);
+    const aWeekAgo = now.subtract(1, "week");
+    const aWeekAgoNumber = aWeekAgo.year() * 10000 + aWeekAgo.month() * 100 + aWeekAgo.date();
+    const weekRows = await conn.query(countSql, [aWeekAgoNumber]);
+    patchFAQCount(weekRows, "week", result);
+    const dayRows = await conn.query(countSql, [today]);
+    patchFAQCount(dayRows, "day", result);
+    console.log(result);
+    return result;
+}
+
+function patchFAQCount(rows: object[], key: string, result: FAQCount[]) {
+    for (const row of rows) {
+        const i = row["faq_index"];
+        result[i-1][key] = row["c"];
+    }
+}
+
+// this method is not perfect wrt locking but it doesn't need to be.
+async function doIncFAQCount(conn: mysql.Connection, view: number, today: number) {
+    const findSql = "select * from faq_counts where date = ? and faq_index = ?";
+    const insertSql = "insert into faq_counts (date, faq_index) values (?,?)";
+    const updateSql = "update faq_counts set count = ? where date = ? and faq_index = ?";
+    const todayRows = await conn.query(findSql, [today, view]);
+    console.log(todayRows);
+    let todayRow;
+    if (todayRows.length === 0) {
+        try {
+            conn.query(insertSql, [today, view]);
+        } catch (e) {
+            console.log(e);
+            // assume simultaneous insert, it's not really that important
+        }
+        todayRow = (await conn.query(findSql, [today, view]))[0];
+    } else {
+        todayRow = todayRows[0];
+    }
+    if (todayRow) {
+        const count = todayRow["count"];
+        console.log("cout - " + count);
+        await conn.query(updateSql, [count+1, today, view]);
+    }
 }
 
 async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats> {
