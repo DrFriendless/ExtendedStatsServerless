@@ -17,7 +17,9 @@
 
     <extstats-documentation id="favouritesTableDoc" *ngIf="buttongroup.selected === 'doc'" [content]="doc"></extstats-documentation>
 
-    <div id="favouritesTableSettings" *ngIf="buttongroup.selected === 'settings'"></div>
+    <div id="favouritesTableSettings" *ngIf="buttongroup.selected === 'settings'">
+      <extstats-table-config [table]="this"></extstats-table-config>
+    </div>
   </div>
 
   <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'fhm'" [mfSortOrder]="'desc'">

@@ -1,6 +1,5 @@
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
-
 import {FavouritesComponent} from './app.component';
 import {HttpClientModule} from "@angular/common/http";
 import {DataTableModule} from "extstats-datatable";
@@ -11,6 +10,8 @@ import { ExtstatsDocumentationComponent } from './extstats-documentation/extstat
 import { TableConfigComponent } from './table-config/table-config.component';
 import { ButtonGroupComponent } from './button-group/button-group.component';
 import { ButtonGroupButtonDirective } from './button-group-button.directive';
+import { FormsModule } from '@angular/forms';
+import { NguiAutoCompleteModule } from '@ngui/auto-complete';
 
 @NgModule({
   declarations: [
@@ -21,7 +22,8 @@ import { ButtonGroupButtonDirective } from './button-group-button.directive';
     ButtonGroupButtonDirective,
   ],
   imports: [
-    BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule
+    BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule,
+    NguiAutoCompleteModule, FormsModule
   ],
   providers: [],
   bootstrap: [FavouritesComponent]

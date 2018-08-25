@@ -1,25 +1,27 @@
 import {AfterViewInit, Component, OnDestroy} from '@angular/core';
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
+import {Subject} from "rxjs/internal/Subject";
+import {Observable} from "rxjs/internal/Observable";
+import {flatMap, tap, map} from "rxjs/internal/operators";
 import {CollectionWithPlays, FavouritesRow, fromExtStatsStorage, GeekGameQuery, GameData, GamePlays} from "extstats-core";
 import {ChartSet, ChartDefinition} from "extstats-angular";
 import {DocumentationContent} from "./extstats-documentation/documentation";
+import {ExtstatsTable} from "./table-config/extstats-table";
 
 @Component({
   selector: 'extstats-favourites',
   templateUrl: './app.component.html'
 })
-export class FavouritesComponent implements OnDestroy, AfterViewInit {
+export class FavouritesComponent implements OnDestroy, AfterViewInit, ExtstatsTable {
   private readonly geek: string;
-  private loadData$;
   public data: CollectionWithPlays;
   public rows: FavouritesRow[];
-  private subscription: Subscription;
-  public docCollapsed = true;
-  public chartsCollapsed = true;
-  public settingsCollapsed = true;
+  private readonly subscription: Subscription;
   public chartSet = new ChartSet();
   public doc: DocumentationContent[];
+  private selectors = new Subject<string>();
+  private selector: string = "all(played(ME), rated(ME))";
 
   constructor(private http: HttpClient) {
     this.geek = fromExtStatsStorage(storage => storage.geek);
@@ -57,6 +59,13 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
       "Then if that's less than 1, R!UHM is zero (which penalises games you've played recently), otherwise it's log(FLMR). " +
       "So R!UHM is high for games you've been playing for a long time and still rate highly."]
     }];
+
+    this.subscription = this.selectors.asObservable()
+      .pipe(
+        flatMap(s => this.doQuery(s)),
+        tap(data => console.log(data)),
+        map(data => FavouritesComponent.makeRows(data))
+      ).subscribe(result => this.rows = result);
   }
 
   private static fhmVsYearPublished(data: CollectionWithPlays): object {
@@ -133,48 +142,39 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit {
     return { values };
   }
 
+  public getId(): string {
+    return "favourites";
+  }
+
+  public getSelector(): string {
+    return this.selector;
+  }
+
+  public setSelector(s: string) {
+    this.selector = s;
+    this.selectors.next(s);
+  }
+
   public ngAfterViewInit(): void {
     if (!this.geek) {
       console.log("There is no geek to gather data for.");
       return;
     }
+    this.selectors.next(this.selector);
+  }
+
+  private doQuery(selector: string): Observable<CollectionWithPlays> {
     const options = {
       headers: new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ")
     };
     const body: GeekGameQuery = {
-      query: "all(played(ME), rated(ME))",
+      query: selector,
       geek: this.geek,
+      format: "CollectionWithPlays",
       vars: {}
     };
     console.log(body);
-    this.loadData$ = this.http.post("https://api.drfriendless.com/v1/collectionWithPlays", body, options);
-    this.subscription = this.loadData$.subscribe(result => {
-      this.data = result;
-      console.log(this.data);
-      this.rows = FavouritesComponent.makeRows(this.data);
-    })
-  }
-
-  public toggle(name: string) {
-    if ("doc" === name) {
-      this.docCollapsed = !this.docCollapsed;
-      if (!this.docCollapsed) {
-        this.chartsCollapsed = true;
-        this.settingsCollapsed = true;
-      }
-    } else if ("charts" === name) {
-      this.chartsCollapsed = !this.chartsCollapsed;
-      if (!this.chartsCollapsed) {
-        this.docCollapsed = true;
-        this.settingsCollapsed = true;
-      }
-    } else if ("settings" === name) {
-      this.settingsCollapsed = !this.settingsCollapsed;
-      if (!this.settingsCollapsed) {
-        this.docCollapsed = true;
-        this.chartsCollapsed = true;
-      }
-    }
+    return this.http.post("https://api.drfriendless.com/v1/collectionWithPlays", body, options) as Observable<CollectionWithPlays>;
   }
 
   private static makeRows(data: CollectionWithPlays): FavouritesRow[] {

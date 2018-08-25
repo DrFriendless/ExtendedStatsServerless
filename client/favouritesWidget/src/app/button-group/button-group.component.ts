@@ -19,9 +19,13 @@ export class ButtonGroupComponent implements OnInit {
   }
 
   public clicked(button: ButtonGroupButton) {
-    this.selected = button.getSelector();
-    this.buttons.forEach(b => {
-      if (b != button) b.deselected();
-    })
+    if (button.getSelector() === this.selected) {
+      this.selected = null;
+    } else {
+      this.selected = button.getSelector();
+      this.buttons.forEach(b => {
+        if (b != button) b.deselected();
+      });
+    }
   }
 }
