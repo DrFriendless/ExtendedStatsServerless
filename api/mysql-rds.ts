@@ -95,7 +95,6 @@ export async function updateFAQCount(views: number[]): Promise<FAQCount[]> {
 }
 
 async function doUpdateFAQCount(conn: mysql.Connection, views: number[]): Promise<FAQCount[]> {
-    console.log(views);
     const now = moment();
     const today = now.year() * 10000 + (now.month()+1) * 100 + now.date();
     for (const v of views) {
@@ -126,7 +125,6 @@ async function doUpdateFAQCount(conn: mysql.Connection, views: number[]): Promis
     patchFAQCount(weekRows, "week", result);
     const dayRows = await conn.query(countSql, [today]);
     patchFAQCount(dayRows, "day", result);
-    console.log(result);
     return result;
 }
 
@@ -143,7 +141,6 @@ async function doIncFAQCount(conn: mysql.Connection, view: number, today: number
     const insertSql = "insert into faq_counts (date, faq_index) values (?,?)";
     const updateSql = "update faq_counts set count = ? where date = ? and faq_index = ?";
     const todayRows = await conn.query(findSql, [today, view]);
-    console.log(todayRows);
     let todayRow;
     if (todayRows.length === 0) {
         try {
@@ -158,7 +155,6 @@ async function doIncFAQCount(conn: mysql.Connection, view: number, today: number
     }
     if (todayRow) {
         const count = todayRow["count"];
-        console.log("cout - " + count);
         await conn.query(updateSql, [count+1, today, view]);
     }
 }
