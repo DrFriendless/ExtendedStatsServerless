@@ -51,14 +51,14 @@ function setUserFromLocalStorage() {
 }
 
 function showAndHide() {
-    document.getElementById("user-link").innerHTML = username;
     if (username) {
-        document.getElementById("btn-login").style.display = "none";
-        document.getElementById("extstats-logout").style.display = "block";
+        if (document.getElementById("btn-login")) document.getElementById("btn-login").style.display = "none";
+        if (document.getElementById("extstats-logout")) document.getElementById("extstats-logout").style.display = "block";
     } else {
-        document.getElementById("btn-login").style.display = "block";
-        document.getElementById("extstats-logout").style.display = "none";
+        if (document.getElementById("btn-login")) document.getElementById("btn-login").style.display = "block";
+        if (document.getElementById("extstats-logout")) document.getElementById("extstats-logout").style.display = "none";
     }
+    if (document.getElementById("user-link")) document.getElementById("user-link").innerHTML = username;
 }
 
 lock.on("authenticated", authResult => {

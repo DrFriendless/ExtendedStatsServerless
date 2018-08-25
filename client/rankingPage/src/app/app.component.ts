@@ -18,7 +18,7 @@ export class RankingTableComponent implements OnDestroy, AfterViewInit {
 
   constructor(private http: HttpClient) {}
 
-  public ngAfterViewInit(): void {
+  public ngAfterViewInit() {
     const options = {
       headers: new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ")
     };
@@ -30,7 +30,7 @@ export class RankingTableComponent implements OnDestroy, AfterViewInit {
     })
   }
 
-  public ngOnDestroy(): void {
+  public ngOnDestroy() {
     if (this.subscription) this.subscription.unsubscribe();
   }
 }
