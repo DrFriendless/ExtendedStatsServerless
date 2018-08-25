@@ -21,3 +21,11 @@ export interface SystemStats {
     playsRows: number;
     normalisedPlaysRows: number;
 }
+
+export interface FAQCount {
+    day: number;
+    week: number;
+    month: number;
+    year: number;
+    ever: number;
+}
