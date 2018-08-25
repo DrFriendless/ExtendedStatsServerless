@@ -15,7 +15,8 @@
 
     <extstats-chartpane #chartPane></extstats-chartpane>
 
-    <extstats-documentation id="favouritesTableDoc" *ngIf="buttongroup.selected === 'doc'" [content]="doc"></extstats-documentation>
+    <extstats-documentation id="favouritesTableDoc" *ngIf="buttongroup.selected === 'doc'" [src]="'/json/en/doc/favourites.json'">
+    </extstats-documentation>
 
     <div id="favouritesTableSettings" *ngIf="buttongroup.selected === 'settings'">
       <extstats-table-config [table]="this"></extstats-table-config>

@@ -38,28 +38,6 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit, ExtstatsTa
       "Year Published", "Friendless Happiness Metric",
       FavouritesComponent.fhmVsYearPublished));
 
-    // trying to make the doc component generic
-    this.doc = [{
-      title: "Friendless Happiness Metric",
-      text: ["This metric attempts to assess how much you love this game. It's RATING * 5 + PLAYS + MONTHS PLAYED IN * 4 + HOURS PLAYED."]
-    }, {
-      title: "Huber Happiness Metric",
-      text: ["This metric also attempts to assess how much you love this game. It's (RATING - 4.5) * HOURS PLAYED."]
-    }, {
-      title: "Huber Heat",
-      text: ["The Huber Heat metric attempts to assess how much you love this game right now. It's complicated. " +
-      "Let S be 1 + (PLAYS IN THE LAST YEAR) / (PLAYS EVER). " +
-      "Let LAST YEAR HAPPINESS be (RATING - 4.5) * HOURS PLAYED IN THE LAST YEAR. " +
-      "Then the Huber Heat is S^2 * sqrt(PLAYS IN THE LAST YEAR) * LAST YEAR HAPPINESS."]
-    }, {
-      title: "Randy Cox Not Unhappiness Metric",
-      text: ["The Randy Cox Not Unhappiness Metric attempts to assess not how much you love this game, but how much you don't hate it. " +
-      "Let FL be (days between your first and last plays of it) divided by (days since you last played it). " +
-      "Let FLMR be FL times the number of months you've played it in times your rating. " +
-      "Then if that's less than 1, R!UHM is zero (which penalises games you've played recently), otherwise it's log(FLMR). " +
-      "So R!UHM is high for games you've been playing for a long time and still rate highly."]
-    }];
-
     this.subscription = this.selectors.asObservable()
       .pipe(
         flatMap(s => this.doQuery(s)),
