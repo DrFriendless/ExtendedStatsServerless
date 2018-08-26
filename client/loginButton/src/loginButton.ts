@@ -28,6 +28,7 @@ export function logout() {
     localStorage.removeItem("identity");
     localStorage.removeItem("jwt");
     username = undefined;
+    showAndHide();
 }
 function loadUserData(jwt: string) {
     const xhttp = new XMLHttpRequest();
@@ -66,6 +67,7 @@ lock.on("authenticated", authResult => {
     console.log(authResult);
     localStorage.setItem('accessToken', authResult.accessToken);
     localStorage.setItem('identity', JSON.stringify(authResult.idTokenPayload));
+    localStorage.setItem("jwt", authResult.idToken);
     loadUserData(authResult.idToken);
 });
 
