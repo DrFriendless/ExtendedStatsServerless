@@ -5,10 +5,10 @@ import {HttpClient} from "@angular/common/http";
 
 @Component({
   selector: 'extstats-documentation',
-  templateUrl: './extstats-documentation.component.html',
-  styleUrls: ['./extstats-documentation.component.css']
+  templateUrl: './documentation.component.html',
+  styleUrls: ['./documentation.component.css']
 })
-export class ExtstatsDocumentationComponent implements AfterViewInit {
+export class DocumentationComponent implements AfterViewInit {
   @Input() collapsed: boolean;
   @Input() src: string;
   public content$: Observable<DocumentationContent>;

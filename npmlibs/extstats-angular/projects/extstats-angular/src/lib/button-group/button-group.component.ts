@@ -5,14 +5,9 @@ import {ButtonGroupButton} from "./button-group-interfaces";
   selector: 'extstats-button-group',
   templateUrl: './button-group.component.html'
 })
-export class ButtonGroupComponent implements OnInit {
+export class ButtonGroupComponent {
   public selected: string;
   private buttons: ButtonGroupButton[] = [];
-
-  constructor() { }
-
-  ngOnInit() {
-  }
 
   public register(button: ButtonGroupButton) {
     this.buttons.push(button);
