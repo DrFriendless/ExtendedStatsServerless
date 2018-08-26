@@ -1,6 +1,6 @@
 import {Callback} from 'aws-lambda';
 import {
-    doGetCollection, doGetCollectionWithPlays, gatherGeekSummary,
+    doGetCollection, doGetCollectionWithPlays, doQuery, gatherGeekSummary,
     gatherSystemStats,
     listUsers,
     listWarTable,
@@ -65,6 +65,22 @@ export async function getCollection(event, context, callback: Callback) {
         try {
             const collection = await asyncReturnWithConnection(async conn => await doGetCollection(conn, query));
             callback(null, collection);
+        } catch (err) {
+            console.log(err);
+            callback(err);
+        }
+    } else {
+        callback(null);
+    }
+}
+
+export async function query(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    if (event && event.body) {
+        const query = event.body as GeekGameQuery;
+        try {
+            const result = await asyncReturnWithConnection(async conn => await doQuery(conn, query));
+            callback(null, result);
         } catch (err) {
             console.log(err);
             callback(err);

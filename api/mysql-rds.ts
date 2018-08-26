@@ -46,6 +46,22 @@ export async function doGetCollection(conn: mysql.Connection, query: GeekGameQue
     return { collection: queryResult.geekGames, games, metadata: queryResult.metadata } as Collection;
 }
 
+export async function doQuery(conn: mysql.Connection, query: GeekGameQuery): Promise<object> {
+    const queryResult = await selectGames(conn, query);
+    const geekGames = queryResult.geekGames.map(gg => gg.bggid);
+    const games = await doRetrieveGames(conn, geekGames);
+    switch (query.format) {
+        case "Collection": {
+            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata } as Collection;
+        }
+        case "CollectionWithPlays": {
+            const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
+            const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
+            return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata } as CollectionWithPlays;
+        }
+    }
+}
+
 export async function doGetCollectionWithPlays(conn: mysql.Connection, query: GeekGameQuery): Promise<CollectionWithPlays> {
     const queryResult = await selectGames(conn, query);
     const geekGames = queryResult.geekGames.map(gg => gg.bggid);

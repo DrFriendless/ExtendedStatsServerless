@@ -6,9 +6,10 @@ plugins:
 
 provider:
   name: aws
-  runtime: nodejs6.10
+  runtime: nodejs8.10
   stage: dev
   timeout: 30
+  memorySize: 128
   region: ap-southeast-2
   vpc:
     securityGroupIds:
@@ -109,6 +110,22 @@ functions:
       - http:
           path: collection
           method: get
+          cors: true
+          integration: lambda
+          private: true
+    role:
+        "doStuffFromInsideVPC"
+  query:
+    handler: functions.query
+    environment:
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
+    events:
+      - http:
+          path: query
+          method: post
           cors: true
           integration: lambda
           private: true
