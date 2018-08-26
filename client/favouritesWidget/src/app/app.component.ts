@@ -5,9 +5,7 @@ import {Subject} from "rxjs/internal/Subject";
 import {Observable} from "rxjs/internal/Observable";
 import {flatMap, tap, map} from "rxjs/internal/operators";
 import {CollectionWithPlays, FavouritesRow, fromExtStatsStorage, GeekGameQuery, GameData, GamePlays} from "extstats-core";
-import {ChartSet, ChartDefinition} from "extstats-angular";
-import {DocumentationContent} from "./extstats-documentation/documentation";
-import {ExtstatsTable} from "./table-config/extstats-table";
+import {ChartSet, ChartDefinition, DocumentationContent, ExtstatsTable} from "extstats-angular";
 
 @Component({
   selector: 'extstats-favourites',
@@ -42,6 +40,7 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit, ExtstatsTa
       .pipe(
         flatMap(s => this.doQuery(s)),
         tap(data => console.log(data)),
+        tap(data => this.data = data),
         map(data => FavouritesComponent.makeRows(data))
       ).subscribe(result => this.rows = result);
   }
