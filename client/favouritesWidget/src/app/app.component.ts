@@ -151,7 +151,7 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit, ExtstatsTa
       vars: {}
     };
     console.log(body);
-    return this.http.post("https://api.drfriendless.com/v1/collectionWithPlays", body, options) as Observable<CollectionWithPlays>;
+    return this.http.post("https://api.drfriendless.com/v1/query", body, options) as Observable<CollectionWithPlays>;
   }
 
   private static makeRows(data: CollectionWithPlays): FavouritesRow[] {
