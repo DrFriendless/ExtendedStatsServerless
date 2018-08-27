@@ -59,14 +59,19 @@ export class RatingsByYearGraphComponent implements OnDestroy, AfterViewInit {
       const g = gamesIndex[gg.bggid];
       if (g && gg.rating > 0) {
         if (g.yearPublished >= this.startYear) {
-          let rating = Math.round(gg.rating);
-          if (rating < 1) rating = 1;
-          if (rating > 10) rating = 10;
+          const rating = RatingsByYearGraphComponent.roundRating(gg.rating);
           data[g.yearPublished][rating-1]++;
         }
       }
     });
     this.refreshChart(data);
+  }
+
+  private static roundRating(r: number): number {
+    let rating = Math.round(r);
+    if (rating < 1) rating = 1;
+    if (rating > 10) rating = 10;
+    return rating;
   }
 
   private static makeGamesIndex(games: GameData[]): { [bggid: number]: GameData } {
@@ -76,7 +81,6 @@ export class RatingsByYearGraphComponent implements OnDestroy, AfterViewInit {
   }
 
   private refreshChart(data: { [year: number]: number[] }) {
-    console.log(data);
     const encoding = {
       "x": {
         "field": "x",
@@ -166,7 +170,6 @@ export class RatingsByYearGraphComponent implements OnDestroy, AfterViewInit {
         }
       ]
     };
-    console.log(this.target);
     embed(this.target.nativeElement, spec, { actions: true });
   }
 }
