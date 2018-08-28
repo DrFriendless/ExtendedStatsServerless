@@ -47,8 +47,8 @@ function loadUserData(jwt: string) {
 }
 
 function setUserFromLocalStorage() {
-    const geek = localStorage.getItem("username");
-    if (geek) username = geek;
+    const user = localStorage.getItem("username");
+    if (user) username = user;
 }
 
 function showAndHide() {
