@@ -1,4 +1,4 @@
-<div class="favourites-table" *ngIf="!!rows">
+<div id="favourites-table" class="favourites-table" *ngIf="!!rows">
 
   <div class="extstats-doc">
     <extstats-button-group #buttongroup>
@@ -63,7 +63,7 @@
     <tfoot>
     <tr>
       <td colspan="4">
-        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]" [mfTable]="warTable"></mfBootstrapPaginator>
+        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]" [mfTable]="favouritesTable"></mfBootstrapPaginator>
       </td>
     </tr>
     </tfoot>
