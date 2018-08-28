@@ -1,6 +1,7 @@
 <div class="rbyr-table">
   <table>
     <tr *ngFor="let row of rows">
+      <td style="border: none; font-size: 12px">{{row.title}}</td>
       <td *ngFor="let col of row" [ngClass]="'rating'+col.rating" title="{{col.tooltip}}" height="16px">&nbsp;</td>
     </tr>
   </table>
@@ -20,8 +21,6 @@
 .rating8 { background: #66ff99 }
 .rating9 { background: #33cc99 }
 .rating10 { background: #00cc00 }
-  .rbyr-table table,
-  .rbyr-table tr,
   .rbyr-table td {
     border: 1px solid black;
   }
