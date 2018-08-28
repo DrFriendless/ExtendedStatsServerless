@@ -1,5 +1,5 @@
 import { Component, OnDestroy, AfterViewInit, Input } from '@angular/core';
-import {Collection} from "extstats-core";
+import {Collection, GameData} from "extstats-core";
 import {Observable} from "rxjs/internal/Observable";
 import {Subscription} from "rxjs/internal/Subscription";
 
@@ -10,6 +10,7 @@ import {Subscription} from "rxjs/internal/Subscription";
 export class FavesByYearTableComponent implements OnDestroy, AfterViewInit {
   @Input('data') data$: Observable<Collection>;
   private subscription: Subscription;
+  public rows: { year: number, games: string[] }[] = [];
 
   constructor() { }
 
@@ -18,9 +19,41 @@ export class FavesByYearTableComponent implements OnDestroy, AfterViewInit {
   }
 
   public ngAfterViewInit() {
-    this.subscription = this.data$.subscribe(this.processData);
+    this.subscription = this.data$.subscribe(collection => this.processData(collection));
   }
 
   private processData(collection: Collection) {
+    const byYear = {} as { [year: number]: string[] };
+    const index = FavesByYearTableComponent.makeGamesIndex(collection.games);
+    for (let gg of collection.collection) {
+      if (gg.rating >= 8) {
+        const game = index[gg.bggid];
+        let games = byYear[game.yearPublished];
+        if (!games) {
+          games = [game.name];
+          byYear[game.yearPublished] = games;
+        } else {
+          games.push(game.name);
+        }
+      }
+    }
+    const years = Object.keys(byYear);
+    years.sort();
+    const result = [];
+    for (let y of years) {
+      result.push({ year: y, games: byYear[y] });
+    }
+    console.log(result);
+    this.rows = result;
+  }
+
+  private join(ss: string[]): string {
+    return ss.join(", ");
+  }
+
+  private static makeGamesIndex(games: GameData[]): { [bggid: number]: GameData } {
+    const result = {};
+    games.forEach(gd => result[gd.bggid] = gd);
+    return result;
   }
 }

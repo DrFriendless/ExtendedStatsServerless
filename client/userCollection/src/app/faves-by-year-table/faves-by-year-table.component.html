@@ -1,3 +1,37 @@
-<p>
-  faves-by-year-table works!
-</p>
+<table class="table table-striped extstats-table fby-table" [mfData]="rows" #favesByYearTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'year'" [mfSortOrder]="'asc'">
+  <thead>
+  <tr>
+    <th><mfDefaultSorter by="year" tooltip="Year These Games Were Published">Year</mfDefaultSorter></th>
+    <th><mfDefaultSorter by="games" tooltip="Games You Rate 8+">Games</mfDefaultSorter></th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr *ngFor="let row of rows">
+    <td>{{row.year}}</td>
+    <td class="games">{{join(row.games)}}</td>
+  </tr>
+  </tbody>
+  <tfoot>
+  <tr>
+    <td colspan="4">
+      <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]" [mfTable]="favesByYearTable"></mfBootstrapPaginator>
+    </td>
+  </tr>
+  </tfoot>
+</table>
+
+<style>
+  .fby-table {
+    width: 100%;
+  }
+  .fby-table td {
+    border: 1px solid black;
+  }
+  table.fby-table {
+    border-collapse: collapse;
+  }
+  table.fby-table td.games {
+    text-align: left;
+    padding: 0 4px;
+  }
+</style>

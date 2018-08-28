@@ -2,7 +2,7 @@
   <table>
     <tr *ngFor="let row of rows">
       <td style="border: none; font-size: 12px">{{row.title}}</td>
-      <td *ngFor="let col of row" [ngClass]="'rating'+col.rating" title="{{col.tooltip}}" height="16px">&nbsp;</td>
+      <td *ngFor="let col of row" [ngClass]="'rating'+col.rating" title="{{col.tooltip}}" height="12px">&nbsp;</td>
     </tr>
   </table>
 </div>

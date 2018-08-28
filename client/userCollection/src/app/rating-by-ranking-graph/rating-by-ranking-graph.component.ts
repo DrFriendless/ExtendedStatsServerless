@@ -53,7 +53,6 @@ export class RatingByRankingGraphComponent implements OnDestroy, AfterViewInit {
       }
     });
     this.rows = result;
-    console.log(this.rows);
   }
 
   private static roundRating(r: number): number {
