@@ -131,11 +131,11 @@ async function doUpdateFAQCount(conn: mysql.Connection, views: number[]): Promis
     });
     const yearRows = await conn.query(countSql, [today-10000]);
     patchFAQCount(yearRows, "year", result);
-    const aMonthAgo = now.subtract(1, "month");
+    const aMonthAgo = moment().subtract(1, "month");
     const aMonthAgoNumber = aMonthAgo.year() * 10000 + (aMonthAgo.month()+1) * 100 + aMonthAgo.date();
     const monthRows = await conn.query(countSql, [aMonthAgoNumber]);
     patchFAQCount(monthRows, "month", result);
-    const aWeekAgo = now.subtract(1, "week");
+    const aWeekAgo = moment().subtract(1, "week");
     const aWeekAgoNumber = aWeekAgo.year() * 10000 + (aWeekAgo.month()+1) * 100 + aWeekAgo.date();
     const weekRows = await conn.query(countSql, [aWeekAgoNumber]);
     patchFAQCount(weekRows, "week", result);
