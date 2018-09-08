@@ -8,12 +8,16 @@ function getQueryVariable(variable: string): string | undefined {
         const pair = vars[i].split("=");
         console.log(pair);
         if (pair[0] == variable) {
-            return pair[1];
+            return decodeURIComponent(pair[1]);
         }
     }
     return undefined;
 }
 
 const geek = getQueryVariable("geek");
-console.log("geek = " + geek);
-if (geek) withExtStatsStorage(storage => storage.geek = geek);
+if (geek) {
+    console.log("geek = " + geek);
+    withExtStatsStorage(storage => storage.geek = geek);
+}
+
+
