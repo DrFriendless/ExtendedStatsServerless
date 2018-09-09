@@ -80,6 +80,7 @@ functions:
         "doStuffFromInsideVPC"
   processCollectionCleanup:
     handler: functions.processCollectionCleanup
+    timeout: 60
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
