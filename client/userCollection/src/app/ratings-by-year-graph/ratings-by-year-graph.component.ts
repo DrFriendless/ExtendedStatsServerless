@@ -1,12 +1,7 @@
 import { Component, OnDestroy, AfterViewInit, Input, ViewChild, ElementRef } from '@angular/core';
-import {Collection, GameData} from "extstats-core";
+import {Collection, GameData, roundRating, makeGamesIndex } from "extstats-core";
 import {Observable} from "rxjs/internal/Observable";
 import {Subscription} from "rxjs/internal/Subscription";
-
-// this is only way I could find to import the vega stuff
-// declare module 'vega-embed' {
-//   export default function embed(e: any, spec: any, ops: any): Promise<any>;
-// }
 import {VisualizationSpec, vega} from "vega-embed";
 import embed from "vega-embed";
 
@@ -43,65 +38,40 @@ export class RatingsByYearGraphComponent implements OnDestroy, AfterViewInit {
     this.subscription = this.data$.subscribe(data => this.processData(data));
   }
 
-  private emptyData(): { [year: number]: number[] } {
+  private emptyData(): { [year: number]: { counts: number[], names: string[][] } } {
     const thisYear = (new Date()).getFullYear();
     const result = {};
     for (let y=this.startYear; y<=thisYear; y++) {
-      result[y] = [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+      result[y] = {
+        counts: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+        names: [[], [], [], [], [], [], [], [], [], []]
+      };
     }
     return result;
   }
 
   private processData(collection: Collection) {
     const data = this.emptyData();
-    const gamesIndex = RatingsByYearGraphComponent.makeGamesIndex(collection.games);
+    const gamesIndex = makeGamesIndex(collection.games);
     collection.collection.forEach(gg => {
       const g = gamesIndex[gg.bggid];
       if (g && gg.rating > 0) {
         if (g.yearPublished >= this.startYear) {
-          const rating = RatingsByYearGraphComponent.roundRating(gg.rating);
-          data[g.yearPublished][rating-1]++;
+          const rating = roundRating(gg.rating);
+          data[g.yearPublished].counts[rating-1]++;
+          data[g.yearPublished].names[rating-1].push(g.name);
         }
       }
     });
     this.refreshChart(data);
   }
 
-  private static roundRating(r: number): number {
-    let rating = Math.round(r);
-    if (rating < 1) rating = 1;
-    if (rating > 10) rating = 10;
-    return rating;
-  }
-
-  private static makeGamesIndex(games: GameData[]): { [bggid: number]: GameData } {
-    const result = {};
-    games.forEach(gd => result[gd.bggid] = gd);
-    return result;
-  }
-
-  private refreshChart(data: { [year: number]: number[] }) {
-    const encoding = {
-      "x": {
-        "field": "x",
-        "type": "quantitative",
-        "axis": {
-          "title": "Published Year"
-        }
-      },
-      "y": {
-        "field": "y",
-        "type": "quantitative",
-        "axis": {
-          "title": "Rating"
-        }
-      }
-    };
+  private refreshChart(data: { [year: number]: { counts: number[], names: string[][] } }) {
     const chartData = [];
     for (let year in data) {
       for (let i=1; i<=10; i++) {
-        const count = data[year][i-1];
-        chartData.push({x: year, y: count, c: i, t: i.toString() });
+        const count = data[year].counts[i-1];
+        chartData.push({x: year, y: count, c: i, t: data[year].names[i-1].join(", ") });
       }
     }
     const spec: VisualizationSpec = {
@@ -158,7 +128,7 @@ export class RatingsByYearGraphComponent implements OnDestroy, AfterViewInit {
               "y": {"scale": "y", "field": "y0"},
               "y2": {"scale": "y", "field": "y1"},
               "fill": {"scale": "color", "field": "c"},
-              // "tooltip": {"field": "t", "type": "quantitative"}
+              "tooltip": {"field": "t", "type": "quantitative"}
             },
             "update": {
               "fillOpacity": {"value": 1}

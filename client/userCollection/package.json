@@ -31,7 +31,7 @@
     "concurrently": "^4.0.0",
     "core-js": "^2.5.4",
     "extstats-angular": "^0.2.2",
-    "extstats-core": "^0.4.0",
+    "extstats-core": "^0.5.0",
     "extstats-datatable": "^0.8.0",
     "jest": "^23.5.0",
     "jest-canvas-mock": "^1.1.0",
