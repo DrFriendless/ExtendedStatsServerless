@@ -36,11 +36,13 @@ export class OwnedByPublishedYearComponent implements AfterViewInit, OnDestroy {
     this.subscription = this.data$.subscribe(collection => this.processData(collection));
   }
 
-  private emptyData(): { [year: number]: number[] } {
+  private emptyData(): { [year: number]: { counts: number[], names: string[][] } } {
     const thisYear = (new Date()).getFullYear();
     const result = {};
     for (let y=this.startYear; y<=thisYear; y++) {
-      result[y] = [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
+      result[y] = {
+        counts: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+        names: [ [], [], [], [], [], [], [], [], [], [], [] ] };
     }
     return result;
   }
@@ -60,19 +62,21 @@ export class OwnedByPublishedYearComponent implements AfterViewInit, OnDestroy {
       if (g) {
         if (g.yearPublished >= this.startYear) {
           const rating = OwnedByPublishedYearComponent.roundRatingOrZero(gg.rating);
-          data[g.yearPublished][rating]++;
+          data[g.yearPublished].counts[rating]++;
+          data[g.yearPublished].names[rating].push(g.name);
         }
       }
     });
     this.refreshChart(data);
   }
 
-  private refreshChart(data: { [year: number]: number[] }) {
+  private refreshChart(data: { [year: number]: { counts: number[], names: string[][] } }) {
     const chartData = [];
     for (let year in data) {
       for (let i=1; i<=10; i++) {
-        const count = data[year][i-1];
-        chartData.push({x: year, y: count, c: i, t: i.toString() });
+        const count = data[year].counts[i-1];
+        const names = data[year].names[i-1];
+        chartData.push({x: year, y: count, c: i, t: names.join(", ") });
       }
     }
     const spec: VisualizationSpec = {
@@ -129,7 +133,9 @@ export class OwnedByPublishedYearComponent implements AfterViewInit, OnDestroy {
               "y": {"scale": "y", "field": "y0"},
               "y2": {"scale": "y", "field": "y1"},
               "fill": {"scale": "color", "field": "c"},
-              // "tooltip": {"field": "t", "type": "quantitative"}
+              "stroke": { "value": "black" },
+              "strokeWidth": { "value": 1 },
+              "tooltip": {"field": "t", "type": "quantitative"}
             },
             "update": {
               "fillOpacity": {"value": 1}
