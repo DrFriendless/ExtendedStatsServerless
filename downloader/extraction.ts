@@ -14,43 +14,48 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
         console.log("BGG says come back later");
         throw new Error("BGG says come back later to get collection for " + geek);
     }
-    if (!dom || !dom.items || !dom.items.item || dom.items.item.length == 0) {
-        console.log("Found no games in collection");
+    if (!dom || !dom.items) {
+        console.log("Found incorrect DOM");
         throw new Error("Found no games in collection for " + geek);
     }
+    if (!dom.items.item || dom.items.item.length === 0) {
+        console.log("Found no games in collection");
+    }
     const items: CollectionGame[] = [];
-    dom.items.item.forEach(item => {
-        if (item.$.subtype != 'boardgame') {
-            console.log(item.$.subtype + " not a board game");
-        } else {
-            const gameId = item.$.objectid;
-            // const name = item.name[0]._;
-            const stats = item.stats[0];
-            const status = item.status[0];
-            const gameItem = { gameId: gameId } as CollectionGame;
-            if (stats) {
-                const rating = stats.rating;
-                if (rating && rating.length > 0) {
-                    gameItem.rating = parseFloat(rating[0].$.value);
-                } else {
-                    gameItem.rating = -1;
+    if (dom.items.item) {
+        dom.items.item.forEach(item => {
+            if (item.$.subtype != 'boardgame') {
+                console.log(item.$.subtype + " not a board game");
+            } else {
+                const gameId = item.$.objectid;
+                // const name = item.name[0]._;
+                const stats = item.stats[0];
+                const status = item.status[0];
+                const gameItem = {gameId: gameId} as CollectionGame;
+                if (stats) {
+                    const rating = stats.rating;
+                    if (rating && rating.length > 0) {
+                        gameItem.rating = parseFloat(rating[0].$.value);
+                    } else {
+                        gameItem.rating = -1;
+                    }
+                    if (gameItem.rating == null || Number.isNaN(gameItem.rating)) gameItem.rating = -1;
                 }
-                if (gameItem.rating == null || Number.isNaN(gameItem.rating)) gameItem.rating = -1;
+                if (status) {
+                    gameItem.owned = status.$.own === '1';
+                    gameItem.prevOwned = status.$.prevowned === '1';
+                    gameItem.forTrade = status.$.fortrade === '1';
+                    gameItem.want = status.$.want === '1';
+                    gameItem.wantToPlay = status.$.wanttoplay === '1';
+                    gameItem.wantToBuy = status.$.wanttobuy;
+                    const onWishList = status.$.wishlist === '1';
+                    gameItem.wishListPriority = onWishList ? parseInt(status.$.wishlist) : 0;
+                    gameItem.preordered = status.$.preordered === '1';
+                }
+                items.push(gameItem);
             }
-            if (status) {
-                gameItem.owned = status.$.own === '1';
-                gameItem.prevOwned = status.$.prevowned === '1';
-                gameItem.forTrade = status.$.fortrade === '1';
-                gameItem.want = status.$.want === '1';
-                gameItem.wantToPlay = status.$.wanttoplay === '1';
-                gameItem.wantToBuy = status.$.wanttobuy;
-                const onWishList =  status.$.wishlist === '1';
-                gameItem.wishListPriority = onWishList ? parseInt(status.$.wishlist) : 0;
-                gameItem.preordered = status.$.preordered === '1';
-            }
-            items.push(gameItem);
-        }
-    });
+        });
+    }
     return { geek: geek, items: items };
 }
 
