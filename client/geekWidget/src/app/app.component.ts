@@ -11,7 +11,7 @@ export class GeekWidget implements AfterViewInit, OnDestroy {
   private loadData$;
   public data: GeekSummary;
   private subscription: Subscription;
-  private geek: string;
+  public geek: string;
 
   public constructor(private http: HttpClient) {
   }
@@ -23,8 +23,12 @@ export class GeekWidget implements AfterViewInit, OnDestroy {
     };
     this.loadData$ = this.http.get("https://api.drfriendless.com/v1/summary?geek=" + encodeURIComponent(this.geek), options);
     this.subscription = this.loadData$.subscribe(result => {
-      this.data = result;
-      console.log(this.data);
+      console.log(result);
+      if (result.warData) {
+        this.data = result;
+      } else {
+        this.data = undefined;
+      }
     });
   }
 

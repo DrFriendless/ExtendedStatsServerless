@@ -1,11 +1,18 @@
 <div class="geekWidget">
-  <a href="/favourites.html"><favourites-panel [geekData]="data"></favourites-panel></a>
+  <a href="/favourites.html" *ngIf="!!data"><favourites-panel [geekData]="data"></favourites-panel></a>
 
-  <a href="/plays.html"><plays-panel [geekData]="data"></plays-panel></a>
+  <a href="/plays.html" *ngIf="!!data"><plays-panel [geekData]="data"></plays-panel></a>
 
-  <a href="/detailedplays.html"><detailed-plays-panel [geekData]="data"></detailed-plays-panel></a>
+  <a href="/detailedplays.html" *ngIf="!!data"><detailed-plays-panel [geekData]="data"></detailed-plays-panel></a>
 
-  <a href="/collection.html"><collection-panel [geekData]="data"></collection-panel></a>
+  <a href="/collection.html" *ngIf="!!data"><collection-panel [geekData]="data"></collection-panel></a>
 
-  <a href="/yearly.html"><yearly-panel [geekData]="data"></yearly-panel></a>
+  <a href="/yearly.html" *ngIf="!!data"><yearly-panel [geekData]="data"></yearly-panel></a>
+
+  <p *ngIf="!data">
+    Geek {{geek}} doesn't seem to be in Extended Stats. Please take a look at <a href="https://pastebin.com/REGME8sF">this list</a>
+    which is everybody who has been added. If you're on that list, you should appear within a couple of hours. If you don't, please let
+    DrFriendless know as something must be broken. If you're not on that list, either DrFriendless hasn't got around to adding you
+    (it can take up to about a week), or you should send a message to Friendless on boardgamegeek and ask to be added.
+  </p>
 </div>
