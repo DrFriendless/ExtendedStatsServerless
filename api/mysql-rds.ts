@@ -103,6 +103,9 @@ export async function gatherGeekSummary(geek: string): Promise<GeekSummary> {
 async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary> {
     const geekId = await getGeekId(conn, geek);
     const warTableRow = await getWarTableRow(geekId);
+    if (!warTableRow) {
+        return { warData: undefined, geekId, error: "No row was found in the war table for " + geek } as GeekSummary;
+    }
     return { warData: warTableRow };
 }
 
