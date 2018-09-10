@@ -20,7 +20,7 @@ export class User {
         this.firstLogin = firstLogin;
     }
 
-    public getUsername(): string {
+    public getUsername(): string | undefined {
         return this.username;
     }
 

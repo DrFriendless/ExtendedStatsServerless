@@ -59,6 +59,9 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery): Pro
             const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
             return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata } as CollectionWithPlays;
         }
+        default: {
+            return {};
+        }
     }
 }
 
@@ -101,12 +104,16 @@ export async function gatherGeekSummary(geek: string): Promise<GeekSummary> {
 }
 
 async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary> {
+    const ratedSql = "select count(*) c, avg(rating) avg from geekgames where geekId = ? and rating > 0";
     const geekId = await getGeekId(conn, geek);
     const warTableRow = await getWarTableRow(geekId);
+    const result = (await conn.query(ratedSql, [geekId]))[0];
+    const rated = result["c"];
+    const average = result["avg"];
     if (!warTableRow) {
-        return { warData: undefined, geekId, error: "No row was found in the war table for " + geek } as GeekSummary;
+        return { warData: undefined, geekId, error: "No row was found in the war table for " + geek, rated, average } as GeekSummary;
     }
-    return { warData: warTableRow };
+    return { warData: warTableRow, rated, average };
 }
 
 export async function updateFAQCount(views: number[]): Promise<FAQCount[]> {

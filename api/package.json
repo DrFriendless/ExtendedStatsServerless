@@ -8,7 +8,7 @@
     "aws-lambda": "^0.1.2",
     "aws-lambda-typescript": "3.0.0",
     "aws-sdk": "^2.302.0",
-    "extstats-core": "^0.4.0",
+    "extstats-core": "^0.6.0",
     "graphql": "^0.12.3",
     "graphql-tag": "^2.7.3",
     "jsonwebtoken": "^8.3.0",
@@ -16,10 +16,11 @@
     "moment": "^2.22.2",
     "moo": "^0.4.3",
     "mysql": "^2.16.0",
-    "promise-mysql": "^3.3.1",
-    "serverless": "^1.30.1"
+    "promise-mysql": "^3.3.1"
   },
   "devDependencies": {
+    "gulp": "^3.9.1",
+    "serverless": "^1.30.1",
     "@types/node": "^8.10.28",
     "serverless-domain-manager": "^2.6.0",
     "serverless-plugin-typescript": "^1.1.5"
