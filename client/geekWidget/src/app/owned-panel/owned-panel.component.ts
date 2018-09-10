@@ -3,11 +3,10 @@ import { GeekSummary } from "extstats-core";
 import { Observer } from "rxjs";
 
 @Component({
-  selector: 'collection-panel',
-  templateUrl: './collection-panel.component.html',
-  styleUrls: ['./collection-panel.component.css']
+  selector: 'owned-panel',
+  templateUrl: './owned-panel.component.html',
+  styleUrls: ['./owned-panel.component.css']
 })
-export class CollectionPanelComponent {
+export class OwnedPanelComponent {
   @Input('geekData') data: GeekSummary;
 }
-

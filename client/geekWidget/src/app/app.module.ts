@@ -7,6 +7,7 @@ import { PlaysPanelComponent } from './plays-panel/plays-panel.component';
 import { DetailedPlaysPanelComponent } from './detailed-plays-panel/detailed-plays-panel.component';
 import { YearlyPanelComponent } from './yearly-panel/yearly-panel.component';
 import { CollectionPanelComponent } from './collection-panel/collection-panel.component';
+import { OwnedPanelComponent } from './owned-panel/owned-panel.component';
 
 @NgModule({
   declarations: [
@@ -15,7 +16,8 @@ import { CollectionPanelComponent } from './collection-panel/collection-panel.co
     PlaysPanelComponent,
     DetailedPlaysPanelComponent,
     YearlyPanelComponent,
-    CollectionPanelComponent
+    CollectionPanelComponent,
+    OwnedPanelComponent
   ],
   imports: [
     BrowserModule, HttpClientModule

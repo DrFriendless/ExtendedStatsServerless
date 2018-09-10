@@ -1,11 +1,13 @@
 <div class="geekWidget">
+  <a href="/collection.html" *ngIf="!!data"><collection-panel [geekData]="data"></collection-panel></a>
+
+  <a href="/owned.html" *ngIf="!!data"><owned-panel [geekData]="data"></owned-panel></a>
+
   <a href="/favourites.html" *ngIf="!!data"><favourites-panel [geekData]="data"></favourites-panel></a>
 
   <a href="/plays.html" *ngIf="!!data"><plays-panel [geekData]="data"></plays-panel></a>
 
   <a href="/detailedplays.html" *ngIf="!!data"><detailed-plays-panel [geekData]="data"></detailed-plays-panel></a>
-
-  <a href="/collection.html" *ngIf="!!data"><collection-panel [geekData]="data"></collection-panel></a>
 
   <a href="/yearly.html" *ngIf="!!data"><yearly-panel [geekData]="data"></yearly-panel></a>
 
