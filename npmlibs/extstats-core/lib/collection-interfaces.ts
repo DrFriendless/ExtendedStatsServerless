@@ -120,4 +120,6 @@ export interface CollectionWithPlays {
 
 export interface GeekSummary {
     warData: WarTableRow;
+    rated: number;
+    average: number;
 }
