@@ -81,6 +81,7 @@ export class OwnedByPublishedYearComponent implements AfterViewInit, OnDestroy {
     }
     const spec: VisualizationSpec = {
       "$schema": "https://vega.github.io/schema/vega/v4.json",
+      "hconcat": [],
       "padding": 5,
       "title": "Ratings By Published Year of Games Owned",
       "width": 600,

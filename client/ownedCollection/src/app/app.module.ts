@@ -8,12 +8,14 @@ import { FormsModule } from '@angular/forms';
 import { UserOwnedComponent } from './app.component';
 import { OwnedByPublishedYearComponent } from './owned-by-published-year/owned-by-published-year.component';
 import { RatingsOfOwnedGamesComponent } from './ratings-of-owned-games/ratings-of-owned-games.component';
+import { BggRatingsOfOwnedGamesComponent } from './bgg-ratings-of-owned-games/bgg-ratings-of-owned-games.component';
 
 @NgModule({
   declarations: [
     UserOwnedComponent,
     OwnedByPublishedYearComponent,
-    RatingsOfOwnedGamesComponent
+    RatingsOfOwnedGamesComponent,
+    BggRatingsOfOwnedGamesComponent
   ],
   imports: [
     BrowserModule, HttpClientModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule, FormsModule

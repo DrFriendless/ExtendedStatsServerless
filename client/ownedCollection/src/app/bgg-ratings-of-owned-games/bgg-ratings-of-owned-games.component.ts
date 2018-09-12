@@ -6,10 +6,10 @@ import {VisualizationSpec, vega} from "vega-embed";
 import embed from "vega-embed";
 
 @Component({
-  selector: 'ratings-owned-charts',
-  templateUrl: './ratings-of-owned-games.component.html'
+  selector: 'bgg-ratings-owned',
+  templateUrl: './bgg-ratings-of-owned-games.component.html'
 })
-export class RatingsOfOwnedGamesComponent implements OnInit, OnDestroy, AfterViewInit {
+export class BggRatingsOfOwnedGamesComponent implements OnInit, OnDestroy, AfterViewInit {
   @Input('data') data$: Observable<Collection>;
   @ViewChild('target') target: ElementRef;
   private subscription: Subscription;
@@ -54,7 +54,7 @@ export class RatingsOfOwnedGamesComponent implements OnInit, OnDestroy, AfterVie
     collection.collection.forEach(gg => {
       const g = gamesIndex[gg.bggid];
       if (g && gg.rating > 0) {
-        const rating = roundRating(gg.rating);
+        const rating = roundRating(g.bggRating);
         data.counts[rating-1]++;
         data.names[rating-1].push(g.name);
       }
@@ -74,7 +74,7 @@ export class RatingsOfOwnedGamesComponent implements OnInit, OnDestroy, AfterVie
       "$schema": "https://vega.github.io/schema/vega/v4.json",
       "hconcat": [],
       "padding": 5,
-      "title": "Your Ratings of Games You Own",
+      "title": "BGG's Ratings of Games You Own",
       "width": 600,
       "height": 600,
       "signals": [
