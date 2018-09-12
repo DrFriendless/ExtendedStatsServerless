@@ -15,7 +15,6 @@ export class RatingsOfOwnedGamesComponent implements OnInit, OnDestroy, AfterVie
   private subscription: Subscription;
   public rows = [];
   private readonly ALDIES_COLOURS = [
-    '#ffffff',
     '#ff0000',
     '#ff3366',
     '#ff6699',

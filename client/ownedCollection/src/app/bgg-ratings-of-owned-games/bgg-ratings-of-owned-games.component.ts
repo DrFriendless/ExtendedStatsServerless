@@ -15,7 +15,6 @@ export class BggRatingsOfOwnedGamesComponent implements OnInit, OnDestroy, After
   private subscription: Subscription;
   public rows = [];
   private readonly ALDIES_COLOURS = [
-    '#ffffff',
     '#ff0000',
     '#ff3366',
     '#ff6699',
@@ -68,7 +67,7 @@ export class BggRatingsOfOwnedGamesComponent implements OnInit, OnDestroy, After
       const count = data.counts[rating-1];
       const names = data.names[rating-1];
       names.sort();
-      chartData.push({rating, count, tooltip: "" + rating + ". " + names.join(", ") });
+      chartData.push({rating: rating+1, count, tooltip: "" + rating + ". " + names.join(", ") });
     }
     const spec: VisualizationSpec = {
       "$schema": "https://vega.github.io/schema/vega/v4.json",
