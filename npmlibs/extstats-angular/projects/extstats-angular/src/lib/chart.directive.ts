@@ -2,12 +2,7 @@ import {CollectionWithPlays} from "extstats-core";
 import {AfterViewInit, Directive, ElementRef, HostListener, Input} from '@angular/core';
 import {ChartDefinition} from "./charts";
 import {ChartPaneComponent} from "./chart-pane/chart-pane.component";
-
-// this is only way I could find to import the vega stuff
-declare module 'vega-embed' {
-  export const config: any;
-  export default function embed(e: any, spec: any, ops: any): Promise<any>;
-}
+import {VisualizationSpec, vega} from "vega-embed";
 import embed from "vega-embed";
 
 @Directive({
@@ -30,7 +25,7 @@ export class ChartDirective implements AfterViewInit {
 
   @HostListener('click') onClick() {
     console.log("should show the chart " + this.definition.getName());
-    const chartData = this.definition.extractData(this.data);
+    const chartData = this.definition.extractData(this.data) as { name: string };
     console.log(chartData);
     const encoding = {
       "x": {
@@ -58,8 +53,8 @@ export class ChartDirective implements AfterViewInit {
         encoding["tooltip"] = {"field": "tooltip", "type": "ordinal"};
       }
     }
-    const spec = {
-      "$schema": "https://vega.github.io/schema/vega-lite/v2.json",
+    const spec: VisualizationSpec = {
+      "$schema": "https://vega.github.io/schema/vega/v4.json",
       "title": this.definition.getName(),
       "autosize": {
         "type": "fit",
@@ -67,7 +62,7 @@ export class ChartDirective implements AfterViewInit {
       },
       "width": 600,
       "height": 600,
-      "data": chartData,
+      "data": [chartData],
       "mark": this.definition.getMark(),
       "encoding": encoding
     };

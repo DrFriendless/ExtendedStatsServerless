@@ -29,3 +29,9 @@ export interface FAQCount {
     year: number;
     ever: number;
 }
+
+export interface NewsItem {
+    id: number;
+    date: string;
+    html: string;
+}

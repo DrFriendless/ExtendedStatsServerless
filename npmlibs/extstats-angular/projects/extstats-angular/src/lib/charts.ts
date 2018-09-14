@@ -2,7 +2,7 @@ import {CollectionWithPlays} from "extstats-core";
 
 export class ChartDefinition {
   constructor(private key: string, private name: string, private mark: string, private xAxisName: string, private yAxisName: string,
-              private extract: (CollectionWithPlays) => object) {
+              private extract: (CollectionWithPlays) => { name: string }) {
   }
 
   public getMark(): string {
@@ -17,7 +17,7 @@ export class ChartDefinition {
     return this.key;
   }
 
-  public extractData(source: CollectionWithPlays): object {
+  public extractData(source: CollectionWithPlays): { name: string } {
     return this.extract(source);
   }
 

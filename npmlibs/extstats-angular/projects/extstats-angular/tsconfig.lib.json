@@ -12,11 +12,12 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "types": [],
-    "allowSyntheticDefaultImports": true, // required for vega-lite
+    "allowSyntheticDefaultImports": true,
     "lib": [
       "dom",
       "es2015"
-    ]
+    ],
+    "strict": false
   },
   "angularCompilerOptions": {
     "annotateForClosureCompiler": true,
