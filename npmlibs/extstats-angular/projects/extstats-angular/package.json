@@ -1,6 +1,6 @@
 {
   "name": "extstats-angular",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Angular component library for ExtendedStatsServerless",
   "author": "John Farrell",
   "license": "ISC",
@@ -9,10 +9,10 @@
   },
   "homepage": "https://github.com/DrFriendless/ExtendedStatsServerless#readme",
   "peerDependencies": {
-    "@angular/common": "^6.1.0",
-    "@angular/core": "^6.1.0",
-    "vega-embed": "^3.18.2",
-    "vega-lite": "^3.0.0-rc3",
+    "@angular/common": "~6.1.3",
+    "@angular/core": "~6.1.3",
+    "vega-embed": "~3.18.2",
+    "vega-lite": "^2.6.0",
     "ngx-bootstrap": "^3.0.1",
     "@ng-bootstrap/ng-bootstrap": "^2.2.2",
     "@ngui/auto-complete": "^2.0.0"
