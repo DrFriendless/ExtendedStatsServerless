@@ -118,6 +118,14 @@ export interface CollectionWithPlays {
     metadata: SelectorMetadataSet;
 }
 
+export interface MonthlyPlays {
+    year: number;
+    month: number;
+    game: number;
+    expansion: boolean;
+    quantity: number;
+}
+
 export interface GeekSummary {
     warData: WarTableRow;
     rated: number;
