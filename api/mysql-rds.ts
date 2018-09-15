@@ -2,10 +2,9 @@ import mysql = require('promise-mysql');
 import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
 import {selectGames} from "./selector";
 import {RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
-    TypeCount, WarTableRow, GeekSummary, FAQCount} from "extstats-core";
+    TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays} from "extstats-core";
 import * as moment from 'moment';
 import {NewsItem} from "../npmlibs/extstats-core/dist";
-import {query} from "./functions";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return await asyncReturnWithConnection(async conn => await doRankGames(conn, query));
@@ -69,6 +68,10 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery): Pro
         default: {
             return {};
         }
+        case "CollectionWithMonthlyPlays": {
+            const plays = (await getMonthlyPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
+            return { collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata } as CollectionWithMonthlyPlays;
+        }
     }
 }
 
@@ -88,6 +91,16 @@ async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePl
     return rows.map(row => {
         return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], firstPlay: row["mi"], lastPlay: row["ma"],
             distinctMonths: row["months"], distinctYears: row["years"]} as GamePlays;
+    });
+}
+
+async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<MonthlyPlays[]> {
+    const playsSql = "select game, sum(quantity) q, year, month, max(expansion_play) x from plays_normalised where geek = ? group by game, year, month";
+    const geekId = await getGeekId(conn, geek);
+    const rows = await conn.query(playsSql, [geekId]);
+    return rows.map(row => {
+        return { game: row["game"], expansion: row["x"] > 0, quantity: row["q"], year: row["year"],
+            month: row["month"]} as MonthlyPlays;
     });
 }
 
