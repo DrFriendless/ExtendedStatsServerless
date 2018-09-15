@@ -4,6 +4,8 @@ import {selectGames} from "./selector";
 import {RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
     TypeCount, WarTableRow, GeekSummary, FAQCount} from "extstats-core";
 import * as moment from 'moment';
+import {NewsItem} from "../npmlibs/extstats-core/dist";
+import {query} from "./functions";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return await asyncReturnWithConnection(async conn => await doRankGames(conn, query));
@@ -44,6 +46,11 @@ export async function doGetCollection(conn: mysql.Connection, query: GeekGameQue
     const queryResult = await selectGames(conn, query);
     const games = await doRetrieveGames(conn, queryResult.geekGames.map(gg => gg.bggid));
     return { collection: queryResult.geekGames, games, metadata: queryResult.metadata } as Collection;
+}
+
+export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {
+    const sql = "select id, published date, message html from news order by published desc limit 10";
+    return (await conn.query(sql)).map(it => it as NewsItem);
 }
 
 export async function doQuery(conn: mysql.Connection, query: GeekGameQuery): Promise<object> {

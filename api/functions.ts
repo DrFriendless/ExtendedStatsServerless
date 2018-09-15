@@ -1,6 +1,6 @@
 import {Callback} from 'aws-lambda';
 import {
-    doGetCollection, doGetCollectionWithPlays, doQuery, gatherGeekSummary,
+    doGetCollection, doGetCollectionWithPlays, doGetNews, doQuery, gatherGeekSummary,
     gatherSystemStats,
     listUsers,
     listWarTable,
@@ -87,6 +87,17 @@ export async function query(event, context, callback: Callback) {
         }
     } else {
         callback(null);
+    }
+}
+
+export async function getNews(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    try {
+        const result = await asyncReturnWithConnection(async conn => await doGetNews(conn));
+        callback(null, result);
+    } catch (err) {
+        console.log(err);
+        callback(err);
     }
 }
 
