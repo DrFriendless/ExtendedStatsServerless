@@ -1,18 +1,15 @@
-import { Component, OnInit, Input, OnDestroy, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, ViewChild, ElementRef } from '@angular/core';
 import { Collection, GameData, makeGamesIndex, roundRating } from "extstats-core";
-import {Observable} from "rxjs/internal/Observable";
-import {Subscription} from "rxjs/internal/Subscription";
 import {VisualizationSpec, vega} from "vega-embed";
 import embed from "vega-embed";
+import {DataViewComponent} from "../data-view-component";
 
 @Component({
   selector: 'bgg-ratings-owned',
   templateUrl: './bgg-ratings-of-owned-games.component.html'
 })
-export class BggRatingsOfOwnedGamesComponent implements OnInit, OnDestroy, AfterViewInit {
-  @Input('data') data$: Observable<Collection>;
+export class BggRatingsOfOwnedGamesComponent extends DataViewComponent<Collection> {
   @ViewChild('target') target: ElementRef;
-  private subscription: Subscription;
   public rows = [];
   private readonly ALDIES_COLOURS = [
     '#ff0000',
@@ -26,20 +23,6 @@ export class BggRatingsOfOwnedGamesComponent implements OnInit, OnDestroy, After
     '#33cc99',
     '#00cc00'];
 
-  constructor() { }
-
-  public ngOnInit() {
-
-  }
-
-  public ngOnDestroy() {
-    if (this.subscription) this.subscription.unsubscribe();
-  }
-
-  public ngAfterViewInit() {
-    this.subscription = this.data$.subscribe(collection => this.processData(collection));
-  }
-
   private emptyData(): { counts: number[], names: string[][] } {
     return {
       counts: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
@@ -47,7 +30,7 @@ export class BggRatingsOfOwnedGamesComponent implements OnInit, OnDestroy, After
     };
   }
 
-  private processData(collection: Collection) {
+  protected processData(collection: Collection) {
     const data = this.emptyData();
     const gamesIndex = makeGamesIndex(collection.games);
     collection.collection.forEach(gg => {

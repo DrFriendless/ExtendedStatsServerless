@@ -1,18 +1,15 @@
-import { Component, Input, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
-import {Observable} from "rxjs/internal/Observable";
-import {Subscription} from "rxjs/internal/Subscription";
+import { Component, ViewChild, ElementRef } from '@angular/core';
 import { Collection, GameData, makeGamesIndex, roundRating } from "extstats-core";
 import {VisualizationSpec, vega} from "vega-embed";
 import embed from "vega-embed";
+import {DataViewComponent} from "../data-view-component";
 
 @Component({
   selector: 'owned-by-year-graph',
   templateUrl: './owned-by-published-year.component.html'
 })
-export class OwnedByPublishedYearComponent implements AfterViewInit, OnDestroy {
-  @Input('data') data$: Observable<Collection>;
+export class OwnedByPublishedYearComponent extends DataViewComponent<Collection> {
   @ViewChild('target') target: ElementRef;
-  private subscription: Subscription;
   public rows = [];
   private startYear = 1995;
   private readonly ALDIES_COLOURS = [
@@ -27,14 +24,6 @@ export class OwnedByPublishedYearComponent implements AfterViewInit, OnDestroy {
     '#66ff99',
     '#33cc99',
     '#00cc00'];
-
-  public ngOnDestroy() {
-    if (this.subscription) this.subscription.unsubscribe();
-  }
-
-  public ngAfterViewInit() {
-    this.subscription = this.data$.subscribe(collection => this.processData(collection));
-  }
 
   private emptyData(): { [year: number]: { counts: number[], names: string[][] } } {
     const thisYear = (new Date()).getFullYear();
@@ -54,7 +43,7 @@ export class OwnedByPublishedYearComponent implements AfterViewInit, OnDestroy {
     return rating;
   }
 
-  private processData(collection: Collection) {
+  protected processData(collection: Collection) {
     const data = this.emptyData();
     const gamesIndex = makeGamesIndex(collection.games);
     collection.collection.forEach(gg => {
