@@ -118,6 +118,13 @@ export interface CollectionWithPlays {
     metadata: SelectorMetadataSet;
 }
 
+export interface CollectionWithMonthlyPlays {
+    collection: GeekGame[];
+    plays: MonthlyPlays[];
+    games: GameData[];
+    metadata: SelectorMetadataSet;
+}
+
 export interface MonthlyPlays {
     year: number;
     month: number;
