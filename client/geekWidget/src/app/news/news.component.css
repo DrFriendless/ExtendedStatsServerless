@@ -1,0 +1,11 @@
+.news table td {
+  border: 1px black solid;
+  padding: 0 4px;
+}
+.news table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.news {
+  clear: both;
+}

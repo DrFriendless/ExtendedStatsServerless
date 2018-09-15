@@ -8,6 +8,7 @@ import { DetailedPlaysPanelComponent } from './detailed-plays-panel/detailed-pla
 import { YearlyPanelComponent } from './yearly-panel/yearly-panel.component';
 import { CollectionPanelComponent } from './collection-panel/collection-panel.component';
 import { OwnedPanelComponent } from './owned-panel/owned-panel.component';
+import { NewsComponent } from './news/news.component';
 
 @NgModule({
   declarations: [
@@ -17,7 +18,8 @@ import { OwnedPanelComponent } from './owned-panel/owned-panel.component';
     DetailedPlaysPanelComponent,
     YearlyPanelComponent,
     CollectionPanelComponent,
-    OwnedPanelComponent
+    OwnedPanelComponent,
+    NewsComponent
   ],
   imports: [
     BrowserModule, HttpClientModule
