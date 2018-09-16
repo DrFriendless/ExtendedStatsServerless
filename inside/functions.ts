@@ -29,7 +29,6 @@ import {
 
 export async function processGameResult(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    console.log(event);
     const data = event as ProcessGameResult;
     try {
         await runProcessGameResult(data);
@@ -98,7 +97,6 @@ export async function getToProcessList(event, context, callback: Callback) {
 export async function processCollectionCleanup(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as CleanUpCollectionResult;
-    console.log(params);
     try {
         await runProcessCollectionCleanup(params.geek, params.items, params.url);
         callback();
@@ -136,7 +134,6 @@ export async function processPlayedMonths(event, context, callback: Callback) {
 export async function processPlaysResult(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as ProcessPlaysResult;
-    console.log(params);
     const conn = await getConnection();
     try {
         await runProcessPlaysResult(params);

@@ -280,7 +280,6 @@ export async function doEnsureUsers(conn: mysql.Connection, users: string[]) {
         await doEnsureUser(conn, user);
     }
     await doDeleteExtraUsers(conn, extraUsers);
-    console.log("All users processed.");
 }
 
 async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) {
@@ -322,6 +321,7 @@ async function doEnsureUser(conn: mysql.Connection, user: string) {
         console.log("added user " + user);
     } catch (e) {
         // user already there
+        return;
     }
     const geekid = await getGeekId(conn, user);
     await doEnsureFileProcessUser(conn, user, geekid);
@@ -344,7 +344,6 @@ async function doUpdateGeekgame(conn: mysql.Connection, geekId: number, game: Co
     await conn.query(deleteSql, [game.gameId, geekId]);
     await conn.query(insertSql, [geekId, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
         game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
-    console.log("Added game " + game.gameId + " for " + geekId);
 }
 
 export async function doEnsureProcessPlaysFiles(conn: mysql.Connection, geek: string, months: MonthPlayed[]) {
@@ -540,7 +539,6 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
 }
 
 export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, expansionData: ExpansionData) {
-    // console.log("normalising plays for " + geekId + " " + month + " " + year);
     const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
     const deleteSql = "delete from plays_normalised where geek = ? and month = ? and year = ?";
     const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values (?, ?, ?, ?, ?, ?, 0)";
@@ -552,11 +550,8 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
     const allPlays = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays as NormalisedPlays[], expansionData))) as WorkingNormalisedPlays[];
     await conn.query(deleteSql, [geekId, month, year]);
     for (let np of allPlays) {
-        console.log(np.game);
         await conn.query(insertBasePlaySql, [np.game, geekId, np.quantity, np.year, np.month, np.date]);
         if (np.expansions.length > 0) {
-            // console.log("has expansioms");
-            // console.log([np.game, geekId, np.quantity, np.year, np.month, np.date]);
             const id = (await conn.query(getIdSql, [np.game, geekId, np.quantity, np.year, np.month, np.date]))[0].id;
             for (let e of np.expansions) {
                 const eparams = [e, geekId, np.quantity, np.year, np.month, np.date, id];
@@ -629,7 +624,6 @@ export async function doProcessPlaysResult(conn: mysql.Connection, data: Process
         if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
     }
     const geekId = await getGeekId(conn, data.geek);
-    console.log("geekId = " + geekId);
     const expansionData = await loadExpansionData(conn);
     const notGames = await doEnsureGames(conn, gameIds);
     await doSetGeekPlaysForMonth(conn, geekId, data.month, data.year, data.plays, notGames);
@@ -646,5 +640,4 @@ export async function doProcessPlaysResult(conn: mysql.Connection, data: Process
         delta = '72:00:00';
     }
     await doMarkUrlProcessedWithUpdate(conn, "processPlays", data.url, delta);
-    console.log("processPlaysResult success");
 }

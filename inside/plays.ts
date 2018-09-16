@@ -108,7 +108,6 @@ function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: Expansi
                     isExpansion: basegamePlay.isExpansion,
                     expansions: _.flatten([expansionPlay.game, expansionPlay.expansions, basegamePlay.expansions])
                 } as WorkingNormalisedPlays;
-                console.log(newPlay);
                 const newPlays = current.filter(p => !Object.is(p, basegamePlay) && !Object.is(p, expansionPlay));
                 newPlays.push(newPlay);
                 if (expansionPlay.quantity > 0) newPlays.push(expansionPlay);
