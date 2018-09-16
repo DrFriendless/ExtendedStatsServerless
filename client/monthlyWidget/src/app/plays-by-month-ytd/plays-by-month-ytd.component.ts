@@ -22,7 +22,8 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
     { field: "newDimes", name: "New Dimes", tooltip: "Games played 10 times this yer due to plays in this month.",
       valueTooltip: (r: Row) => r.newDimeNames.join(", ") },
     { field: "playsYtd", name: "Plays YTD", tooltip: "Total plays so far this year, at the end of the month." },
-    { field: "distinctYtd", name: "Distinct YTD", tooltip: "Total different games so far this year, at the end of the month." }
+    { field: "distinctYtd", name: "Distinct YTD", tooltip: "Total different games so far this year, at the end of the month." },
+    { field: "hindex", name: "H-Index", tooltip: "You had played this many games this many times each at the end of this month." }
   ].map(c => new Column(c));
   public rows: Row[] = [];
 
@@ -46,12 +47,12 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
       const sortOrder = mp.year * 12 + mp.month;
       const row = { month: key, distinct, expansions, plays, sortOrder, newGames: 0, newNickels: 0, newDimes: 0,
         year: mp.year, playsYtd: 0, distinctYtd: 0, january: mp.month === 0, expansionNames: [],
-        gamesPlayedNames: [], newDimeNames: [], newGameNames: [], newNickelNames: [] } as Row;
+        gamesPlayedNames: [], newDimeNames: [], newGameNames: [], newNickelNames: [], hindex: 0 } as Row;
       rows.push(row);
     }
     rows.sort((r1,r2) => r1.sortOrder - r2.sortOrder);
     let currentYear = -1;
-    const playsByGame = {};
+    const playsByGame: { [game: number]: number } = {};
     let playsYtd;
     let distinctYtd;
     const gamesEverPlayed = [];
@@ -94,9 +95,17 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
       });
       row.playsYtd = playsYtd;
       row.distinctYtd = distinctYtd;
+      row.hindex = PlaysByMonthYtdComponent.calcHIndex(Object.values(playsByGame));
     });
     rows.sort((r1,r2) => r2.sortOrder - r1.sortOrder);
     this.rows = rows;
+  }
+
+  private static calcHIndex(values: number[]) {
+    values.sort((a,b) => b-a);
+    let hindex = 0;
+    while (hindex < values.length && values[hindex] > hindex) hindex++;
+    return hindex;
   }
 
   private static makeKey(year: number, month: number): string {
@@ -121,6 +130,7 @@ interface Row {
   newGameNames: string[];
   newNickelNames: string[];
   newDimeNames: string[];
+  hindex: number;
 }
 
 class Column<R extends object> {
