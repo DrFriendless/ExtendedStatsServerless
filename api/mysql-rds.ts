@@ -2,9 +2,8 @@ import mysql = require('promise-mysql');
 import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
 import {selectGames} from "./selector";
 import {RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
-    TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays} from "extstats-core";
+    TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem} from "extstats-core";
 import * as moment from 'moment';
-import {NewsItem} from "../npmlibs/extstats-core/dist";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return await asyncReturnWithConnection(async conn => await doRankGames(conn, query));
@@ -125,15 +124,18 @@ export async function gatherGeekSummary(geek: string): Promise<GeekSummary> {
 
 async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary> {
     const ratedSql = "select count(*) c, avg(rating) avg from geekgames where geekId = ? and rating > 0";
+    const monthsPlayedSql = "select count(*) c from months_played where geek = ?";
     const geekId = await getGeekId(conn, geek);
     const warTableRow = await getWarTableRow(geekId);
     const result = (await conn.query(ratedSql, [geekId]))[0];
     const rated = result["c"];
     const average = result["avg"];
+    const monthsPlayed = (await conn.query(monthsPlayedSql, [geekId]))[0]["c"];
     if (!warTableRow) {
-        return { warData: undefined, geekId, error: "No row was found in the war table for " + geek, rated, average } as GeekSummary;
+        return { warData: undefined, geekId, error: "No row was found in the war table for " + geek, rated, average,
+        monthsPlayed } as GeekSummary;
     }
-    return { warData: warTableRow, rated, average };
+    return { warData: warTableRow, rated, average, monthsPlayed };
 }
 
 export async function updateFAQCount(views: number[]): Promise<FAQCount[]> {
