@@ -137,4 +137,5 @@ export interface GeekSummary {
     warData: WarTableRow;
     rated: number;
     average: number;
+    monthsPlayed: number;
 }
