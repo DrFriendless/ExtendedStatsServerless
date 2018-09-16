@@ -15,7 +15,7 @@ export class UserOwnedComponent extends DataSourceComponent<Collection> {
   }
 
   public getId(): string {
-    return "rated";
+    return "owned";
   }
 
   protected getQueryResultFormat(): string {

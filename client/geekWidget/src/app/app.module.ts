@@ -9,6 +9,7 @@ import { YearlyPanelComponent } from './yearly-panel/yearly-panel.component';
 import { CollectionPanelComponent } from './collection-panel/collection-panel.component';
 import { OwnedPanelComponent } from './owned-panel/owned-panel.component';
 import { NewsComponent } from './news/news.component';
+import { MonthlyPanelComponent } from './monthly-panel/monthly-panel.component';
 
 @NgModule({
   declarations: [
@@ -19,7 +20,8 @@ import { NewsComponent } from './news/news.component';
     YearlyPanelComponent,
     CollectionPanelComponent,
     OwnedPanelComponent,
-    NewsComponent
+    NewsComponent,
+    MonthlyPanelComponent
   ],
   imports: [
     BrowserModule, HttpClientModule
