@@ -1,6 +1,6 @@
 {
   "name": "extstats-angular",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Angular component library for ExtendedStatsServerless",
   "author": "John Farrell",
   "license": "ISC",

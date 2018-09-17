@@ -38,6 +38,7 @@ export abstract class DataSourceComponent<T> implements ExtstatsTable, AfterView
       format: this.getQueryResultFormat(),
       vars: this.getQueryVariables()
     };
+    Object.assign(body, this.getExtra());
     return this.http.post("https://api.drfriendless.com/v1/query", body, options) as Observable<T>;
   }
 
@@ -57,4 +58,8 @@ export abstract class DataSourceComponent<T> implements ExtstatsTable, AfterView
   protected abstract getQueryVariables(): { [key: string]: string };
 
   protected abstract getApiKey(): string;
+
+  protected getExtra(): { [key: string]: any } {
+    return {};
+  }
 }
