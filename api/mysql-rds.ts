@@ -40,47 +40,37 @@ function extractGameData(row: object, expansionData: ExpansionData): GameData {
         weight: row["averageWeight"], yearPublished: row["yearPublished"], isExpansion: expansionData.isExpansion(row["bggid"]) } as GameData;
 }
 
-export async function doGetCollection(conn: mysql.Connection, query: GeekGameQuery): Promise<Collection> {
-    const queryResult = await selectGames(conn, query);
-    const games = await doRetrieveGames(conn, queryResult.geekGames.map(gg => gg.bggid));
-    return { collection: queryResult.geekGames, games, metadata: queryResult.metadata } as Collection;
-}
-
 export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {
     const sql = "select id, published date, message html from news order by published desc limit 10";
     return (await conn.query(sql)).map(it => it as NewsItem);
 }
 
-export async function doQuery(conn: mysql.Connection, query: GeekGameQuery): Promise<object> {
-    const queryResult = await selectGames(conn, query);
+export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
+        Promise<Collection | CollectionWithPlays | CollectionWithMonthlyPlays> {
+    const queryResult = await selectGames(conn, query, query.query);
     const geekGames = queryResult.geekGames.map(gg => gg.bggid);
     const games = await doRetrieveGames(conn, geekGames);
+    let extra;
+    if (query.extra) {
+        extra = (await selectGames(conn, query, query.extra)).geekGames.map(gg => gg.bggid);
+    }
     switch (query.format) {
         case "Collection": {
-            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata } as Collection;
+            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata, extra } as Collection;
         }
         case "CollectionWithPlays": {
             const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
             const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-            return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata } as CollectionWithPlays;
-        }
-        default: {
-            return {};
+            return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata, extra } as CollectionWithPlays;
         }
         case "CollectionWithMonthlyPlays": {
             const plays = (await getMonthlyPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-            return { collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata } as CollectionWithMonthlyPlays;
+            return { collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata, extra } as CollectionWithMonthlyPlays;
+        }
+        default: {
+            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata, extra } as Collection;
         }
     }
-}
-
-export async function doGetCollectionWithPlays(conn: mysql.Connection, query: GeekGameQuery): Promise<CollectionWithPlays> {
-    const queryResult = await selectGames(conn, query);
-    const geekGames = queryResult.geekGames.map(gg => gg.bggid);
-    const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-    const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-    const games = await doRetrieveGames(conn, geekGames);
-    return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata } as CollectionWithPlays;
 }
 
 async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
@@ -133,7 +123,7 @@ async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<G
     const monthsPlayed = (await conn.query(monthsPlayedSql, [geekId]))[0]["c"];
     if (!warTableRow) {
         return { warData: undefined, geekId, error: "No row was found in the war table for " + geek, rated, average,
-        monthsPlayed } as GeekSummary;
+            monthsPlayed } as GeekSummary;
     }
     return { warData: warTableRow, rated, average, monthsPlayed };
 }

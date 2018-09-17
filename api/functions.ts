@@ -1,10 +1,7 @@
 import {Callback} from 'aws-lambda';
 import {
-    doGetCollection, doGetCollectionWithPlays, doGetNews, doQuery, gatherGeekSummary,
-    gatherSystemStats,
-    listUsers,
-    listWarTable,
-    rankGames, updateFAQCount
+    doGetNews, doQuery, gatherGeekSummary,
+    gatherSystemStats, listUsers, listWarTable, rankGames, updateFAQCount
 } from "./mysql-rds";
 import {asyncReturnWithConnection} from "./library";
 import {GeekGameQuery} from "extstats-core";
@@ -58,22 +55,6 @@ export async function getWarTable(event, context, callback: Callback) {
     }
 }
 
-export async function getCollection(event, context, callback: Callback) {
-    context.callbackWaitsForEmptyEventLoop = false;
-    if (event && event.body) {
-        const query = event.body as GeekGameQuery;
-        try {
-            const collection = await asyncReturnWithConnection(async conn => await doGetCollection(conn, query));
-            callback(null, collection);
-        } catch (err) {
-            console.log(err);
-            callback(err);
-        }
-    } else {
-        callback(null);
-    }
-}
-
 export async function query(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     if (event && event.body) {
@@ -98,21 +79,6 @@ export async function getNews(event, context, callback: Callback) {
     } catch (err) {
         console.log(err);
         callback(err);
-    }
-}
-
-export async function getCollectionWithPlays(event, context, callback: Callback) {
-    if (event && event.body) {
-        const query = event.body as GeekGameQuery;
-        try {
-            const collection = await asyncReturnWithConnection(async conn => await doGetCollectionWithPlays(conn, query));
-            callback(null, collection);
-        } catch (err) {
-            console.log(err);
-            callback(err);
-        }
-    } else {
-        callback(null);
     }
 }
 

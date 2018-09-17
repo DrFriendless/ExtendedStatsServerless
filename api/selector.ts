@@ -3,8 +3,8 @@ import {Arg, Argument, Expression, Integer, Keyword, parse, StringValue} from ".
 import {getGeekId} from "./library";
 import {GeekGameQuery, GeekGameQueryResult, SelectorMetadataSet, GeekGame} from "extstats-core";
 
-export async function selectGames(conn: mysql.Connection, query: GeekGameQuery): Promise<GeekGameQueryResult> {
-    const expr = parse(query.query);
+export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameQueryResult> {
+    const expr = parse(q);
     return await evaluate(conn, expr, query);
 }
 
