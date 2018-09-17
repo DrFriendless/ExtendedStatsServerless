@@ -109,21 +109,16 @@ export interface Collection {
     collection: GeekGame[];
     games: GameData[];
     metadata: SelectorMetadataSet;
+    extra?: number[];
 }
 
-export interface CollectionWithPlays {
-    collection: GeekGame[];
+export interface CollectionWithPlays extends Collection {
     plays: GamePlays[];
     lastYearPlays: GamePlays[];
-    games: GameData[];
-    metadata: SelectorMetadataSet;
 }
 
-export interface CollectionWithMonthlyPlays {
-    collection: GeekGame[];
+export interface CollectionWithMonthlyPlays extends Collection {
     plays: MonthlyPlays[];
-    games: GameData[];
-    metadata: SelectorMetadataSet;
 }
 
 export interface MonthlyPlays {
@@ -139,4 +134,6 @@ export interface GeekSummary {
     rated: number;
     average: number;
     monthsPlayed: number;
+    error?: string;
+    geekId?: number;
 }
