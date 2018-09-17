@@ -1,6 +1,7 @@
 export interface GeekGameQuery {
     geek: string;
     query: string;
+    extra?: string;
     format: string;
     vars: { THEM?: string, YEAR?: number, RATING?: number, MONTH?: number }
 }
