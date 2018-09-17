@@ -30,4 +30,8 @@ export class MonthlyWidget extends DataSourceComponent<CollectionWithMonthlyPlay
   protected getApiKey(): string {
     return "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ";
   }
+
+  protected getExtra(): { [key: string]: any } {
+    return { extra: "minus(owned(ME), expansions(), books())" };
+  }
 }

@@ -23,11 +23,13 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
       valueTooltip: (r: Row) => r.newDimeNames.join(", ") },
     { field: "playsYtd", name: "Plays YTD", tooltip: "Total plays so far this year, at the end of the month." },
     { field: "distinctYtd", name: "Distinct YTD", tooltip: "Total different games so far this year, at the end of the month." },
-    { field: "hindex", name: "H-Index", tooltip: "You had played this many games this many times each at the end of this month." }
+    { field: "hindex", name: "H-Index", tooltip: "You had played this many games this many times each at the end of this month." },
+    { field: "percent", name: "Percent Played", tooltip: "The percentage of your (presently) owned games that you had played by the end of the month."}
   ].map(c => new Column(c));
   public rows: Row[] = [];
 
   protected processData(collection: CollectionWithMonthlyPlays) {
+    const ownedGameIds = collection.extra;
     const gamesIndex = makeGamesIndex(collection.games);
     const byMonth = {} as { [month: string]: MonthlyPlays[] };
     const allGameIds = [];
@@ -47,7 +49,7 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
       const sortOrder = mp.year * 12 + mp.month;
       const row = { month: key, distinct, expansions, plays, sortOrder, newGames: 0, newNickels: 0, newDimes: 0,
         year: mp.year, playsYtd: 0, distinctYtd: 0, january: mp.month === 0, expansionNames: [],
-        gamesPlayedNames: [], newDimeNames: [], newGameNames: [], newNickelNames: [], hindex: 0 } as Row;
+        gamesPlayedNames: [], newDimeNames: [], newGameNames: [], newNickelNames: [], hindex: 0, percent: 0 } as Row;
       rows.push(row);
     }
     rows.sort((r1,r2) => r1.sortOrder - r2.sortOrder);
@@ -55,6 +57,7 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
     const playsByGame: { [game: number]: number } = {};
     let playsYtd;
     let distinctYtd;
+    let playedThisYear: number[];
     const gamesEverPlayed = [];
     rows.forEach(row => {
       if (row.year != currentYear) {
@@ -62,6 +65,7 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
         currentYear = row.year;
         playsYtd = 0;
         distinctYtd = 0;
+        playedThisYear = [];
       }
       const pbm = byMonth[row.month];
       pbm.forEach(mp => {
@@ -81,6 +85,7 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
         }
         if (playsBefore === 0) {
           distinctYtd++;
+          playedThisYear.push(mp.game);
         }
         const playsAfter = playsBefore + mp.quantity;
         if (playsBefore < 5 && playsAfter >= 5) {
@@ -96,9 +101,19 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
       row.playsYtd = playsYtd;
       row.distinctYtd = distinctYtd;
       row.hindex = PlaysByMonthYtdComponent.calcHIndex(Object.values(playsByGame));
+      row.percent = this.calcPercentPlayed(ownedGameIds, playedThisYear);
     });
     rows.sort((r1,r2) => r2.sortOrder - r1.sortOrder);
     this.rows = rows;
+  }
+
+  private calcPercentPlayed(owned: number[], played: number[]): number {
+    if (owned.length == 0) return 100;
+    let count = 0;
+    for (let o of owned) {
+      if (played.indexOf(o) >= 0) count++;
+    }
+    return Math.floor((count * 10000) / owned.length)/100;
   }
 
   private static calcHIndex(values: number[]) {
@@ -131,6 +146,7 @@ interface Row {
   newNickelNames: string[];
   newDimeNames: string[];
   hindex: number;
+  percent: number;
 }
 
 class Column<R extends object> {
