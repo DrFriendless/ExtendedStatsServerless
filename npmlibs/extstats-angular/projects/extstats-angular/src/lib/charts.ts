@@ -1,32 +1,18 @@
 import {CollectionWithPlays} from "extstats-core";
+import {VisualizationSpec} from "vega-embed";
 
 export class ChartDefinition {
-  constructor(private key: string, private name: string, private mark: string, private xAxisName: string, private yAxisName: string,
-              private extract: (CollectionWithPlays) => { name: string }) {
+  constructor(public name: string,
+              private extract: (CollectionWithPlays) => object,
+              private mkSpec: (object) => VisualizationSpec) {
   }
 
-  public getMark(): string {
-    return this.mark;
+  public extractData(data: CollectionWithPlays): object {
+    return this.extract(data);
   }
 
-  public getName(): string {
-    return this.name;
-  }
-
-  public getKey(): string {
-    return this.key;
-  }
-
-  public extractData(source: CollectionWithPlays): { name: string } {
-    return this.extract(source);
-  }
-
-  public getXAxisName(): string {
-    return this.xAxisName;
-  }
-
-  public getYAxisName(): string {
-    return this.yAxisName;
+  public makeSpec(values: object) {
+    return this.mkSpec(values);
   }
 }
 

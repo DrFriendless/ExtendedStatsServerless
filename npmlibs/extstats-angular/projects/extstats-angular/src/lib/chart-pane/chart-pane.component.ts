@@ -13,9 +13,6 @@ export class ChartPaneComponent {
   }
 
   public getTarget(): HTMLElement {
-    console.log(this.element);
-    console.log(this.element.nativeElement.clientWidth);
-    console.log(this.element.nativeElement.clientHeight);
     return this.target.nativeElement as HTMLElement;
   }
 

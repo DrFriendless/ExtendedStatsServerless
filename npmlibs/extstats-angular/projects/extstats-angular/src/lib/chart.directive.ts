@@ -20,55 +20,12 @@ export class ChartDirective implements AfterViewInit {
   }
 
   public ngAfterViewInit() {
-    this.button.textContent = this.definition.getName();
+    this.button.textContent = this.definition.name;
   }
 
   @HostListener('click') onClick() {
-    console.log("should show the chart " + this.definition.getName());
     const chartData = this.definition.extractData(this.data) as { name: string };
-    console.log(chartData);
-    const encoding = {
-      "x": {
-        "field": "x",
-        "type": "quantitative",
-        "axis": {
-          "title": this.definition.getXAxisName()
-        }
-      },
-      "y": {
-        "field": "y",
-        "type": "quantitative",
-        "axis": {
-          "title": this.definition.getYAxisName()
-        }
-      }
-    };
-    if (chartData["values"].length > 0) {
-      const sample = chartData["values"][0];
-      console.log(sample);
-      if (sample.hasOwnProperty("size")) {
-        encoding["size"] = {"field": "size", "type": "quantitative"};
-      }
-      if (sample.hasOwnProperty("tooltip")) {
-        encoding["tooltip"] = {"field": "tooltip", "type": "ordinal"};
-      }
-    }
-    const spec: VisualizationSpec = {
-      "$schema": "https://vega.github.io/schema/vega/v4.json",
-      "title": this.definition.getName(),
-      "autosize": {
-        "type": "fit",
-        "resize": true
-      },
-      "width": 600,
-      "height": 600,
-      "data": [chartData],
-      "mark": this.definition.getMark(),
-      "encoding": encoding
-    };
-    console.log(this.pane.getTarget());
-    console.log(this.pane.getTarget());
-
+    const spec = this.definition.makeSpec(chartData);
     embed(this.pane.getTarget(), spec, { actions: true });
     this.pane.show();
   }
