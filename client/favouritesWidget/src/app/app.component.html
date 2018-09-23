@@ -1,72 +1,24 @@
-<div id="favourites-table" class="favourites-table" *ngIf="!!rows">
+<div style="text-align:center">
+  <extstats-button-group #buttongroup>
+    <button type="button" class="btn table-button extstats-button" [extstatsButtonGroup]="buttongroup" selector="charts">Charts</button>
+    <button type="button" class="btn table-button svg-button extstats-button" [extstatsButtonGroup]="buttongroup" selector="settings">
+      <img src="/img/settings.svg">
+    </button>
+  </extstats-button-group>
 
-  <div class="extstats-doc">
-    <extstats-button-group #buttongroup>
-      <button type="button" class="btn table-button" [extstatsButtonGroup]="buttongroup" selector="doc">Documentation</button>
-      <button type="button" class="btn table-button" [extstatsButtonGroup]="buttongroup" selector="charts">Charts</button>
-      <button type="button" class="btn table-button svg-button" [extstatsButtonGroup]="buttongroup" selector="settings">
-        <img src="/img/settings.svg">
-      </button>
-    </extstats-button-group>
-
-    <div id="favouritesTableCharts" *ngIf="buttongroup.selected === 'charts'">
-      <button type="button" class="btn chart-button" *ngFor="let chart of chartSet.charts" [extstatsChart]="chart" [chartData]="data" [chartPane]="chartPane"></button>
-    </div>
-
-    <extstats-chartpane #chartPane></extstats-chartpane>
-
-    <extstats-documentation id="favouritesTableDoc" *ngIf="buttongroup.selected === 'doc'" [src]="'/json/en/doc/favourites.json'">
-    </extstats-documentation>
-
-    <div id="favouritesTableSettings" *ngIf="buttongroup.selected === 'settings'">
-      <extstats-table-config [table]="this"></extstats-table-config>
-    </div>
+  <div id="favouritesTableCharts" *ngIf="buttongroup.selected === 'charts'">
+    <button type="button" class="btn chart-button extstats-button" *ngFor="let chart of chartSet.charts" [extstatsChart]="chart" [chartData]="data" [chartPane]="chartPane"></button>
   </div>
 
-  <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'fhm'" [mfSortOrder]="'desc'">
-    <thead>
-    <tr>
-      <th><mfDefaultSorter by="gameName">Game</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="rating" tooltip="Your rating for this game.">Rating</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="plays" tooltip="The number of times you have played this game.">Plays</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="bggRanking" tooltip="This game's ranking on BoardGameGeek.">BGG Ranking</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="bggRating" tooltip="This game's rating on BoardGameGeek.">BGG Rating</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="firstPlayed" tooltip="First date you played this game.">First Played</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="lastPlayed" tooltip="Last date you played this game.">Last Played</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="monthsPlayed" tooltip="Months in which you have played this game.">Months Played</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="hoursPlayed" tooltip="Hours for which you have played this game.">Hours Played</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="fhm" tooltip="Friendless Happiness Metric">FHM</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="hhm" tooltip="Huber Happiness Metric">HHM</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="huberHeat" tooltip="Huber Heat">Huber Heat</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="ruhm" tooltip="Randy Cox Not Unhappiness Metric">R!UHM</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="yearPublished" tooltip="The year in which this game was first published.">Year Published</mfDefaultSorter></th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr *ngFor="let row of favouritesTable.data">
-      <td><a href="https://boardgamegeek.com/boardgame/{{row.game}}">{{row.gameName}}</a></td>
-      <td>{{row.rating}}</td>
-      <td>{{row.plays}}</td>
-      <td>{{row.bggRanking}}</td>
-      <td>{{row.bggRating}}</td>
-      <td>{{row.firstPlayed}}</td>
-      <td>{{row.lastPlayed}}</td>
-      <td>{{row.monthsPlayed}}</td>
-      <td>{{row.hoursPlayed}}</td>
-      <td>{{row.fhm}}</td>
-      <td>{{row.hhm}}</td>
-      <td>{{row.huberHeat}}</td>
-      <td>{{row.ruhm}}</td>
-      <td>{{row.yearPublished}}</td>
-    </tr>
-    </tbody>
-    <tfoot>
-    <tr>
-      <td colspan="4">
-        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]" [mfTable]="favouritesTable"></mfBootstrapPaginator>
-      </td>
-    </tr>
-    </tfoot>
-  </table>
-</div>
+  <div id="favouritesSettings" *ngIf="buttongroup.selected === 'settings'">
+    <extstats-table-config [table]="this"></extstats-table-config>
+  </div>
 
+  <extstats-chartpane #chartPane></extstats-chartpane>
+
+  <h2 id="faves">Your Favourite Games</h2>
+  <favourites-table [data]="data$"></favourites-table>
+
+  <!--<h2 id="pbpy">Plays By Published Year</h2>-->
+  <!--<plays-by-published-year [data]="data$"></plays-by-published-year>-->
+</div>

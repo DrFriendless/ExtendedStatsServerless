@@ -24,13 +24,13 @@
     "@ng-bootstrap/ng-bootstrap": "^2.2.2",
     "@ngui/auto-complete": "^2.0.0",
     "core-js": "^2.5.4",
-    "extstats-angular": "^0.2.2",
-    "extstats-core": "^0.4.0",
+    "extstats-angular": "^1.0.0",
+    "extstats-core": "^0.10.1",
     "extstats-datatable": "^0.8.0",
     "ngx-bootstrap": "^3.0.1",
     "rxjs": "^6.0.0",
-    "vega-embed": "^3.19.2",
-    "vega-lite": "^3.0.0-rc5",
+    "vega-embed": "^3.18.2",
+    "vega-lite": "^2.6.0",
     "zone.js": "^0.8.26"
   },
   "devDependencies": {

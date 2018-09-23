@@ -14,49 +14,49 @@
 
   <extstats-favourites></extstats-favourites>
 
-<script>
-  function getExtStatsStorage() {
-    var localStorage = window.localStorage;
-    console.log(typeof localStorage.extStats);
-    var result = {};
-    if (localStorage.extStats) {
-      try {
-        result = JSON.parse(localStorage.extStats);
-      }
-      catch (err) {
-        console.log(err);
-      }
-    }
-    return result;
-  }
-  function withExtStatsStorage(func) {
-    var content = getExtStatsStorage();
-    func(content);
-    window.localStorage.extStats = JSON.stringify(content);
-  }
+<!--<script>-->
+  <!--function getExtStatsStorage() {-->
+    <!--var localStorage = window.localStorage;-->
+    <!--console.log(typeof localStorage.extStats);-->
+    <!--var result = {};-->
+    <!--if (localStorage.extStats) {-->
+      <!--try {-->
+        <!--result = JSON.parse(localStorage.extStats);-->
+      <!--}-->
+      <!--catch (err) {-->
+        <!--console.log(err);-->
+      <!--}-->
+    <!--}-->
+    <!--return result;-->
+  <!--}-->
+  <!--function withExtStatsStorage(func) {-->
+    <!--var content = getExtStatsStorage();-->
+    <!--func(content);-->
+    <!--window.localStorage.extStats = JSON.stringify(content);-->
+  <!--}-->
 
-  function fromExtStatsStorage(func) {
-    var content = getExtStatsStorage();
-    var returnValue = func(content);
-    window.localStorage.extStats = JSON.stringify(content);
-    return returnValue;
-  }
+  <!--function fromExtStatsStorage(func) {-->
+    <!--var content = getExtStatsStorage();-->
+    <!--var returnValue = func(content);-->
+    <!--window.localStorage.extStats = JSON.stringify(content);-->
+    <!--return returnValue;-->
+  <!--}-->
 
-  function getQueryVariable(variable) {
-    var query = window.location.search.substring(1);
-    var vars = query.split("&");
-    for (var i = 0; i < vars.length; i++) {
-      var pair = vars[i].split("=");
-      console.log(pair);
-      if (pair[0] == variable) {
-        return pair[1];
-      }
-    }
-    return undefined;
-  }
-  var geek = getQueryVariable("geek");
-  console.log("geek = " + geek);
-  if (geek) withExtStatsStorage(function (storage) { return storage.geek = geek; });
-</script>
+  <!--function getQueryVariable(variable) {-->
+    <!--var query = window.location.search.substring(1);-->
+    <!--var vars = query.split("&");-->
+    <!--for (var i = 0; i < vars.length; i++) {-->
+      <!--var pair = vars[i].split("=");-->
+      <!--console.log(pair);-->
+      <!--if (pair[0] == variable) {-->
+        <!--return pair[1];-->
+      <!--}-->
+    <!--}-->
+    <!--return undefined;-->
+  <!--}-->
+  <!--var geek = getQueryVariable("geek");-->
+  <!--console.log("geek = " + geek);-->
+  <!--if (geek) withExtStatsStorage(function (storage) { return storage.geek = geek; });-->
+<!--</script>-->
 </body>
 </html>

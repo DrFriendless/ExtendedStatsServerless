@@ -7,10 +7,14 @@ import {NgbModule} from "@ng-bootstrap/ng-bootstrap";
 import { TooltipModule } from 'ngx-bootstrap/tooltip';
 import {ExtstatsAngularModule} from "extstats-angular";
 import { FormsModule } from '@angular/forms';
+import { FavouritesTableComponent } from './favourites-table/favourites-table.component';
+import { PlaysByPublishedYearComponent } from './plays-by-published-year/plays-by-published-year.component';
 
 @NgModule({
   declarations: [
-    FavouritesComponent
+    FavouritesComponent,
+    FavouritesTableComponent,
+    PlaysByPublishedYearComponent
   ],
   imports: [
     BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule, FormsModule

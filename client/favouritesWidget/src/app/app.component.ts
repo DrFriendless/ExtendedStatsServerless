@@ -1,76 +1,252 @@
-import {AfterViewInit, Component, OnDestroy} from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {Subscription} from "rxjs/internal/Subscription";
 import {Subject} from "rxjs/internal/Subject";
 import {Observable} from "rxjs/internal/Observable";
 import {flatMap, tap, map} from "rxjs/internal/operators";
 import {CollectionWithPlays, FavouritesRow, fromExtStatsStorage, GeekGameQuery, GameData, GamePlays} from "extstats-core";
-import {ChartSet, ChartDefinition, DocumentationContent, ExtstatsTable} from "extstats-angular";
+import {ChartSet, ChartDefinition, DocumentationContent, ExtstatsTable, DataSourceComponent} from "extstats-angular";
+import {VisualizationSpec, vega} from "vega-embed";
 
 @Component({
   selector: 'extstats-favourites',
   templateUrl: './app.component.html'
 })
-export class FavouritesComponent implements OnDestroy, AfterViewInit, ExtstatsTable {
-  private readonly geek: string;
-  public data: CollectionWithPlays;
-  public rows: FavouritesRow[];
-  private readonly subscription: Subscription;
+export class FavouritesComponent extends DataSourceComponent<CollectionWithPlays> implements OnInit, OnDestroy {
+  private static DEFAULT_SELECTOR = "all(played(ME), rated(ME))";
   public chartSet = new ChartSet();
-  public doc: DocumentationContent[];
-  private selectors = new Subject<string>();
-  private selector: string = "all(played(ME), rated(ME))";
+  private dataSubscription: Subscription;
+  public data: CollectionWithPlays;
 
-  constructor(private http: HttpClient) {
-    this.geek = fromExtStatsStorage(storage => storage.geek);
-    this.chartSet.add(new ChartDefinition("avgVsRating", "Average vs Rating", "circle",
-      "Your Rating", "BGG Average",
-      FavouritesComponent.extractAvgVsRating));
-    this.chartSet.add(new ChartDefinition("ratingVsPlays", "Rating vs Plays (max 50)", "point",
-      "Your Rating", "Number of Plays",
-      FavouritesComponent.extractRatingVsPlays));
-    this.chartSet.add(new ChartDefinition("ratingVsMonths", "Rating vs Distinct Months", "circle",
-      "Your Rating", "Number of months in which you have played this game",
-      FavouritesComponent.extractRatingVsMonths));
-    this.chartSet.add(new ChartDefinition("fhmVsYearPublished", "FHM vs Year Published", "circle",
-      "Year Published", "Friendless Happiness Metric",
-      FavouritesComponent.fhmVsYearPublished));
-
-    this.subscription = this.selectors.asObservable()
-      .pipe(
-        flatMap(s => this.doQuery(s)),
-        tap(data => console.log(data)),
-        tap(data => this.data = data),
-        map(data => FavouritesComponent.makeRows(data))
-      ).subscribe(result => this.rows = result);
+  constructor(http: HttpClient) {
+    super(http, FavouritesComponent.DEFAULT_SELECTOR);
+    this.chartSet.add(new ChartDefinition("Average vs Rating",
+      FavouritesComponent.extractAvgVsRating, FavouritesComponent.avrSpec));
+    this.chartSet.add(new ChartDefinition("Rating vs Plays",
+      FavouritesComponent.extractRatingVsPlays, FavouritesComponent.ratingsVsPlays));
+    this.chartSet.add(new ChartDefinition("Rating vs Months Played",
+      FavouritesComponent.extractRatingVsMonths, FavouritesComponent.ratingsVsMonths));
   }
 
-  private static fhmVsYearPublished(data: CollectionWithPlays): object {
-    const values = [];
-    const gameById = {};
-    for (const gd of data.games) {
-      gameById[gd.bggid] = gd;
-    }
-    for (const gg of data.collection) {
-      if (gg["fhm"] > 0 && gameById[gg.bggid].yearPublished >= 1990) {
-        values.push({ x: gameById[gg.bggid].yearPublished, y: gg["fhm"], tooltip: gameById[gg.bggid].name });
-      }
-    }
-    return { values };
+  private static ratingsVsMonths(values: object): VisualizationSpec {
+    const star = "M0,0.2L0.2351,0.3236 0.1902,0.0618 0.3804,-0.1236 0.1175,-0.1618 0,-0.4 -0.1175,-0.1618 -0.3804,-0.1236 -0.1902,0.0618 -0.2351,0.3236 0,0.2Z";
+    return {
+      "$schema": "https://vega.github.io/schema/vega/v4.json",
+      "hconcat": [],
+      "title": "Rating vs Months Played",
+      "autosize": {
+        "type": "fit",
+        "resize": true
+      },
+      "width": 600,
+      "height": 600,
+      "data": [ { values, name: "table" } ],
+      "scales": [ {
+          "name": "x",
+          "type": "linear",
+          "range": "width",
+          "domain": [0, 10]
+        }, {
+          "name": "y",
+          "type": "linear",
+          "range": "height",
+          "nice": true, "zero": true,
+          "domain": {"data": "table", "field": "months"}
+        }, {
+          "name": "sub",
+          "type": "ordinal",
+          "domain": ["Abstract Games", "Children's Games", "Customizable Games", "Family Games", "Party Games",
+            "Strategy Games", "Thematic Games", "Unknown", "Wargames"],
+          "range": ['#000000', '#f0d000', "#A4C639", '#20d0d0', '#f02020', '#4381b2', '#fab6b6', "#888888", '#BDB76B' ]
+        }, {
+          "name": "shape",
+          "type": "ordinal",
+          "domain": ["Abstract Games", "Children's Games", "Customizable Games", "Family Games", "Party Games",
+            "Strategy Games", "Thematic Games", "Unknown", "Wargames"],
+          "range": ['circle', 'square', "cross", 'diamond', 'triangle-up', 'triangle-down', 'triangle-right', "triangle-left", star ]
+        }
+      ],
+      "axes": [
+        {"orient": "bottom", "scale": "x", "zindex": 1, "title": "Your Rating" },
+        {"orient": "left", "scale": "y", "zindex": 1, "title": "Number of months in which you have played this game" }
+      ],
+      "marks": [{
+        "type": "symbol",
+        "from": {"data": "table"},
+        "encode": {
+          "enter": {
+            "x": { "scale": "x", "field": "rating"},
+            "y": { "scale": "y", "field": "months"},
+            "tooltip": {"field": "tooltip", "type": "quantitative"},
+            "stroke": { "field": "subdomain", "scale": "sub" },
+            "shape": { "field": "subdomain", "scale": "shape" },
+            "strokeWidth": {"value": 2}
+          }
+        }
+      }],
+      "legends": [{
+        "direction": "vertical",
+        "stroke": "sub",
+        "shape": "shape"
+      }]
+    };
+  }
+
+  private static ratingsVsPlays(values: object): VisualizationSpec {
+    return {
+      "$schema": "https://vega.github.io/schema/vega/v4.json",
+      "hconcat": [],
+      "title": "Rating vs Plays",
+      "autosize": {
+        "type": "fit",
+        "resize": true
+      },
+      "width": 600,
+      "height": 600,
+      "data": [ { values, name: "table" } ],
+      "scales": [
+        {
+          "name": "x",
+          "type": "linear",
+          "nice": true, "zero": true,
+          "range": "width",
+          "domain": [0,10]
+        }, {
+          "name": "y",
+          "type": "linear",
+          "range": "height",
+          "nice": true, "zero": true,
+          "domain": {"data": "table", "field": "plays"}
+        }
+      ],
+      "axes": [
+        {"orient": "bottom", "scale": "x", "zindex": 1, "title": "Your Rating" },
+        {"orient": "left", "scale": "y", "zindex": 1, "title": "Number of Plays" }
+      ],
+      "marks": [{
+        "type": "symbol",
+        "from": {"data": "table"},
+        "encode": {
+          "enter": {
+            "x": { "scale": "x", "field": "rating"},
+            "y": { "scale": "y", "field": "plays"},
+            "size": { "field": "size" },
+            "tooltip": {"field": "tooltip", "type": "quantitative"}
+          }
+        }
+      }]
+    };
+  }
+
+  private static avrSpec(values: object): VisualizationSpec {
+    const star = "M0,0.2L0.2351,0.3236 0.1902,0.0618 0.3804,-0.1236 0.1175,-0.1618 0,-0.4 -0.1175,-0.1618 -0.3804,-0.1236 -0.1902,0.0618 -0.2351,0.3236 0,0.2Z";
+    const house = "M-0.5,0L0,-0.5 0.5,0 0.3,0 0.3,0.5 0.05,0.5 0.05,0.2 -0.05,0.2 -0.05,0.5 -0.3,0.5 -0.3,0 -0.5,0Z";
+    const heart = "M0.3408,0.0984c0.0507,0,0.0919,0.0413,0.0919,0.0923c0,0.0262,-0.0109,0.0498,-0.0283,0.0666L0.256,0.4071L0.105,0.2546c-0.0158,-0.0166,-0.0256,-0.0391,-0.0256,-0.0639c0-0.051,0.0411,-0.0923,0.0919,-0.0923c0.0382,0,0.0709,0.0234,0.0848,0.0568C0.2698,0.1219,0.3026,0.0984,0.3408,0.0984 M0.3408,0.083z";
+    const spec = {
+      "$schema": "https://vega.github.io/schema/vega/v4.json",
+      "hconcat": [],
+      "title": "Average vs Rating",
+      "autosize": { "type": "fit", "resize": true, "contains": "padding" },
+      "width": 600,
+      "height": 600,
+      "config": { },
+      "data": [ { values, name: "table" } ],
+      "scales": [ {
+          "name": "x",
+          "type": "linear",
+          "nice": true, "zero": true,
+          "domain": [0,10],
+          "range": "width"
+        }, {
+          "name": "y",
+          "type": "linear",
+          "nice": true, "zero": true,
+          "domain": [0,10],
+          "range": "height"
+        }, {
+          "name": "sub",
+          "type": "ordinal",
+          "domain": ["Abstract Games", "Children's Games", "Customizable Games", "Family Games", "Party Games",
+            "Strategy Games", "Thematic Games", "Unknown", "Wargames"],
+          "range": ['#000000', '#f0d000', "#A4C639", '#20d0d0', '#f02020', '#4381b2', '#fab6b6', "#888888", '#BDB76B' ]
+        }, {
+          "name": "shape",
+          "type": "ordinal",
+          "domain": ["Abstract Games", "Children's Games", "Customizable Games", "Family Games", "Party Games",
+            "Strategy Games", "Thematic Games", "Unknown", "Wargames"],
+          "range": ['circle', 'square', "cross", 'diamond', 'triangle-up', 'triangle-down', 'triangle-right', "triangle-left", star ]
+        }
+      ],
+      "axes": [
+        {"orient": "bottom", "scale": "x", "zindex": 1, "title": "Your Rating", "domain": false },
+        {"orient": "left", "scale": "y", "zindex": 1, "title": "BGG Average", "domain": false, "grid": true }
+      ],
+      "marks": [{
+        "type": "symbol",
+        "from": {"data": "table"},
+        "encode": {
+          "enter": {
+            "x": { "scale": "x", "field": "rating"},
+            "y": { "scale": "y", "field": "average"},
+            "size": 150,
+            "tooltip": {"field": "tooltip", "type": "quantitative"},
+            "stroke": { "field": "subdomain", "scale": "sub" },
+            "shape": { "field": "subdomain", "scale": "shape" },
+            "strokeWidth": {"value": 2}
+          }
+        }
+      }],
+      "legends": [{
+        "direction": "vertical",
+        "stroke": "sub",
+        "shape": "shape"
+      }]
+    };
+    return spec as VisualizationSpec;
+  }
+
+  public ngOnInit() {
+    this.dataSubscription = this.data$.subscribe(data => this.data = data);
+  }
+
+  public ngOnDestroy() {
+    if (this.dataSubscription) this.dataSubscription.unsubscribe();
+  }
+
+  public getId(): string {
+    return "favourites";
+  }
+
+  protected getQueryResultFormat(): string {
+    return "CollectionWithPlays";
+  }
+
+  protected getQueryVariables(): { [p: string]: string } {
+    return {};
+  }
+
+  protected getApiKey(): string {
+    return "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ";
   }
 
   private static extractAvgVsRating(data: CollectionWithPlays): object {
     const values = [];
     const gameById = {};
+    console.log(data);
     for (const gd of data.games) {
       gameById[gd.bggid] = gd;
     }
     for (const gg of data.collection) {
       if (gg.rating > 0 && gameById[gg.bggid].bggRating) {
-        values.push({ x: gg.rating, y: gameById[gg.bggid].bggRating, tooltip: gameById[gg.bggid].name });
+        values.push({
+          rating: gg.rating,
+          average: gameById[gg.bggid].bggRating,
+          tooltip: gameById[gg.bggid].name,
+          subdomain: gameById[gg.bggid].subdomain
+        });
       }
     }
-    return { values };
+    return values;
   }
 
   private static extractRatingVsPlays(data: CollectionWithPlays): object {
@@ -80,13 +256,20 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit, ExtstatsTa
     for (const gp of data.plays) {
       playsByGame[gp.game] = gp.plays;
     }
+    const gameById = {};
+    for (const game of data.games) {
+      gameById[game.bggid] = game;
+    }
     const sizeSoFar = {};
+    const tooltips = {};
     for (const gg of data.collection) {
       if (gg.rating > 0) {
-        const plays = Math.min(playsByGame[gg.bggid] || 0, 50);
+        const plays = Math.min(playsByGame[gg.bggid] || 0, 40);
         const key = "" + gg.rating + "+" + plays;
         sizeSoFar[key] = (sizeSoFar[key] || 0) + 1;
-        const xy = { x: gg.rating, y: plays };
+        if (!tooltips[key]) tooltips[key] = [];
+        tooltips[key].push(gameById[gg.bggid].name);
+        const xy = { rating: gg.rating, plays };
         if (doneKeys.indexOf(key) < 0) {
           values.push(xy);
           doneKeys.push(key);
@@ -94,10 +277,11 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit, ExtstatsTa
       }
     }
     for (const xy of values) {
-      const key = "" + xy.x + "+" + xy.y;
-      xy.size = sizeSoFar[key];
+      const key = "" + xy.rating + "+" + xy.plays;
+      xy.size = sizeSoFar[key] * 10;
+      xy.tooltip = tooltips[key].join(", ");
     }
-    return { values };
+    return values;
   }
 
   private static extractRatingVsMonths(data: CollectionWithPlays): object {
@@ -112,143 +296,10 @@ export class FavouritesComponent implements OnDestroy, AfterViewInit, ExtstatsTa
     }
     for (const gg of data.collection) {
       if (gg.rating > 0) {
-        const plays = monthsByGame[gg.bggid] || 0;
-        values.push({ x: gg.rating, y: plays, tooltip: gameById[gg.bggid].name });
+        const months = monthsByGame[gg.bggid] || 0;
+        values.push({ rating: gg.rating, months, tooltip: gameById[gg.bggid].name, subdomain: gameById[gg.bggid].subdomain });
       }
     }
-    return { values };
-  }
-
-  public getId(): string {
-    return "favourites";
-  }
-
-  public getSelector(): string {
-    return this.selector;
-  }
-
-  public setSelector(s: string) {
-    this.selector = s;
-    this.selectors.next(s);
-  }
-
-  public ngAfterViewInit(): void {
-    if (!this.geek) {
-      console.log("There is no geek to gather data for.");
-      return;
-    }
-    this.selectors.next(this.selector);
-  }
-
-  private doQuery(selector: string): Observable<CollectionWithPlays> {
-    const options = {
-      headers: new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ")
-    };
-    const body: GeekGameQuery = {
-      query: selector,
-      geek: this.geek,
-      format: "CollectionWithPlays",
-      vars: {}
-    };
-    console.log(body);
-    return this.http.post("https://api.drfriendless.com/v1/query", body, options) as Observable<CollectionWithPlays>;
-  }
-
-  private static makeRows(data: CollectionWithPlays): FavouritesRow[] {
-    const HUBER_BASELINE = 4.5;
-    const collection = data.collection;
-    const playsIndex = FavouritesComponent.makePlaysIndex(data.plays);
-    const gamesIndex = FavouritesComponent.makeGamesIndex(data.games);
-    const lastYearIndex = FavouritesComponent.makePlaysIndex(data.lastYearPlays);
-    const rows = [] as FavouritesRow[];
-    collection.forEach(gg => {
-      if (!gg.rating) gg.rating = undefined;
-      const gp = playsIndex[gg.bggid] || { plays: 0, expansion: false, game: gg.bggid, distinctMonths: 0, distinctYears: 0 } as GamePlays;
-      const ly = lastYearIndex[gg.bggid] || { plays: 0, expansion: false, game: gg.bggid, distinctMonths: 0, distinctYears: 0 } as GamePlays;
-      const game = gamesIndex[gg.bggid] || { name: "Unknown", bggRanking: 1000000, bggRating: 1.0 } as GameData;
-      const hoursPlayed = gp.plays * game.playTime / 60;
-      const friendlessHappiness = (!gg.rating) ? undefined : Math.floor((gg.rating * 5 + gp.plays + gp.distinctMonths * 4 + hoursPlayed) * 10) / 10;
-      const huberHappiness = (!gg.rating) ? undefined : Math.floor((gg.rating - HUBER_BASELINE) * hoursPlayed);
-      let huberHeat = undefined;
-      if (gp.plays > 0 && gg.rating) {
-        const s = 1 + ly.plays / gp.plays;
-        const lyHours = ly.plays * game.playTime / 60;
-        const lyHappiness = (gg.rating - HUBER_BASELINE) * lyHours;
-        huberHeat = s * s * Math.sqrt(ly.plays) * lyHappiness;
-        huberHeat = Math.floor(huberHeat * 10) / 10;
-      }
-      let ruhm = 0;
-      if (gp.distinctMonths > 0 && gg.rating && gp.firstPlay && gp.lastPlay) {
-        const firstDate = FavouritesComponent.intToDate(gp.firstPlay);
-        const lastDate = FavouritesComponent.intToDate(gp.lastPlay);
-        const flash = FavouritesComponent.daysBetween(lastDate, firstDate);
-        const lag = FavouritesComponent.daysBetween(new Date(), lastDate);
-        const flmr = flash / lag * gp.distinctMonths * gg.rating;
-        const log = (flmr < 1) ? 0 : Math.log(flmr);
-        ruhm = Math.round(log * 100) / 100;
-      }
-      gg["fhm"] = friendlessHappiness;
-      gg["hhm"] = huberHappiness;
-      gg["hh"] = huberHeat;
-      gg["ruhm"] = ruhm;
-      const row = { gameName: game.name, game: gg.bggid, rating: gg.rating, plays: gp.plays, bggRanking: game.bggRanking,
-        bggRating: game.bggRating, firstPlayed: FavouritesComponent.toDateString(gp.firstPlay),
-        lastPlayed: FavouritesComponent.toDateString(gp.lastPlay), monthsPlayed: gp.distinctMonths, yearsPlayed: gp.distinctYears,
-        yearPublished: game.yearPublished, fhm: friendlessHappiness, hhm: huberHappiness, huberHeat,
-        hoursPlayed: Math.floor(hoursPlayed), ruhm } as FavouritesRow;
-      rows.push(row);
-    });
-    return rows;
-  }
-
-  private static toDateString(date: number): string {
-    if (!date) return "";
-    const y = Math.floor(date/10000);
-    const m = Math.floor(date/100) % 100;
-    const d = date % 100;
-    const mm = (m < 10) ? "0" + m.toString() : m.toString();
-    const dd = (d < 10) ? "0" + d.toString() : d.toString();
-    return y.toString() + "-" + mm + "-" + dd;
-  }
-
-  private static makeGamesIndex(games: GameData[]): object {
-    const result = {};
-    games.forEach(gd => {
-      result[gd.bggid] = gd;
-    });
-    return result;
-  }
-
-  private static makePlaysIndex(plays: GamePlays[]): object {
-    const result = {};
-    plays.forEach(gp => {
-      result[gp.game] = gp;
-    });
-    return result;
-  }
-
-  public ngOnDestroy(): void {
-    if (this.subscription) this.subscription.unsubscribe();
-  }
-
-  private static intToDate(date: number): Date | undefined {
-    if (!date) return undefined;
-    const y = Math.floor(date/10000);
-    const m = Math.floor(date/100) % 100;
-    const d = date % 100;
-    return new Date(y, m, d);
-  }
-
-  // https://stackoverflow.com/questions/2627473/how-to-calculate-the-number-of-days-between-two-dates
-  private static daysBetween(date1: Date, date2: Date) {
-    // The number of milliseconds in one day
-    const ONE_DAY = 1000 * 60 * 60 * 24;
-    // Convert both dates to milliseconds
-    const date1Ms = date1.getTime();
-    const date2Ms = date2.getTime();
-    // Calculate the difference in milliseconds
-    const difference_ms = Math.abs(date1Ms - date2Ms);
-    // Convert back to days and return
-    return Math.round(difference_ms/ONE_DAY);
+    return values;
   }
 }
