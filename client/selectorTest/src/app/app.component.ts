@@ -72,7 +72,12 @@ export class SelectorTestComponent implements AfterViewInit {
       const game = gameIndex[gg.bggid];
       const row = { bggid: gg.bggid, name: game.name, average: game.bggRating, rating: gg.rating } as UserCollectionRow;
       const meta = metadata.lookup(gg.bggid);
-      if (meta) row["colour"] = meta.colour;
+      if (meta) {
+        row["colour"] = meta.colour;
+        row["owner"] = meta.owner;
+        row["player"] = meta.player;
+        row["rater"] = meta.rater;
+      }
       result.push(row);
     });
     return result;

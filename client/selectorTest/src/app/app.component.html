@@ -70,11 +70,28 @@
       <dt>expansions()</dt><dd>All games which are expansions of some other game.</dd>
       <dt>mechanic(name)</dt><dd>All games which have the named mechanic.</dd>
       <dt>minus(A, B...)</dt><dd>Games which are in selection A but not in any of the other selections.</dd>
-      <dt>owned(geek)</dt><dd>Games owned by that geek.</dd>
-      <dt>played(geek)</dt><dd>Games ever played by that geek.</dd>
+      <dt>owned(geek)</dt><dd>Games owned by that geek. Sets the 'owner' metadata.</dd>
+      <dt>played(geek)</dt><dd>Games ever played by that geek. Sets the 'player' metadata.</dd>
       <dt>publisher(number)</dt><dd>All games published by the publisher, denoted by their number on BGG.</dd>
-      <dt>rated(geek)</dt><dd>Games rated by that geek.</dd>
+      <dt>rated(geek)</dt><dd>Games rated by that geek. Sets the 'rater' metadata.</dd>
+      <dt>colour("red", A)</dt><dd>When the games in A come back, colour them red. I think you can use any valid HTML colour string. Technically this sets the 'colour' metadata. Yes, it's Australian spelling.</dd>
     </dl>
+    <h3>Metadata</h3>
+    <p>
+      When a selector returns a game, it includes with it some metadata about the selection.
+      This can be used to tell you why the game got selected.
+      For example, if you want to find all of the games owned by you or played by Aldie, you can write a selector to do that.
+      But then when the games come back, you might not be sure which it is.
+      If you look in the metadata though, either 'owner' will be set to you, or 'player' will be set to Aldie, or both.
+      And that's why the game is in the selection.
+    </p>
+    <p>
+      A further trick with metadata is that it can include a colour.
+      I haven't started using the colour in the main site yet, but I'll get there.
+      When you call the function 'colour' on a selection, the 'colour' metadata for all of those games is set to that colour.
+      And then in the selection result table, it's coloured that way.
+      Note that a game might be assigned two colours for different reasons, and it can only have one, which I will try to make sure is the last colour assigned during evaluation of the selector.
+    </p>
   </div>
   <p></p>
 
@@ -83,12 +100,18 @@
     <tr>
       <th><mfDefaultSorter by="name">Game</mfDefaultSorter></th>
       <th><mfDefaultSorter by="rating" tooltip="Your rating for this game.">Rating</mfDefaultSorter></th>
+      <th>Owner</th>
+      <th>Rater</th>
+      <th>Player</th>
     </tr>
     </thead>
     <tbody>
     <tr *ngFor="let row of selectorTestTable.data" [extstats-row-colour]="row.colour">
-      <td><a href="https://boardgamegeek.com/boardgame/{{row.bggid}}">{{row.name}}</a></td>
+      <td>{{row.name}}</td>
       <td>{{row.rating}}</td>
+      <td>{{row.owner}}</td>
+      <td>{{row.rater}}</td>
+      <td>{{row.player}}</td>
     </tr>
     </tbody>
     <tfoot>
