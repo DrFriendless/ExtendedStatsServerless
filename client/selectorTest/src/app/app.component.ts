@@ -29,7 +29,7 @@ export class SelectorTestComponent implements AfterViewInit {
         console.log("Sending query to server...");
         console.log(q);
       }),
-      flatMap(q => this.http.post("https://api.drfriendless.com/v1/collection", q, options))
+      flatMap(q => this.http.post("https://api.drfriendless.com/v1/query", q, options))
     );
     this.subscription = this.loadData$.subscribe(result => {
       const data = result as Collection;
