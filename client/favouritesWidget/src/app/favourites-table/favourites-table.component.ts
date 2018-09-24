@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import {CollectionWithPlays, GameData, GamePlays } from "extstats-core";
+import {CollectionWithPlays, GameData, GamePlays, makeGamesIndex } from "extstats-core";
 import { ExtstatsTable, DataViewComponent, ChartSet, ChartDefinition } from "extstats-angular";
 import {VisualizationSpec, vega} from "vega-embed";
 
@@ -105,7 +105,7 @@ export class FavouritesTableComponent extends DataViewComponent<CollectionWithPl
     const HUBER_BASELINE = 4.5;
     const collection = data.collection;
     const playsIndex = FavouritesTableComponent.makePlaysIndex(data.plays);
-    const gamesIndex = FavouritesTableComponent.makeGamesIndex(data.games);
+    const gamesIndex = makeGamesIndex(data.games);
     const lastYearIndex = FavouritesTableComponent.makePlaysIndex(data.lastYearPlays);
     this.rows = [];
     collection.forEach(gg => {
@@ -201,14 +201,6 @@ export class FavouritesTableComponent extends DataViewComponent<CollectionWithPl
     const mm = (m < 10) ? "0" + m.toString() : m.toString();
     const dd = (d < 10) ? "0" + d.toString() : d.toString();
     return y.toString() + "-" + mm + "-" + dd;
-  }
-
-  private static makeGamesIndex(games: GameData[]): object {
-    const result = {};
-    games.forEach(gd => {
-      result[gd.bggid] = gd;
-    });
-    return result;
   }
 
   private static makePlaysIndex(plays: GamePlays[]): object {

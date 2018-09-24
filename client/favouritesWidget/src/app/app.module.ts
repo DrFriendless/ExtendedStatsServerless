@@ -17,7 +17,8 @@ import { PlaysByPublishedYearComponent } from './plays-by-published-year/plays-b
     PlaysByPublishedYearComponent
   ],
   imports: [
-    BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule, FormsModule
+    BrowserModule, HttpClientModule, DataTableModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule,
+    FormsModule
   ],
   providers: [],
   bootstrap: [FavouritesComponent]
