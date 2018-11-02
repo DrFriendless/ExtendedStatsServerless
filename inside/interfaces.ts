@@ -24,24 +24,6 @@ export interface ProcessUserResult {
     url: string;
 }
 
-export interface ProcessCollectionResult {
-    geek: string;
-    items: CollectionGame[];
-}
-
-export interface CollectionGame {
-    gameId: number;
-    rating: number;
-    owned: boolean;
-    forTrade: boolean;
-    want: boolean;
-    wantToPlay: boolean;
-    wantToBuy: boolean;
-    preordered: boolean;
-    wishListPriority: number;
-    prevOwned: boolean;
-}
-
 export interface ProcessGameResult {
     gameId: number;
     name: string;
@@ -69,45 +51,10 @@ export interface ProcessGameResult {
     expansions: number[];
 }
 
-export interface RankingTableRow {
-    game: number;
-    game_name: string;
-    total_ratings: number;
-    num_ratings: number;
-    bgg_ranking: number;
-    bgg_rating: number;
-    normalised_ranking: number;
-    total_plays: number;
-}
-
-export interface WarTableRow {
-    geek: number;
-    geekName: string;
-    totalPlays: number;
-    distinctGames: number;
-    top50: number;
-    sdj: number;
-    owned: number;
-    want: number;
-    wish: number;
-    trade: number;
-    prevOwned: number;
-    friendless: number;
-    cfm: number;
-    utilisation: number;
-    tens: number;
-    zeros: number;
-    ext100: number;
-    hindex: number;
-    preordered: number;
-}
-
-export interface CleanUpCollectionResult {
+export interface ProcessCollectionResult {
     geek: string;
-    url: string;
-    items: number[];
+    items: CollectionGame[];
 }
-
 export interface MonthPlayed {
     month: number;
     year: number;
@@ -136,22 +83,26 @@ export interface ProcessPlaysResult {
     url: string;
 }
 
-export interface NormalisedPlays {
-    quantity: number;
-    game: number;
-    geek: number;
-    date: number;
-    month: number;
-    year: number;
-    baseplay: number;
-    expansionPlay: boolean;
-    id: number;
+export interface CollectionGame {
+    gameId: number;
+    rating: number;
+    owned: boolean;
+    forTrade: boolean;
+    want: boolean;
+    wantToPlay: boolean;
+    wantToBuy: boolean;
+    preordered: boolean;
+    wishListPriority: number;
+    prevOwned: boolean;
 }
 
-export interface WorkingNormalisedPlays extends NormalisedPlays {
-    expansions: number[];
-    isExpansion: boolean;
+
+export interface CleanUpCollectionResult {
+    geek: string;
+    url: string;
+    items: number[];
 }
+
 
 export interface SeriesMetadata {
     name: string;
@@ -168,4 +119,21 @@ export interface MetadataRule {
 export interface Metadata {
     series: SeriesMetadata[];
     rules: MetadataRule[];
+}
+
+export interface NormalisedPlays {
+    quantity: number;
+    game: number;
+    geek: number;
+    date: number;
+    month: number;
+    year: number;
+    baseplay: number;
+    expansionPlay: boolean;
+    id: number;
+}
+
+export interface WorkingNormalisedPlays extends NormalisedPlays {
+    expansions: number[];
+    isExpansion: boolean;
 }

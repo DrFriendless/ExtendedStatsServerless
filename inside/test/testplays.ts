@@ -1,4 +1,4 @@
-import {ExpansionData} from "../plays";
+import {ExpansionData} from "extstats-core";
 import { suite, test, slow, timeout } from "mocha-typescript";
 var assert = require('assert');
 

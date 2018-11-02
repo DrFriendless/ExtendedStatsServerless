@@ -1,6 +1,6 @@
 import * as _ from "lodash";
 import {NormalisedPlays, WorkingNormalisedPlays} from "./interfaces";
-import {ExpansionData} from "./expansion-data";
+import {ExpansionData} from "extstats-core";
 
 function toWorkingPlay(expansionData: ExpansionData, play: NormalisedPlays): WorkingNormalisedPlays {
     return {

@@ -8,16 +8,15 @@ import {
     CollectionGame, MetadataRule,
     MonthPlayed, NormalisedPlays, PlayData,
     ProcessGameResult, ProcessPlaysResult,
-    RankingTableRow, SeriesMetadata,
-    ToProcessElement,
-    WarTableRow, WorkingNormalisedPlays
+    SeriesMetadata,
+    ToProcessElement, WorkingNormalisedPlays
 } from "./interfaces";
+import { RankingTableRow, WarTableRow, ExpansionData } from "extstats-core";
 import {
     count, extractNormalisedPlayFromPlayRow, listIntersect, listMinus, playDate
 } from "./library";
 import * as _ from "lodash";
 import {inferExtraPlays} from "./plays";
-import {ExpansionData} from "./expansion-data";
 
 export async function doUpdateMetadata(conn: mysql.Connection, series: SeriesMetadata[], rules: MetadataRule[]) {
     await doUpdateSeries(conn, series);
@@ -180,10 +179,11 @@ async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: nu
         game_name: data.name,
         bgg_ranking: data.rank || 1000000,
         bgg_rating: data.average || 0,
-        normalised_ranking: 0, // TODO
+        normalised_ranking: 0,
         total_plays: howManyPlays,
         total_ratings: total || 0,
-        num_ratings: count
+        num_ratings: count,
+        ranking: 0
     };
     try {
         await conn.query(insertSql, [row.game, row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays]);
@@ -210,9 +210,13 @@ export async function doProcessGameResult(conn: mysql.Connection, data: ProcessG
 
 export async function doProcessCollectionCleanup(conn: mysql.Connection, geek: string, items: number[], url: string) {
     const geekid = await getGeekId(conn, geek);
+    console.log("geek = " + geek + " " + geekid);
     await doRestrictCollectionToGames(conn, geekid, items);
+    console.log("a");
     await doMarkUrlProcessed(conn, "processCollection", url);
+    console.log("b");
     await doUpdateFrontPageGeek(conn, geek);
+    console.log("done");
 }
 
 async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: number, items: number[]) {
@@ -389,7 +393,8 @@ export async function doEnsureGames(conn: mysql.Connection, ids: number[]): Prom
     }
     const found = (await conn.query(sql, params)).map(row => row.bggid);
     const notExist = await getGamesThatDontExist(conn);
-    for (const id of listMinus(listMinus(ids, found), notExist)) {
+    const uniques = Array.from(new Set(listMinus(listMinus(ids, found), notExist)));
+    for (const id of uniques) {
         await doRecordGame(conn, id);
     }
     return listIntersect(ids, notExist);
