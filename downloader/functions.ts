@@ -10,7 +10,7 @@ import {
     SeriesMetadata,
     MetadataRule,
     METADATA_RULE_BASEGAME,
-    Metadata
+    Metadata, PlayData
 } from "./interfaces"
 import {between, invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
 import {
@@ -152,12 +152,12 @@ export async function processGame(event, context, callback: Callback) {
     try {
         const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data.toString());
         await invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result);
-        callback(null, null);
+        callback();
     } catch (err) {
         console.log(err);
         if (err instanceof NoSuchGameError) {
             await invokeLambdaAsync("processGame", INSIDE_PREFIX + FUNCTION_NO_SUCH_GAME, {bggid: err.getId()});
-            callback(null, null);
+            callback();
         } else {
             console.log(err);
             callback(err);
@@ -184,7 +184,7 @@ export async function processCollection(event, context, callback: Callback) {
     try {
         await tryToProcessCollection(invocation);
         await markTryAgainTomorrow("processCollection", invocation);
-        callback(null, null);
+        callback();
     } catch (e) {
         console.log(e);
         await markAsUnprocessed("processCollection", invocation);
@@ -263,8 +263,16 @@ export async function processPlayed(event, context, callback: Callback) {
 export async function processPlays(event, context, callback: Callback) {
     console.log(event);
     const invocation = event as FileToProcess;
-    const data = await request(invocation.url) as string;
-    const playsData = await processPlaysFile(data, invocation);
+    let playsData = [];
+    let pagesSoFar = 0;
+    let pagesNeeded = -1;
+    while (pagesSoFar === 0 || pagesSoFar < pagesNeeded) {
+        pagesSoFar++;
+        let data = await request(invocation.url + "&page=" + pagesSoFar) as string;
+        const processResult: { count: number, plays: PlayData[] } = await processPlaysFile(data, invocation);
+        playsData = playsData.concat(processResult.plays);
+        pagesNeeded = Math.ceil(processResult.count/100);
+    }
     const playsResult = { geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url } as ProcessPlaysResult;
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
 }

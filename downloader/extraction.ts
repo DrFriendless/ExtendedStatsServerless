@@ -1,8 +1,7 @@
 import {
     ProcessUserResult,
     ProcessCollectionResult,
-    CollectionGame,
-    ProcessGameResult,
+    ProcessGameResult, CollectionGame,
     FileToProcess, PlayData
 } from "./interfaces";
 import {between} from "./library";
@@ -22,6 +21,7 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
         console.log("Found no games in collection");
     }
     const items: CollectionGame[] = [];
+    const byId = {};
     if (dom.items.item) {
         dom.items.item.forEach(item => {
             if (item.$.subtype != 'boardgame') {
@@ -31,31 +31,36 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
                 // const name = item.name[0]._;
                 const stats = item.stats[0];
                 const status = item.status[0];
-                const gameItem = {gameId: gameId} as CollectionGame;
+                const existingItem = byId[gameId];
+                const existing = !!existingItem;
+                const gameItem = existingItem || ({ gameId: gameId, rating: -1 } as CollectionGame);
                 if (stats) {
                     const rating = stats.rating;
                     if (rating && rating.length > 0) {
-                        gameItem.rating = parseFloat(rating[0].$.value);
-                    } else {
-                        gameItem.rating = -1;
+                        const r = parseFloat(rating[0].$.value);
+                        if (!Number.isNaN(r)) gameItem.rating = r;
                     }
-                    if (gameItem.rating == null || Number.isNaN(gameItem.rating)) gameItem.rating = -1;
                 }
                 if (status) {
-                    gameItem.owned = status.$.own === '1';
-                    gameItem.prevOwned = status.$.prevowned === '1';
-                    gameItem.forTrade = status.$.fortrade === '1';
-                    gameItem.want = status.$.want === '1';
-                    gameItem.wantToPlay = status.$.wanttoplay === '1';
-                    gameItem.wantToBuy = status.$.wanttobuy;
+                    gameItem.owned = gameItem.owned || (status.$.own === '1');
+                    gameItem.prevOwned = gameItem.prevOwned || (status.$.prevowned === '1');
+                    gameItem.forTrade = gameItem.forTrade || (status.$.fortrade === '1');
+                    gameItem.want = gameItem.want || (status.$.want === '1');
+                    gameItem.wantToPlay = gameItem.wantToPlay || (status.$.wanttoplay === '1');
+                    gameItem.wantToBuy = gameItem.wantToBuy || (status.$.wanttobuy);
                     const onWishList = status.$.wishlist === '1';
-                    gameItem.wishListPriority = onWishList ? parseInt(status.$.wishlist) : 0;
-                    gameItem.preordered = status.$.preordered === '1';
+                    gameItem.wishListPriority = gameItem.wishListPriority || (onWishList ? parseInt(status.$.wishlist) : 0);
+                    gameItem.preordered = gameItem.preordered || (status.$.preordered === '1');
                 }
-                items.push(gameItem);
+                if (!existing) {
+                    items.push(gameItem);
+                    byId[gameItem.gameId] = gameItem;
+                }
             }
         });
     }
+
+    // console.log(items);
     return { geek: geek, items: items };
 }
 
@@ -174,14 +179,15 @@ export class NoSuchGameError {
     }
 }
 
-export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<PlayData[]> {
+export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<{ count: number, plays: PlayData[] }> {
     const dom = await xml2js(fileContents, {trim: true});
     const result: PlayData[] = [];
     if (!dom || !dom.plays || !dom.plays.play) {
         console.log("Plays not found");
         console.log(dom);
-        return result;
+        return { count: -1, plays: result };
     }
+    const playCount = parseInt(dom.plays.$.total);
     dom.plays.play.forEach(play => {
         const date = play.$.date;
         const items = play.item;
@@ -192,7 +198,7 @@ export async function processPlaysFile(fileContents: string, invocation: FileToP
         const ratingsTotal = 0; // TODO
         result.push({ quantity, location, date, gameid, raters, ratingsTotal });
     });
-    return result;
+    return { count: playCount, plays: result };
 }
 
 // TODO - get player ratings

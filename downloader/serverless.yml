@@ -17,6 +17,8 @@ custom:
 functions:
   processUserList:
     handler: functions.processUserList
+    tags:
+      component: downloader
     environment:
       USERS_FILE: ${self:custom.secret.usersFile}
     role:
@@ -32,6 +34,8 @@ functions:
               stage: dev
   processMetadata:
     handler: functions.processMetadata
+    tags:
+      component: downloader
     environment:
       METADATA_FILE: ${self:custom.secret.metadataFile}
     role:
@@ -47,6 +51,8 @@ functions:
               stage: dev
   fireFileProcessing:
     handler: functions.fireFileProcessing
+    tags:
+      component: downloader
     environment:
       COUNT: ${self:custom.secret.filesPerMinute}
     role:
@@ -66,10 +72,14 @@ functions:
       "invokeLambdas"
   processGame:
     handler: functions.processGame
+    tags:
+      component: downloader
     role:
       "invokeLambdas"
   processPlayed:
     handler: functions.processPlayed
+    tags:
+      component: downloader
     role:
       "invokeLambdas"
   processPlays:
@@ -78,6 +88,8 @@ functions:
       "invokeLambdas"
   processCollection:
     handler: functions.processCollection
+    tags:
+      component: downloader
     timeout: 300
     memorySize: 256
     role:
