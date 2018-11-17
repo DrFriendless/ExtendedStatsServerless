@@ -32,3 +32,16 @@ export async function returnWithConnectionAsync<T>(func: (conn: mysql.Connection
         throw e;
     }
 }
+
+export async function getGamesThatDontExist(conn: mysql.Connection): Promise<number[]> {
+    const sql = "select bggid from not_games";
+    return (await conn.query(sql)).map((row: { [key: string]: any }) => row.bggid);
+}
+
+export function listMinus(ints: number[], takeaway: number[]): number[] {
+    return ints.filter(x => takeaway.indexOf(x) < 0);
+}
+
+export function listIntersect(ints: number[], other: number[]): number[] {
+    return ints.filter(x => other.indexOf(x) >= 0);
+}

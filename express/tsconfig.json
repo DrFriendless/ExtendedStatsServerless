@@ -15,7 +15,7 @@
         "src/types/*"
       ]
     },
-    "lib": [ "es2017", "dom", "es2015" ],
+    "lib": [ "es2018", "es2015", "es6" ],
     "types": ["node"]
   },
   "include": [

@@ -4,11 +4,12 @@ import path from "path";
 import logger from "morgan";
 import errorhandler from "errorhandler";
 
-// Load environment variables from .env file, where API keys and passwords are configured
+// Load environment variables from .env file, where API keys and passwords are configured for the development environment
 dotenv.config({ path: ".env.example" });
 
 import * as indexRoute from "./routes/index";
 import * as findGeeksRoute from "./routes/findgeeks";
+import * as ensureGamesRoute from "./routes/ensuregames";
 
 // Create Express server
 const app = express();
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/findgeeks/:fragment", findGeeksRoute.findgeeks);
+app.post("/ensuregames", ensureGamesRoute.ensuregames);
 app.get("/", indexRoute.index);
 
 if (process.env.NODE_ENV === "development") {
