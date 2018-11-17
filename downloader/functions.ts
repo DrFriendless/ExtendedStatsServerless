@@ -208,6 +208,11 @@ async function tryToProcessCollection(invocation: FileToProcess): Promise<number
         throw e;
     }
     const collection = await extractUserCollectionFromPage(invocation.geek, invocation.url, response.body.toString());
+    const ids = collection.items.map(item => item.gameId);
+    // make sure that all of these games are in the database
+    // if there are a lot, this lambda might timeout, but next time more of them will be there.
+    const added = await ensureGames(ids);
+    if (added.length > 0) console.log("Added " + added + " to the database for " + invocation.geek);
     for (const games of splitCollection(collection)) {
         await invokeLambdaAsync("processCollection", INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES, games);
         console.log("invoked " + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES + " for " + games.items.length + " games.");
@@ -215,6 +220,14 @@ async function tryToProcessCollection(invocation: FileToProcess): Promise<number
     await cleanupCollection(collection, invocation.url);
     console.log("cleaned up collection");
     return 200;
+}
+
+async function ensureGames(ids: number[]): Promise<number[]> {
+    const options = {
+        uri: "http://eb.drfriendless.com/ensuregames",
+        json: ids
+    };
+    return await request.post(options);
 }
 
 async function cleanupCollection(collection: ProcessCollectionResult, url: string) {
