@@ -343,12 +343,14 @@ export async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string,
 }
 
 async function doUpdateGeekgame(conn: mysql.Connection, geekId: number, game: CollectionGame) {
-    // TODO - use an update instead of delete & insert
-    const deleteSql = "delete from geekgames where game = ? and geekid = ?";
     const insertSql = "insert into geekgames (geekId, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    await conn.query(deleteSql, [game.gameId, geekId]);
-    await conn.query(insertSql, [geekId, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
-        game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
+    const updateSql = "update geekgames set rating = ?, owned = ?, want = ?, wish = ?, trade = ?, prevowned = ?, wanttobuy = ?, wanttoplay = ?, preordered = ? where game = ? and geekid = ?";
+    const updateResult = await conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade, game.prevOwned,
+        game.wantToBuy, game.wantToPlay, game.preordered, game.gameId, geekId]);
+    if (updateResult["affectedRows"] === 0) {
+        await conn.query(insertSql, [geekId, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
+            game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
+    }
 }
 
 export async function doEnsureProcessPlaysFiles(conn: mysql.Connection, geek: string, months: MonthPlayed[]) {
