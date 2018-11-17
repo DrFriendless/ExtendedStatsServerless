@@ -343,6 +343,7 @@ export async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string,
 }
 
 async function doUpdateGeekgame(conn: mysql.Connection, geekId: number, game: CollectionGame) {
+    // TODO - use an update instead of delete & insert
     const deleteSql = "delete from geekgames where game = ? and geekid = ?";
     const insertSql = "insert into geekgames (geekId, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     await conn.query(deleteSql, [game.gameId, geekId]);

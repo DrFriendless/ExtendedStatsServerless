@@ -110,7 +110,10 @@ export async function processCollectionUpdateGames(event, context, callback: Cal
     context.callbackWaitsForEmptyEventLoop = false;
     const params = event as ProcessCollectionResult;
     try {
-        await runEnsureGames(params.items);
+        // this has been added to Express as method ensuregames.
+        // The caller should call that before calling this (or this will fail.)
+        // This was because processCollectionUpdateGames took way too long to run.
+        // await runEnsureGames(params.items);
         await runUpdateGamesForGeek(params.geek, params.items);
         callback();
     } catch (e) {

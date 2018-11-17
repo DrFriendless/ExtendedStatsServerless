@@ -8,7 +8,10 @@ import mysql = require("promise-mysql");
  * @param {} res
  */
 export async function ensuregames(req: Request, res: Response) {
-    const gameIds = req.body.filter((x: any) => typeof x === "number" && x > 0 && x < 10000000);
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const gameIds = body
+        .map((x: any) => typeof x === "string" ? parseInt(x) : x)
+        .filter((x: any) => typeof x === "number" && x > 0 && x < 10000000);
     const gameIdsToAdd = await returnWithConnectionAsync(conn => removeExistingGames(conn, gameIds));
     const success: number[] = [];
     for (const id of gameIdsToAdd) {
@@ -16,6 +19,7 @@ export async function ensuregames(req: Request, res: Response) {
             // one transaction per game so that if we time out or something at least some get done.
             await withConnectionAsync(conn => doRecordGame(conn, id));
             success.push(id);
+            console.log("added game " + id);
         } catch (e) {
             // meh
         }
