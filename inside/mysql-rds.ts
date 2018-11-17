@@ -210,13 +210,9 @@ export async function doProcessGameResult(conn: mysql.Connection, data: ProcessG
 
 export async function doProcessCollectionCleanup(conn: mysql.Connection, geek: string, items: number[], url: string) {
     const geekid = await getGeekId(conn, geek);
-    console.log("geek = " + geek + " " + geekid);
     await doRestrictCollectionToGames(conn, geekid, items);
-    console.log("a");
     await doMarkUrlProcessed(conn, "processCollection", url);
-    console.log("b");
     await doUpdateFrontPageGeek(conn, geek);
-    console.log("done");
 }
 
 async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: number, items: number[]) {
@@ -239,12 +235,22 @@ async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: numbe
 }
 
 // longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
-const TILL_NEXT_UPDATE = { 'processCollection' : '72:00:00', 'processMarket' : '72:00:00', 'processPlayed' : '72:00:00',
-    'processGame' : '838:00:00', 'processTop50' : '72:00:00', "processFrontPage" : '24:00:00', "processUser": '838:00:00'  };
+const TILL_NEXT_UPDATE = { "processCollection" : "72:00:00", "processMarket" : "72:00:00", "processPlayed" : "72:00:00",
+    "processGame" : "838:00:00", "processTop50" : "72:00:00", "processFrontPage" : "24:00:00", "processUser": "838:00:00"  };
 
+function about3Days() {
+    const minutes = 3600 + Math.floor(Math.random() * 1440);
+    const ms = minutes % 60;
+    return "" + Math.floor(minutes / 60) + ":" + (ms < 10 ? "0" : "") + ms + ":00";
+}
+
+function tillNextUpdate(processMethod: string) {
+    const orig = TILL_NEXT_UPDATE[processMethod];
+    return (orig === "72:00:00") ? about3Days() : orig;
+}
 
 export async function doMarkUrlProcessed(conn: mysql.Connection, processMethod: string, url: string) {
-    const delta = TILL_NEXT_UPDATE[processMethod];
+    const delta = tillNextUpdate(processMethod);
     const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
     await conn.query(sqlSet, [delta, url, processMethod]);
 }
@@ -407,7 +413,7 @@ async function doRecordGame(conn: mysql.Connection, bggid: number) {
     const GAME_URL = "https://boardgamegeek.com/xmlapi/boardgame/%d&stats=1";
     const url = GAME_URL.replace("%d", bggid.toString());
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
-    const tillNext = TILL_NEXT_UPDATE["processGame"];
+    const tillNext = tillNextUpdate("processGame");
     const insertParams = [url, "processGame", null, null, tillNext, "Game #" + bggid, bggid];
     await conn.query(insertSql, insertParams).catch(err => {});
 }
@@ -419,7 +425,7 @@ async function doRecordFile(conn: mysql.Connection, url: string, processMethod: 
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     const found = await count(conn, countSql, [url, processMethod]);
     if (found === 0) {
-        const tillNext = TILL_NEXT_UPDATE[processMethod];
+        const tillNext = tillNextUpdate(processMethod);
         const insertParams = [url, processMethod, user, null, tillNext, description, bggid, month, year, geekid];
         await conn.query(insertSql, insertParams).catch(err => {});
     }
