@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import path from "path";
 import logger from "morgan";
 import errorhandler from "errorhandler";
+import basicAuth from "express-basic-auth";
+import cors from "cors";
 
 // Load environment variables from .env file, where API keys and passwords are configured for the development environment
 dotenv.config({ path: ".env.example" });
@@ -24,8 +26,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/findgeeks/:fragment", findGeeksRoute.findgeeks);
-app.post("/ensuregames", ensureGamesRoute.ensuregames);
+const downloaderRouter = express.Router();
+downloaderRouter.use(basicAuth({
+    users: { "downloader": process.env.downloaderPassword }
+}));
+downloaderRouter.post("/ensuregames", ensureGamesRoute.ensuregames);
+app.use("/downloader", downloaderRouter);
+
+app.get("/findgeeks/:fragment", cors(), findGeeksRoute.findgeeks);
 app.get("/", indexRoute.index);
 
 if (process.env.NODE_ENV === "development") {
