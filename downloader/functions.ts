@@ -224,10 +224,10 @@ async function tryToProcessCollection(invocation: FileToProcess): Promise<number
 
 async function ensureGames(ids: number[]): Promise<number[]> {
     const options = {
-        uri: "http://eb.drfriendless.com/ensuregames",
+        uri: "http://eb.drfriendless.com/downloader/ensuregames",
         json: ids
     };
-    return await request.post(options);
+    return await request.post(options).auth("downloader", process.env["downloaderPassword"]);
 }
 
 async function cleanupCollection(collection: ProcessCollectionResult, url: string) {

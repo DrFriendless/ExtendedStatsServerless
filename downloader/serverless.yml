@@ -21,6 +21,7 @@ functions:
       component: downloader
     environment:
       USERS_FILE: ${self:custom.secret.usersFile}
+      downloaderPassword: ${self:custom.secret.downloaderPassword}
     role:
       "invokeLambdas"
     events:
@@ -38,6 +39,7 @@ functions:
       component: downloader
     environment:
       METADATA_FILE: ${self:custom.secret.metadataFile}
+      downloaderPassword: ${self:custom.secret.downloaderPassword}
     role:
       "invokeLambdas"
     events:
@@ -68,18 +70,26 @@ functions:
               stage: dev
   processUser:
     handler: functions.processUser
+    tags:
+      component: downloader
+    environment:
+      downloaderPassword: ${self:custom.secret.downloaderPassword}
     role:
       "invokeLambdas"
   processGame:
     handler: functions.processGame
     tags:
       component: downloader
+    environment:
+      downloaderPassword: ${self:custom.secret.downloaderPassword}
     role:
       "invokeLambdas"
   processPlayed:
     handler: functions.processPlayed
     tags:
       component: downloader
+    environment:
+      downloaderPassword: ${self:custom.secret.downloaderPassword}
     role:
       "invokeLambdas"
   processPlays:
@@ -90,6 +100,8 @@ functions:
     handler: functions.processCollection
     tags:
       component: downloader
+    environment:
+      downloaderPassword: ${self:custom.secret.downloaderPassword}
     timeout: 300
     memorySize: 256
     role:
