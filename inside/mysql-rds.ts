@@ -25,17 +25,19 @@ export async function doUpdateMetadata(conn: mysql.Connection, series: SeriesMet
 
 async function doUpdateSeries(conn: mysql.Connection, seriesMetada: SeriesMetadata[]) {
     const deleteSql = "delete from series where series_id = ?";
-    const insertSql = "insert into series (series_id, game) values (?,?)";
+    const insertSql = "insert into series (series_id, game) values ?";
     const gamesThatDontExist = await getGamesThatDontExist(conn);
     for (const sm of seriesMetada) {
         const sid = await doGetOrCreateSeriesMetadata(conn, sm.name);
         const gamesToUse = listMinus(sm.games, gamesThatDontExist);
         await doEnsureGames(conn, gamesToUse);
         await conn.query(deleteSql, sid);
+        const values = [];
         for (const game of gamesToUse) {
-            console.log(sm.name + " " + game);
-            await conn.query(insertSql, [sid, game]);
+            values.push([sid, game]);
         }
+        console.log(values);
+        await conn.query(insertSql, [values]);
     }
 }
 
@@ -555,39 +557,54 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
 export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, expansionData: ExpansionData) {
     const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
     const deleteSql = "delete from plays_normalised where geek = ? and month = ? and year = ?";
-    const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values (?, ?, ?, ?, ?, ?, 0)";
+    const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values ?";
     const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
-    const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values (?, ?, ?, ?, ?, ?, 1, ?)";
+    const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values ?";
     const rows = await conn.query(selectSql, [geekId, month, year]);
     const rawData = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
     const byDate = _.groupBy(rawData, playDate);
     const allPlays = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays as NormalisedPlays[], expansionData))) as WorkingNormalisedPlays[];
     await conn.query(deleteSql, [geekId, month, year]);
+    // insert all of the base plays
+    const basePlays = [];
     for (let np of allPlays) {
-        await conn.query(insertBasePlaySql, [np.game, geekId, np.quantity, np.year, np.month, np.date]);
+        basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, 0]);
+    }
+    if (basePlays.length > 0) {
+        await conn.query(insertBasePlaySql, [basePlays]);
+    }
+    // construct the expansion plays with references to the base plays
+    const expPlays = [];
+    for (let np of allPlays) {
         if (np.expansions.length > 0) {
             const id = (await conn.query(getIdSql, [np.game, geekId, np.quantity, np.year, np.month, np.date]))[0].id;
             for (let e of np.expansions) {
-                const eparams = [e, geekId, np.quantity, np.year, np.month, np.date, id];
-                await conn.query(insertExpansionPlaySql, eparams);
+                expPlays.push([e, geekId, np.quantity, np.year, np.month, np.date, 1, id]);
             }
         }
+    }
+    if (expPlays.length > 0) {
+        await conn.query(insertExpansionPlaySql, [expPlays]);
     }
 }
 
 export async function doSetGeekPlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number,
                                              plays: PlayData[], notGames: number[]) {
     const deleteSql = "delete from plays where geek = ? and month = ? and year = ?";
-    const insertSql = "insert into plays (game, geek, playDate, quantity, raters, ratingsTotal, location, month, year) values (?, ?, STR_TO_DATE(?, '%Y-%m-%d'), ?, ?, ?, ?, ?, ?)";
+    const insertSql = "insert into plays (game, geek, playDate, quantity, raters, ratingsTotal, location, month, year) values ?";
     const playsAlready = await countWhere(conn, "plays where geek = ? and month = ? and year = ?", [geekId, month, year]);
     if (playsAlready > 0 && plays.length === 0) {
         console.log("Not updating plays for " + geekId + " " + month + "/" + year + " because there are existing plays and none to replace them.");
         return;
     }
     await conn.query(deleteSql, [geekId, month, year]);
+    const values = [];
     for (const play of plays) {
         if (notGames.indexOf(play.gameid) >= 0) continue;
-        await conn.query(insertSql, [play.gameid, geekId, play.date, play.quantity, play.raters, play.ratingsTotal, play.location, month, year]);
+        values.push([play.gameid, geekId, play.date, play.quantity, play.raters, play.ratingsTotal, play.location, month, year]);
+    }
+    if (values.length > 0) {
+        await conn.query(insertSql, [values]);
     }
 }
 
