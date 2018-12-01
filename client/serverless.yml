@@ -12,7 +12,6 @@ provider:
 
 custom:
   assets:
-    auto: true
     targets:
      - bucket:
          Ref: StaticBucket

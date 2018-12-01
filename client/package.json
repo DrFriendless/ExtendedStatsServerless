@@ -5,12 +5,12 @@
   "private": true,
   "dependencies": {
     "@types/aws-lambda": "0.0.17",
-    "aws-sdk": "^2.259.1",
-    "npm": "^6.4.0",
-    "serverless": "^1.28.0"
+    "aws-sdk": "^2.368.0",
+    "npm": "^6.4.1",
+    "serverless": "^1.34.1"
   },
   "devDependencies": {
-    "@angular/cli": "^6.1.3",
+    "@angular/cli": "^6.2.8",
     "serverless-plugin-typescript": "^1.1.5",
     "serverless-s3-deploy": "^0.7.0"
   }
