@@ -1,0 +1,7 @@
+<mat-form-field class="input-full-width">
+  <mat-chip-list [selectable]="true">
+    <mat-chip [removable]="true" (removed)="remove(geek)" *ngFor="let geek of geeks">
+      {{geek}}<mat-icon matChipRemove>cancel</mat-icon>
+    </mat-chip>
+  </mat-chip-list>
+</mat-form-field>
