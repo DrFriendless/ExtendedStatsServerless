@@ -1,16 +1,22 @@
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
-
-import { AppComponent } from './app.component';
+import { PlaysWidget } from './app.component';
+import { NewPlaysComponent } from './new-plays/new-plays.component';
+import { HttpClientModule } from "@angular/common/http";
+import { NgbModule } from "@ng-bootstrap/ng-bootstrap";
+import { TooltipModule } from 'ngx-bootstrap/tooltip';
+import { ExtstatsAngularModule } from "extstats-angular";
+import { FormsModule } from '@angular/forms';
 
 @NgModule({
   declarations: [
-    AppComponent
+    PlaysWidget,
+    NewPlaysComponent
   ],
   imports: [
-    BrowserModule
+    BrowserModule, HttpClientModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule, FormsModule
   ],
   providers: [],
-  bootstrap: [AppComponent]
+  bootstrap: [PlaysWidget]
 })
 export class AppModule { }
