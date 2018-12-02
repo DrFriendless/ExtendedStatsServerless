@@ -9,7 +9,7 @@ for F in src/*.mustache
     do
     FILENAME=`basename ${F}`
     FILENAME=${FILENAME%%.*}
-    mustache values.json -p src/partials/adsbygoogle.mustache \
+    mustache values.json -p src/partials/adsplaceholder.mustache \
                          -p src/partials/loginhead.mustache \
                          -p src/partials/gtmbody.mustache \
                          -p src/partials/windowhack.mustache \
