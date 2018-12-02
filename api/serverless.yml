@@ -63,6 +63,8 @@ functions:
           private: false
   adminGatherSystemStats:
     handler: functions.adminGatherSystemStats
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -79,6 +81,8 @@ functions:
         "doStuffFromInsideVPC"
   getNews:
     handler: functions.getNews
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -95,6 +99,8 @@ functions:
         "doStuffFromInsideVPC"
   getUserList:
     handler: functions.getUserList
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -111,6 +117,8 @@ functions:
         "doStuffFromInsideVPC"
   query:
     handler: functions.query
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -127,6 +135,8 @@ functions:
         "doStuffFromInsideVPC"
   getGeekSummary:
     handler: functions.getGeekSummary
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -143,6 +153,8 @@ functions:
         "doStuffFromInsideVPC"
   incFAQCount:
     handler: functions.incFAQCount
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -159,6 +171,8 @@ functions:
         "doStuffFromInsideVPC"
   getCollectionWithPlays:
     handler: functions.getCollectionWithPlays
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -181,6 +195,8 @@ functions:
         "doStuffFromInsideVPC"
   getRankings:
     handler: functions.getRankings
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -203,6 +219,8 @@ functions:
         "doStuffFromInsideVPC"
   getWarTable:
     handler: functions.getWarTable
+    tags:
+      component: api
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
