@@ -35,7 +35,6 @@ async function withAuthentication(event, callback: (Error?, Decoded?) => Promise
         algorithms: ["RS256"],
         issuer: ["https://drfriendless.au.auth0.com/"],
         audience: ["z7FL2jZnXI9C66WcmCMC7V1STnQbFuQl"] // this is the ID of the application in auth0
-        // TODO check token is not expired
     };
     let decoded = null;
     try {
@@ -57,8 +56,12 @@ export async function authenticate(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     await withAuthentication(event, async (error, decoded) => {
         if (error) {
-            console.log(error);
-            callback(new Error("Computer says no."));
+            if (error.name === 'TokenExpiredError') {
+                callback(new Error('TokenExpiredError'));
+            } else {
+                console.log(error);
+                callback(new Error("Bzzzt!"));
+            }
         } else {
             callback(undefined, await getUserData(decoded));
         }
@@ -71,7 +74,7 @@ async function getUserData(decoded: Decoded): Promise<UserData> {
 }
 
 async function getPersonalData(decoded: Decoded): Promise<PersonalData> {
-    return { userData: await getUserData(decoded), allData: await retrieveAllData(decoded.sub) };
+    return { userData: await getUserData(decoded), allData: await retrieveAllData(decoded.sub), error: undefined };
 }
 
 export async function personal(event, context, callback: Callback) {
@@ -79,7 +82,7 @@ export async function personal(event, context, callback: Callback) {
     await withAuthentication(event, async (error, decoded) => {
         if (error) {
             console.log(error);
-            callback(new Error("Computer says no."));
+            callback(undefined, { error: error.name });
         } else {
             callback(undefined, await getPersonalData(decoded));
         }
