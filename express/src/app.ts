@@ -7,7 +7,7 @@ import basicAuth from "express-basic-auth";
 import cors from "cors";
 
 // Load environment variables from .env file, where API keys and passwords are configured for the development environment
-dotenv.config({ path: ".env.example" });
+dotenv.config({ path: ".env" });
 
 import * as indexRoute from "./routes/index";
 import * as findGeeksRoute from "./routes/findgeeks";

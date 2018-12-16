@@ -1,2 +1,4 @@
 #!/usr/bin/env bash
-eb deploy extstats-express
+npm run build
+zip -r extstats-express.zip dist node_modules
+

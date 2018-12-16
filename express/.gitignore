@@ -9,3 +9,5 @@ node_modules/
 /.ebextensions/*
 /dist/
 /.env.example
+/extstats-express.zip
+/.env.production
