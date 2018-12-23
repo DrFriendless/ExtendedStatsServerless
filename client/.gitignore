@@ -7,3 +7,4 @@ jspm_packages
 env.yml
 
 static
+/client.code-workspace
