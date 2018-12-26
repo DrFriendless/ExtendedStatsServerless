@@ -1,17 +1,17 @@
 import mysql = require('promise-mysql');
-import {asyncReturnWithConnection} from "./library";
-import {UserConfig} from "extstats-core";
+import { asyncReturnWithConnection } from "./library";
+import { UserConfig, UserData } from "extstats-core";
 
 export class User {
-    private identity: string;
-    private username: string | undefined;
+    private readonly identity: string;
+    private readonly username: string | undefined;
     private configuration: UserConfig;
     private loginCount: number;
     private created: Date;
     private lastLogin: Date | undefined;
     private icon: number | undefined;
     private colour: number | undefined;
-    private firstLogin: boolean;
+    private readonly firstLogin: boolean;
 
     constructor(identity: string, username: string, loginCount: number, firstLogin: boolean) {
         this.identity = identity;
@@ -58,6 +58,10 @@ export async function findOrCreateUser(identity: string, suggestedUsername: stri
     return asyncReturnWithConnection(conn => doFindOrCreateUser(conn, identity, suggestedUsername));
 }
 
+export async function updateUser(identity: string, userData: UserData) {
+    return asyncReturnWithConnection(conn => doUpdateUser(conn, identity, userData));
+}
+
 export async function doFindOrCreateUser(conn: mysql.Connection, identity: string, suggestedUsername: string): Promise<User> {
     const findSql = "select * from users where identity = ?";
     const createSql = "insert into users (identity, username, created) values (?,?,?)";
@@ -71,6 +75,11 @@ export async function doFindOrCreateUser(conn: mysql.Connection, identity: strin
         await recordLoginForUser(conn, user);
         return user;
     }
+}
+
+async function doUpdateUser(conn: mysql.Connection, identity: string, userData: UserData) {
+    const updateSql = "update users set configuration = ? where identity = ?";
+    await conn.query(updateSql, [JSON.stringify(userData), identity]);
 }
 
 async function recordLoginForUser(conn: mysql.Connection, user: User) {

@@ -1,10 +1,10 @@
-import {Callback} from 'aws-lambda';
+import { Callback } from 'aws-lambda';
 import {
     doGetNews, doQuery, gatherGeekSummary,
     gatherSystemStats, listUsers, listWarTable, rankGames, updateFAQCount
 } from "./mysql-rds";
-import {asyncReturnWithConnection} from "./library";
-import {GeekGameQuery} from "extstats-core";
+import { asyncReturnWithConnection } from "./library";
+import { GeekGameQuery } from "extstats-core";
 
 export async function getGeekSummary(event, context, callback: Callback) {
     try {
