@@ -1,5 +1,3 @@
-<button (click)="refresh()">Refresh</button>
-
 <div *ngIf="!username">
   <p>
     Extended Stats uses data from boardgamegeek.com. This data is available to everybody, without logging in.
@@ -12,19 +10,30 @@
 
 <div class="user-config-form" *ngIf="!!username">
   <form #userForm="ngForm">
-    <div class="form-group">
-      <label for="geekname">BGG User Name</label>
-      <input type="text" class="form-control" size="80" id="geekname" required [(ngModel)]="geekname" name="geekname">
-      <br>
-      <button type="submit" class="btn btn-success" (click)="save()">Save</button>
+    <p>This is your BGG user name. In case you use multiple accounts, enter them all so you will be able to switch between them easily.
+      If your BGG username is not here, please PM Friendless on BGG to be added to the list.
+    </p>
+    <geek-combo (geekChosen)="geekchips.addGeek($event)" [placeholder]="'BGG User Name'"></geek-combo>
+    <geek-chips #geekchips [editable]="true" [geeks]="geekids"></geek-chips>
+
+    <h4>Buddy Groups</h4>
+    <p>These are your buddy groups, which are groups of people that you will be able to compare with each other.</p>
+    <div fxLayout="column" fxLayoutGap="32px">
+      <buddy-set-editor *ngFor="let buddies of buddyGroups" [buddies]="buddies" (edited)="buddiesChanged($event)"></buddy-set-editor>
     </div>
+    <button type="button" class="extstats-button" (click)="more()" style="margin: 20px">Another Buddy Group</button>
   </form>
 
   <div>
     <a name="personal"><h4>Your Personal Data</h4></a>
     <p>This is the data which Extended Stats stores about you.</p>
-    <textarea class="personal-data" readonly [rows]="8">
+    <mat-form-field class="input-full-width" style="display: block;">
+    <textarea matInput class="personal-data" readonly [rows]="8" class="input-full-width">
       {{personalData.toString()}}
     </textarea>
+    </mat-form-field>
   </div>
 </div>
+
+<button type="button" class="extstats-button" (click)="refresh()">Refresh</button>
+<button type="button" class="extstats-button" (click)="save()">Save</button>

@@ -1,0 +1,17 @@
+<div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="center baseline" class="buddysetro" *ngIf="!editing">
+  <input matInput fxFlex="0 0 75px" [(ngModel)]="name" readonly>
+  <geek-chips fxFlex="1 1 auto" [editable]="false" [geeks]="geeks"></geek-chips>
+  <button fxFlex="0 0 50px" type="button" class="extstats-button" (click)="edit()">Edit</button>
+  <button fxFlex="0 0 50px" type="button" class="extstats-button" (click)="delete()">Delete</button>
+</div>
+<div fxLayout="column" fxLayoutGap="12px" fxLayoutAlign="center baseline" *ngIf="editing">
+  <div fxLayout="row" fxLayoutGap="12px">
+    <mat-form-field class="input-full-width">
+      <input matInput placeholder="Buddy group name" [(ngModel)]="name">
+    </mat-form-field>
+    <button type="button" class="extstats-button" (click)="save()" [disabled]="!saveable()">Save</button>
+    <button type="button" class="extstats-button" (click)="cancel()">Cancel</button>
+  </div>
+  <geek-combo (geekChosen)="chips.addGeek($event)" [placeholder]="'Buddy name'"></geek-combo>
+  <geek-chips style="width: 100%" #chips [editable]="true" [geeks]="geeks"></geek-chips>
+</div>
