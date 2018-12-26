@@ -54,7 +54,7 @@ import {
     BrowserModule, HttpClientModule, FormsModule, ExtstatsAngularModule, MatInputModule, BrowserAnimationsModule, MatButtonModule,
     FlexLayoutModule
   ],
-  providers: [],
+  providers: [ HttpClientModule ],
   bootstrap: [UserConfigComponent]
 })
 export class AppModule { }

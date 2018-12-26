@@ -27,7 +27,7 @@
     "@ngui/auto-complete": "^2.0.0",
     "core-js": "^2.5.4",
     "extstats-angular": "^3.2.2",
-    "extstats-core": "^1.0.0",
+    "extstats-core": "^1.1.0",
     "hammerjs": "^2.0.8",
     "ngx-bootstrap": "^3.0.1",
     "rollup": "^0.65.2",

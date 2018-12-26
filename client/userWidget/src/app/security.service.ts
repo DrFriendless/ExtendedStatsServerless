@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs/internal/Observable';
-import { PersonalData, UserData, BuddySet } from 'extstats-core';
+import { PersonalData, UserConfig, BuddySet } from 'extstats-core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { of } from 'rxjs/internal/observable/of';
 
@@ -28,8 +28,15 @@ export class SecurityService implements SecurityApi {
     return localStorage.getItem('username');
   }
 
-  public saveUserData(userData: UserData) {
-    // TODO
+  public saveUserConfig(userConfig: UserConfig) {
+    const jwt = localStorage.getItem('jwt');
+    if (jwt) {
+      const options = {
+        headers: new HttpHeaders().set('Authorization', 'Bearer ' + jwt)
+      };
+      const body = userConfig;
+      this.http.post('https://api.drfriendless.com/v1/update', body, options);
+    }
   }
 }
 
@@ -38,23 +45,23 @@ export interface SecurityApi {
 
   getStoredUsername(): string | undefined;
 
-  saveUserData(userData: UserData);
+  saveUserConfig(userConfig: UserConfig);
 }
 
 export class TestSecurityService implements SecurityApi {
   private GEEK = 'Friendless';
-  private userData = { usernames: [this.GEEK], buddies: [ new BuddySet("Family", ["Friendless", "Scrabblette", "harley22"]) ] } as UserData;
+  private userConfig = { usernames: [this.GEEK], buddies: [ new BuddySet("Family", ["Friendless", "Scrabblette", "harley22"]) ] } as UserConfig;
 
   public getStoredUsername(): string | undefined {
     return this.GEEK;
   }
 
   public loadUserData(): Observable<PersonalData | undefined> {
-    return of({ error: 'TokenExpiredError', userData: this.userData, allData: undefined });
+    return of({ error: 'TokenExpiredError', userData: { config: this.userConfig }, allData: undefined } as PersonalData);
   }
 
-  public saveUserData(userData: UserData) {
-    this.userData = userData;
-    console.log(userData);
+  public saveUserConfig(userConfig: UserConfig) {
+    this.userConfig = userConfig;
+    console.log(userConfig);
   }
 }

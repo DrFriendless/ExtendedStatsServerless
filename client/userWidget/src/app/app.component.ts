@@ -4,7 +4,7 @@ import { flatMap, map, tap } from 'rxjs/operators';
 import { Subscription } from 'rxjs/internal/Subscription';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { SecurityService } from './security.service';
-import { UserData, BuddySet } from 'extstats-core';
+import { UserConfig, BuddySet } from 'extstats-core';
 
 @Component({
   selector: 'extstats-user-config',
@@ -25,24 +25,26 @@ export class UserConfigComponent implements OnDestroy {
         map(u => u ? u : undefined),
         tap(u => this.username = u),
         flatMap(u => this.securityApi.loadUserData()),
-        tap(pd => this.setToUi(pd.userData)),
+        tap(pd => {
+          if (pd && pd.userData && pd.userData.config) this.setToUi(pd.userData.config);
+        }),
         map(pd => pd ? JSON.stringify(pd) : '')
       )
       .subscribe(pds => this.personalData = pds);
     this.refresh();
   }
 
-  private setToUi(ud: UserData) {
-    this.geekids = ud.usernames;
-    this.buddyGroups = ud.buddies;
+  private setToUi(userConfig: UserConfig) {
+    this.geekids = userConfig.usernames;
+    this.buddyGroups = userConfig.buddies;
   }
 
-  private gatherUserData(): UserData {
-    return { usernames: this.geekids, buddies: this.buddyGroups } as UserData;
+  private gatherUserData(): UserConfig {
+    return { usernames: this.geekids, buddies: this.buddyGroups } as UserConfig;
   }
 
   public save() {
-    this.securityApi.saveUserData(this.gatherUserData());
+    this.securityApi.saveUserConfig(this.gatherUserData());
   }
 
   public more() {
