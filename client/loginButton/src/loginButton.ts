@@ -47,19 +47,50 @@ function loadUserData(jwt: string) {
 }
 
 function setUserFromLocalStorage() {
+    const identity = localStorage.getItem("identity");
+    if (identity) {
+        console.log("Found identity in local storage");
+        const id = JSON.parse(identity);
+        console.log(id);
+        const seconds = (new Date()).getTime() / 1000;
+        if (id.exp < seconds) {
+            console.log("Login expired");
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("identity");
+            localStorage.removeItem("jwt");
+            localStorage.removeItem("username");
+            return;
+        }
+        localStorage.setItem("username", id["nickname"]);
+    } else {
+        console.log("No identity in local storage.");
+    }
     const user = localStorage.getItem("username");
-    if (user) username = user;
+    if (user) {
+        console.log("setting username to " + user);
+        username = user;
+    }
 }
 
 function showAndHide() {
+    console.log("showAndHide");
     if (username) {
         if (document.getElementById("btn-login")) document.getElementById("btn-login").style.display = "none";
-        if (document.getElementById("extstats-logout")) document.getElementById("extstats-logout").style.display = "block";
+        if (document.getElementById("extstats-logout")) {
+            document.getElementById("extstats-logout").style.display = "block";
+            document.getElementById("btn-logout").style.display = "block";
+        }
     } else {
         if (document.getElementById("btn-login")) document.getElementById("btn-login").style.display = "block";
         if (document.getElementById("extstats-logout")) document.getElementById("extstats-logout").style.display = "none";
     }
-    if (document.getElementById("user-link")) document.getElementById("user-link").innerHTML = username;
+    if (document.getElementById("user-link")) {
+        if (username) {
+            document.getElementById("user-link").innerHTML = username;
+        } else {
+            document.getElementById("user-link").innerHTML = "";
+        }
+    }
 }
 
 lock.on("authenticated", authResult => {
