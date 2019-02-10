@@ -86,7 +86,7 @@ export async function update(event, context, callback: Callback) {
 
 async function getUserData(decoded: Decoded): Promise<UserData> {
     const user = await findOrCreateUser(decoded.sub, decoded.nickname);
-    return { jwt: decoded, first: user.isFirstLogin(), config: user.getConfig() } as UserData;
+    return { jwt: decoded, first: user.isFirstLogin(), config: user.getConfig(), username: user.getUsername() } as UserData;
 }
 
 async function saveUserData(decoded: Decoded, userData: UserData) {

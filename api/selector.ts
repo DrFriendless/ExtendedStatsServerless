@@ -1,7 +1,7 @@
 import mysql = require('promise-mysql');
-import {Arg, Argument, Expression, Integer, Keyword, parse, StringValue} from "./parser";
-import {getGeekId} from "./library";
-import {GeekGameQuery, GeekGameQueryResult, SelectorMetadataSet, GeekGame} from "extstats-core";
+import { Arg, Argument, Expression, Integer, Keyword, parse, StringValue } from "./parser";
+import { getGeekId } from "./library";
+import { GeekGameQuery, GeekGameQueryResult, SelectorMetadataSet, GeekGame } from "extstats-core";
 
 export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameQueryResult> {
     const expr = parse(q);

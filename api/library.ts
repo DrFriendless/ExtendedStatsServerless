@@ -34,3 +34,21 @@ export async function getGeekId(conn: mysql.Connection, geek: string): Promise<n
     if (!results.length) throw new Error("Geek " + geek + " does not seem to be in Extended Stats");
     return results[0]['id'];
 }
+
+export async function getGeekIds(conn: mysql.Connection, geeks: string[]): Promise<{ [id: number]: string }> {
+    if (!geeks) return undefined;
+    if (geeks.length === 1) {
+        const geek: string = geeks[0];
+        const id: number = await getGeekId(conn, geek);
+        const result = {};
+        result[id] = geek;
+        return result;
+    }
+    const getIdSql = "select id, username from geeks where geeks.username in ?";
+    const results = await conn.query(getIdSql, [geeks]);
+    const result = {};
+    for (const row of results) {
+        result[parseInt(row.id)] = row.username;
+    }
+    return result;
+}

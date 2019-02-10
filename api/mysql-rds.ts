@@ -1,8 +1,9 @@
 import mysql = require('promise-mysql');
-import {asyncReturnWithConnection, count, countTableRows, getGeekId} from "./library";
-import {selectGames} from "./selector";
-import {RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
-    TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem} from "extstats-core";
+import { asyncReturnWithConnection, count, countTableRows, getGeekId, getGeekIds } from './library';
+import { selectGames } from "./selector";
+import { RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
+    TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery, Plays,
+    MultiGeekPlays, PlaysWithDate } from "extstats-core";
 import * as moment from 'moment';
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
@@ -46,7 +47,7 @@ export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {
 }
 
 export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
-        Promise<Collection | CollectionWithPlays | CollectionWithMonthlyPlays> {
+    Promise<Collection | CollectionWithPlays | CollectionWithMonthlyPlays> {
     const queryResult = await selectGames(conn, query, query.query);
     const geekGames = queryResult.geekGames.map(gg => gg.bggid);
     const games = await doRetrieveGames(conn, geekGames);
@@ -71,6 +72,94 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
             return { collection: queryResult.geekGames, games, metadata: queryResult.metadata, extra } as Collection;
         }
     }
+}
+
+// export interface PlaysQuery {
+//     geek: string;
+//     geeks?: string[];
+//     year?: number;
+//     month?: number;
+//     date?: number;
+//     filter?: string;
+// }
+// export interface Collection {
+//     collection: GeekGame[];
+//     games: GameData[];
+//     metadata?: SelectorMetadataSet;
+//     extra?: number[];
+// }
+// export interface PlaysWithDate {
+//     geek?: string;
+//     game: number;
+//     expansions?: number[];
+//     quantity: number;
+//     year: number;
+//     month: number;
+//     date: number;
+// }
+//
+// export interface MultiGeekPlays extends Collection {
+//     geeks: string[];
+//     plays: { [geek: string]: PlaysWithDate[] }
+// }
+export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): Promise<MultiGeekPlays> {
+    const geeks = query.geeks || [query.geek];
+    const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
+    console.log(geekNameIds);
+    if (Object.values(geekNameIds).length === 0) {
+        return { geeks: [], plays: {}, collection: [], games: [] };
+    }
+    let where = "geek in (?)";
+    const args: any[] = [ Object.keys(geekNameIds).map(s => parseInt(s)) ];
+    if (Object.keys(geekNameIds).length === 1) {
+        where = "geek = ?";
+        args[0] = parseInt(Object.keys(geekNameIds)[0]);
+    }
+    if (typeof query.year !== "undefined") {
+        where += " and year = ?";
+        args.push(query.year);
+    }
+    if (typeof query.month !== "undefined") {
+        where += " and month = ?";
+        args.push(query.month);
+    }
+    if (typeof query.date !== "undefined") {
+        where += " and date = ?";
+        args.push(query.date);
+    }
+    // TODO - interpret filter
+    const playsSql = "select id, game, geek, quantity, year, month, date, expansion_play, baseplay from plays_normalised where " + where;
+    const playsResult = await conn.query(playsSql, args);
+    const expPlays = [];
+    const basePlays: { [geek: string]: PlaysWithDate[] } = {};
+    const playsById = {};
+    const gameIds: number[] = [];
+    for (const row of playsResult) {
+        if (gameIds.indexOf(row.game) < 0) gameIds.push(row.game);
+        if (row['expansion_play']) {
+            expPlays.push(row);
+        } else {
+            const pwd: PlaysWithDate = { year: row.year, month: row.month, date: row.date, expansions: [], game: row.game, geek: undefined, quantity: row.quantity };
+            const username = geekNameIds[row.geek];
+            if (!username) {
+                console.log("No user found for " + row.geek);
+                continue;
+            }
+            if (!basePlays.hasOwnProperty(username)) basePlays[username] = [];
+            basePlays[username].push(pwd);
+            playsById[row.id] = pwd;
+        }
+    }
+    for (const ep of expPlays) {
+        const pwd = playsById[ep.baseplay];
+        if (!pwd) {
+            console.log("No base play " + ep.baseplay + " found");
+            continue;
+        }
+        pwd.expansions.push(ep.game);
+    }
+    const games = await doRetrieveGames(conn, gameIds);
+    return { geeks: Object.values(geekNameIds), plays: basePlays, collection: [], games };
 }
 
 async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {

@@ -147,6 +147,24 @@ functions:
           private: true
     role:
         "doStuffFromInsideVPC"
+  plays:
+    handler: functions.plays
+    tags:
+      component: api
+    environment:
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
+    events:
+      - http:
+          path: plays
+          method: post
+          cors: true
+          integration: lambda
+          private: true
+    role:
+        "doStuffFromInsideVPC"
   getGeekSummary:
     handler: functions.getGeekSummary
     tags:

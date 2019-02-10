@@ -1,14 +1,14 @@
 import { Callback } from 'aws-lambda';
 import {
-    doGetNews, doQuery, gatherGeekSummary,
+    doGetNews, doQuery, gatherGeekSummary, doPlaysQuery,
     gatherSystemStats, listUsers, listWarTable, rankGames, updateFAQCount
 } from "./mysql-rds";
 import { asyncReturnWithConnection } from "./library";
-import { GeekGameQuery } from "extstats-core";
+import { GeekGameQuery, PlaysQuery } from "extstats-core";
 
 export async function getGeekSummary(event, context, callback: Callback) {
     try {
-        callback(null, await gatherGeekSummary(event["query"]["geek"]));
+        callback(undefined, await gatherGeekSummary(event["query"]["geek"]));
     } catch (err) {
         console.log(err);
         callback(err);
@@ -17,7 +17,7 @@ export async function getGeekSummary(event, context, callback: Callback) {
 
 export async function incFAQCount(event, context, callback: Callback) {
     try {
-        callback(null, await updateFAQCount(event.body as number[]));
+        callback(undefined, await updateFAQCount(event.body as number[]));
     } catch (err) {
         console.log(err);
         callback(err);
@@ -26,7 +26,7 @@ export async function incFAQCount(event, context, callback: Callback) {
 
 export async function adminGatherSystemStats(event, context, callback: Callback) {
     try {
-        callback(null, await gatherSystemStats());
+        callback(undefined, await gatherSystemStats());
     } catch (err) {
         console.log(err);
         callback(err);
@@ -37,7 +37,7 @@ export async function adminGatherSystemStats(event, context, callback: Callback)
 export async function getUserList(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     try {
-        callback(null, await listUsers());
+        callback(undefined, await listUsers());
     } catch (err) {
         console.log(err);
         callback(err);
@@ -48,7 +48,7 @@ export async function getUserList(event, context, callback: Callback) {
 export async function getWarTable(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     try {
-        callback(null, await listWarTable());
+        callback(undefined, await listWarTable());
     } catch (err) {
         console.log(err);
         callback(err);
@@ -61,13 +61,29 @@ export async function query(event, context, callback: Callback) {
         const query = event.body as GeekGameQuery;
         try {
             const result = await asyncReturnWithConnection(async conn => await doQuery(conn, query));
-            callback(null, result);
+            callback(undefined, result);
         } catch (err) {
             console.log(err);
             callback(err);
         }
     } else {
-        callback(null);
+        callback();
+    }
+}
+
+export async function plays(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    if (event && event.body) {
+        const query = event.body as PlaysQuery;
+        try {
+            const result = await asyncReturnWithConnection(async conn => await doPlaysQuery(conn, query));
+            callback(undefined, result);
+        } catch (err) {
+            console.log(err);
+            callback(err);
+        }
+    } else {
+        callback();
     }
 }
 
@@ -75,7 +91,7 @@ export async function getNews(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     try {
         const result = await asyncReturnWithConnection(async conn => await doGetNews(conn));
-        callback(null, result);
+        callback(undefined, result);
     } catch (err) {
         console.log(err);
         callback(err);
@@ -87,12 +103,12 @@ export async function getRankings(event, context, callback: Callback) {
     if (event && event.body) {
         const query = {}; // TODO
         try {
-            callback(null, await rankGames(query));
+            callback(undefined, await rankGames(query));
         } catch (err) {
             console.log(err);
             callback(err);
         }
     } else {
-        callback(null);
+        callback();
     }
 }
