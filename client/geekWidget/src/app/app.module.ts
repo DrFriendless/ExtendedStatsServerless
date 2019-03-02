@@ -1,6 +1,6 @@
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
-import {HttpClientModule} from "@angular/common/http";
+import { HttpClientModule } from "@angular/common/http";
 import { GeekWidget } from './app.component';
 import { FavouritesPanelComponent } from './favourites-panel/favourites-panel.component';
 import { PlaysPanelComponent } from './plays-panel/plays-panel.component';
