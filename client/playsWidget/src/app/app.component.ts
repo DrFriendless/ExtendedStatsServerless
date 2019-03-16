@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
-import { DataSourceComponent } from "extstats-angular";
-import { CollectionWithPlays } from "extstats-core";
+import { PlaysSourceComponent } from "extstats-angular";
+import { MultiGeekPlays } from "extstats-core";
 import { HttpClient } from "@angular/common/http";
 
 @Component({
@@ -8,11 +8,9 @@ import { HttpClient } from "@angular/common/http";
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
-export class PlaysWidget extends DataSourceComponent<CollectionWithPlays> {
-  private static DEFAULT_SELECTOR = "played(ME)";
-
+export class PlaysWidget extends PlaysSourceComponent<MultiGeekPlays> {
   constructor(http: HttpClient) {
-    super(http, PlaysWidget.DEFAULT_SELECTOR);
+    super(http);
   }
 
   public getId(): string {
