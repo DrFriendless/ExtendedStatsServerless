@@ -95,7 +95,9 @@ async function saveUserData(decoded: Decoded, userData: UserData) {
 }
 
 async function getPersonalData(decoded: Decoded): Promise<PersonalData> {
-    return { userData: await getUserData(decoded), allData: await retrieveAllData(decoded.sub), error: undefined };
+    const userData = await getUserData(decoded);
+    const allData = await retrieveAllData(decoded.sub);
+    return { userData, allData, error: undefined };
 }
 
 export async function personal(event, context, callback: Callback) {

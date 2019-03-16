@@ -5,7 +5,7 @@ import { UserConfig, UserData } from "extstats-core";
 export class User {
     private readonly identity: string;
     private readonly username: string | undefined;
-    private configuration: UserConfig;
+    private readonly configuration: UserConfig;
     private loginCount: number;
     private created: Date;
     private lastLogin: Date | undefined;
@@ -13,11 +13,17 @@ export class User {
     private colour: number | undefined;
     private readonly firstLogin: boolean;
 
-    constructor(identity: string, username: string, loginCount: number, firstLogin: boolean) {
+    constructor(identity: string, username: string, loginCount: number, firstLogin: boolean, created: Date,
+                lastLogin: Date | undefined, configuration: string, icon: number, colour: number) {
         this.identity = identity;
         this.username = username;
         this.loginCount = loginCount;
         this.firstLogin = firstLogin;
+        this.created = created;
+        this.lastLogin = lastLogin;
+        this.configuration = JSON.parse(configuration) as UserConfig;
+        this.icon = icon;
+        this.colour = colour;
     }
 
     public getUsername(): string | undefined {
@@ -65,12 +71,12 @@ export async function updateUser(identity: string, userData: UserData) {
 export async function doFindOrCreateUser(conn: mysql.Connection, identity: string, suggestedUsername: string): Promise<User> {
     const findSql = "select * from users where identity = ?";
     const createSql = "insert into users (identity, username, created) values (?,?,?)";
-    const findResult = (await conn.query(findSql, [identity])).map(extractUser);
+    const findResult = (await conn.query(findSql, [identity])).map(row => extractUser(row, false));
     if (findResult.length === 0) {
         await conn.query(createSql, [identity, suggestedUsername, new Date()]);
         return (await conn.query(findSql, [identity])).map(row => extractUser(row, true))[0];
     } else {
-        const user = extractUser(findResult[0], false);
+        const user = findResult[0];
         user.incrementLoginCount();
         await recordLoginForUser(conn, user);
         return user;
@@ -88,5 +94,6 @@ async function recordLoginForUser(conn: mysql.Connection, user: User) {
 }
 
 function extractUser(row: object, first: boolean): User {
-    return new User(row["identity"], row["username"], row["loginCount"], first);
+    return new User(row["identity"], row["username"], row["loginCount"], first, row["created"], row["lastLogin"],
+        row["configuration"], row["icon"], row["colour"]);
 }

@@ -105,7 +105,6 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
 export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): Promise<MultiGeekPlays> {
     const geeks = query.geeks || [query.geek];
     const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
-    console.log(geekNameIds);
     if (Object.values(geekNameIds).length === 0) {
         return { geeks: [], plays: {}, collection: [], games: [] };
     }
