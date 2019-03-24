@@ -41,16 +41,28 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
       if (!alreadyPlayedByGeek[geek]) alreadyPlayedByGeek[geek] = [];
       const playedByThisGeek = alreadyPlayedByGeek[geek];
       plays.sort((p1, p2) => this.compareDate(p1, p2));
+      let first = true;
       for (const play of plays) {
         if (playedByThisGeek.indexOf(play.game) >= 0) continue;
         playedByThisGeek.push(play.game);
-        const game = gamesIndex[play.game];
-        firstPlays.push({
-          count: playedByThisGeek.length,
-          gameName: game.name,
-          playDate: new Date(play.year, play.month - 1, play.date),
-          geek
-        });
+        if (play.year >= 1996) {
+          if (first) {
+            firstPlays.push({
+              count: playedByThisGeek.length,
+              gameName: "Before 1996",
+              playDate: new Date(1996, 0, 1).getTime(),
+              geek
+            });
+            first = false;
+          }
+          const game = gamesIndex[play.game];
+          firstPlays.push({
+            count: playedByThisGeek.length,
+            gameName: game.name,
+            playDate: new Date(play.year, play.month - 1, play.date).getTime(),
+            geek
+          });
+        }
       }
       console.log(firstPlays);
       const spec: VisualizationSpec = {
@@ -58,7 +70,7 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
         "hconcat": [],
         "padding": 5,
         "title": "First Plays",
-        "width": 600,
+        "width": 900,
         "height": 600,
         "data": [{
           "name": "table",
@@ -118,6 +130,6 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
 interface ChartPlay {
   count: number;
   gameName: string;
-  playDate: Date;
+  playDate: number;
   geek: string;
 }
