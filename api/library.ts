@@ -44,7 +44,7 @@ export async function getGeekIds(conn: mysql.Connection, geeks: string[]): Promi
         result[id] = geek;
         return result;
     }
-    const getIdSql = "select id, username from geeks where geeks.username in ?";
+    const getIdSql = "select id, username from geeks where geeks.username in (?)";
     const results = await conn.query(getIdSql, [geeks]);
     const result = {};
     for (const row of results) {
