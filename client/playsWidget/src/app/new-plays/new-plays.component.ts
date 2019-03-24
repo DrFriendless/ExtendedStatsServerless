@@ -1,6 +1,6 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, ViewChild, ElementRef } from '@angular/core';
 import { PlaysViewComponent } from "extstats-angular";
-import { CollectionWithPlays, makeGamesIndex, MultiGeekPlays, PlaysWithDate } from "extstats-core";
+import { makeGamesIndex, MultiGeekPlays } from "extstats-core";
 import { VisualizationSpec } from "vega-embed";
 import embed from "vega-embed";
 
@@ -33,6 +33,7 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
   }
 
   private refreshChart(data: MultiGeekPlays) {
+    if (!data || !data.games) return;
     const firstPlays: ChartPlay[] = [];
     const alreadyPlayedByGeek: { [geek: string]: number[] } = {};
     const gamesIndex = makeGamesIndex(data.games);

@@ -27,7 +27,7 @@
     "@ngui/auto-complete": "^2.0.0",
     "acorn": "^6.1.0",
     "core-js": "^2.5.4",
-    "extstats-angular": "^3.3.2",
+    "extstats-angular": "^3.5.9",
     "extstats-core": "^1.3.3",
     "ngx-bootstrap": "^3.2.0",
     "rollup": "^0.65.2",
