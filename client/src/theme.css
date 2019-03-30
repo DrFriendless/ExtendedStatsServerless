@@ -52,6 +52,7 @@ div.extstats-doc {
     margin-bottom: 1rem;
     font-size: 14px;
 }
+button.extstats-button,
 div.extstats-doc button {
     color: #777777;
     font-size: 14px;
@@ -65,4 +66,7 @@ h1 {
 }
 h2 {
     margin-top: 20px;
+}
+.mat-form-field-underline {
+    display: none;
 }
