@@ -58,7 +58,16 @@ functions:
       - http:
           path: personal
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: false
   update:
@@ -124,7 +133,16 @@ functions:
       - http:
           path: users
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
     role:
@@ -142,7 +160,16 @@ functions:
       - http:
           path: query
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
     role:
@@ -160,7 +187,16 @@ functions:
       - http:
           path: plays
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
     role:
@@ -178,7 +214,16 @@ functions:
       - http:
           path: summary
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
     role:
@@ -214,13 +259,31 @@ functions:
       - http:
           path: collectionWithPlays
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
       - http:
           path: collectionWithPlays
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
     role:
@@ -238,13 +301,31 @@ functions:
       - http:
           path: rankings
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
       - http:
           path: rankings
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
     role:
@@ -262,13 +343,31 @@ functions:
       - http:
           path: wartable
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
       - http:
           path: wartable
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
           integration: lambda
           private: true
     role:
