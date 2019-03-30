@@ -94,6 +94,11 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
             "type": "ordinal",
             "domain": data.geeks,
             "range": ['circle', 'square', "cross", 'diamond', 'triangle-up', 'triangle-down', 'triangle-right', "triangle-left", this.star ]
+          }, {
+            "name": "colour",
+            "type": "ordinal",
+            "domain": data.geeks,
+            "range": ['#cdda49', '#673fb4', '#e62565', "#159588", '#fd9727', '#fc5830', '#8cc152' ]
           }
         ],
         "axes": [
@@ -109,7 +114,7 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
                 "x": { "scale": "xscale", "field": "playDate"},
                 "y": { "scale": "yscale", "field": "count"},
                 "tooltip": {"field": "gameName", "type": "quantitative"},
-                "stroke": { "value": "#000000" },
+                "stroke": { "field": "geek", "scale": "colour" },
                 "shape": { "field": "geek", "scale": "shape" },
                 "strokeWidth": {"value": 2}
               },
