@@ -30,4 +30,13 @@
     </tr>
     </tbody>
   </table>
+
+  <div class="col-xs-12">
+    <h2>Where's My Page?</h2>
+    <p>If you don't appear in the list and you'd like to, send geekmail to Friendless and ask to be added.</p>
+    <geek-combo (geekChosen)="choose($event)" [placeholder]="'BGG user name'"></geek-combo>
+    <p *ngIf="!!geek">
+      Your page is <a href="/geek.html?geek={{geek}}">https://extstats.drfriendless.com/geek.html?geek={{geek}}</a>
+    </p>
+  </div>
 </div>

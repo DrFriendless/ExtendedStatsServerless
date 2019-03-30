@@ -1,10 +1,10 @@
 import { AfterViewInit, Component, OnDestroy } from '@angular/core';
-import {Subject} from "rxjs/internal/Subject";
-import { Subscription} from "rxjs/internal/Subscription";
-import { Observable} from "rxjs/internal/Observable";
-import {flatMap, tap} from "rxjs/operators";
-import {HttpClient, HttpHeaders} from "@angular/common/http";
-import {FAQCount} from "extstats-core";
+import { Subject } from "rxjs/internal/Subject";
+import { Subscription } from "rxjs/internal/Subscription";
+import { Observable } from "rxjs/internal/Observable";
+import { flatMap, tap } from "rxjs/operators";
+import { HttpClient, HttpHeaders } from "@angular/common/http";
+import { FAQCount } from "extstats-core";
 
 @Component({
   selector: 'extstats-faq',
@@ -17,6 +17,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly faqSubscription: Subscription;
   public faqCounts: { [index: number]: FAQCount } = {};
   public faqs: object[] = [];
+  public geek: string;
 
   constructor(private http: HttpClient) {
     const options = {
@@ -44,7 +45,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private indexFAQData(faqData: FAQCount[]) {
     let i = 0;
     while (i < faqData.length) {
-      this.faqCounts[i+1] = faqData[i];
+      this.faqCounts[i + 1] = faqData[i];
       i++;
     }
   }
@@ -63,5 +64,10 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   public getCount(index: number, key: string): number {
     if (!this.faqCounts[index]) return 0;
     return this.faqCounts[index][key];
+  }
+
+  public choose(event) {
+    console.log(event);
+    this.geek = event;
   }
 }
