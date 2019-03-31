@@ -116,7 +116,8 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
                 "tooltip": {"field": "gameName", "type": "quantitative"},
                 "stroke": { "field": "geek", "scale": "colour" },
                 "shape": { "field": "geek", "scale": "shape" },
-                "strokeWidth": {"value": 2}
+                "strokeWidth": { "value": 1 },
+                "size": 16
               },
               "update": {
                 "fillOpacity": {"value": 1}
@@ -126,7 +127,13 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
               }
             }
           }
-        ]
+        ],
+        "legends": [{
+          "direction": "vertical",
+          "type": "symbol",
+          "stroke": "colour",
+          "shape": "shape"
+        }]
       };
       embed(this.target.nativeElement, spec, { actions: true });
     }
