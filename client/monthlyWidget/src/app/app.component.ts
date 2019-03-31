@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
-import {DataSourceComponent} from "extstats-angular";
-import {CollectionWithMonthlyPlays} from "extstats-core";
-import {HttpClient} from "@angular/common/http";
+import { DataSourceComponent, UserDataService } from 'extstats-angular';
+import { CollectionWithMonthlyPlays } from "extstats-core";
+import { HttpClient } from "@angular/common/http";
 
 @Component({
   selector: 'monthly-plays',
@@ -11,8 +11,8 @@ import {HttpClient} from "@angular/common/http";
 export class MonthlyWidget extends DataSourceComponent<CollectionWithMonthlyPlays> {
   private static DEFAULT_SELECTOR = "played(ME)";
 
-  constructor(http: HttpClient) {
-    super(http, MonthlyWidget.DEFAULT_SELECTOR);
+  constructor(http: HttpClient, userDataService: UserDataService) {
+    super(http, userDataService, MonthlyWidget.DEFAULT_SELECTOR);
   }
 
   public getId(): string {

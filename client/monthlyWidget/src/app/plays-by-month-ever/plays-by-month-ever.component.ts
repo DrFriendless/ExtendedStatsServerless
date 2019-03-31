@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CollectionWithMonthlyPlays } from "extstats-core";
 import { DataViewComponent } from "extstats-angular";
 

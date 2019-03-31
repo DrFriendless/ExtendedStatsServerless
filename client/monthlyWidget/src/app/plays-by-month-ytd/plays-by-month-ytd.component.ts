@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { DataViewComponent } from "extstats-angular";
 import { CollectionWithMonthlyPlays, MonthlyPlays, makeGamesIndex } from "extstats-core";
 
@@ -34,14 +34,14 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
     const gamesIndex = makeGamesIndex(collection.games);
     const byMonth = {} as { [month: string]: MonthlyPlays[] };
     const allGameIds = [];
-    for (let mp of collection.plays) {
+    for (const mp of collection.plays) {
       const key = PlaysByMonthYtdComponent.makeKey(mp.year, mp.month);
       if (!byMonth[key]) byMonth[key] = [];
       byMonth[key].push(mp);
       allGameIds.push(mp.game);
     }
     const rows = [];
-    for (let key in byMonth) {
+    for (const key in byMonth) {
       const mps = byMonth[key];
       const distinct = mps.filter(mp => !mp.expansion).length;
       const expansions = mps.filter(mp => mp.expansion).length;
@@ -54,7 +54,7 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
         hoursPlayed: 0 } as Row;
       rows.push(row);
     }
-    rows.sort((r1,r2) => r1.sortOrder - r2.sortOrder);
+    rows.sort((r1, r2) => r1.sortOrder - r2.sortOrder);
     let currentYear = -1;
     const playsByGame: { [game: number]: number } = {};
     let playsYtd;
@@ -109,21 +109,21 @@ export class PlaysByMonthYtdComponent extends DataViewComponent<CollectionWithMo
       row.percent = this.calcPercentPlayed(ownedGameIds, playedThisYear);
       row.hoursPlayed = Math.floor(hoursPlayed / 6) / 10;
     });
-    rows.sort((r1,r2) => r2.sortOrder - r1.sortOrder);
+    rows.sort((r1, r2) => r2.sortOrder - r1.sortOrder);
     this.rows = rows;
   }
 
   private calcPercentPlayed(owned: number[], played: number[]): number {
     if (owned.length == 0) return 100;
     let count = 0;
-    for (let o of owned) {
+    for (const o of owned) {
       if (played.indexOf(o) >= 0) count++;
     }
-    return Math.floor((count * 10000) / owned.length)/100;
+    return Math.floor((count * 10000) / owned.length) / 100;
   }
 
   private static calcHIndex(values: number[]) {
-    values.sort((a,b) => b-a);
+    values.sort((a, b) => b - a);
     let hindex = 0;
     while (hindex < values.length && values[hindex] > hindex) hindex++;
     return hindex;
@@ -160,8 +160,8 @@ class Column<R extends object> {
   name: string;
   field: string;
   tooltip: string;
-  valueHtml(r:R): string { return r[this.field] };
-  valueTooltip(r: R): string | undefined { return undefined };
+  valueHtml(r: R): string { return r[this.field]; }
+  valueTooltip(r: R): string | undefined { return undefined; }
 
   constructor(obj: object) {
     if (obj["name"]) this.name = obj["name"];
