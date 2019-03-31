@@ -7,7 +7,6 @@ import { NgbModule } from "@ng-bootstrap/ng-bootstrap";
 import { TooltipModule } from 'ngx-bootstrap/tooltip';
 import { ExtstatsAngularModule } from "extstats-angular";
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
 
 @NgModule({
   declarations: [
@@ -15,8 +14,7 @@ import { RouterModule } from '@angular/router';
     NewPlaysComponent
   ],
   imports: [
-    BrowserModule, HttpClientModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule, FormsModule,
-    RouterModule.forRoot([])
+    BrowserModule, HttpClientModule, TooltipModule.forRoot(), NgbModule.forRoot(), ExtstatsAngularModule, FormsModule
   ],
   providers: [],
   bootstrap: [PlaysWidget]
