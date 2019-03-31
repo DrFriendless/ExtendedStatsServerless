@@ -10,6 +10,8 @@ import { CollectionPanelComponent } from './collection-panel/collection-panel.co
 import { OwnedPanelComponent } from './owned-panel/owned-panel.component';
 import { NewsComponent } from './news/news.component';
 import { MonthlyPanelComponent } from './monthly-panel/monthly-panel.component';
+import { MultiplaysPanelComponent } from './multiplays-panel/multiplays-panel.component';
+import { ExtstatsAngularModule } from 'extstats-angular';
 
 @NgModule({
   declarations: [
@@ -21,10 +23,11 @@ import { MonthlyPanelComponent } from './monthly-panel/monthly-panel.component';
     CollectionPanelComponent,
     OwnedPanelComponent,
     NewsComponent,
-    MonthlyPanelComponent
+    MonthlyPanelComponent,
+    MultiplaysPanelComponent
   ],
   imports: [
-    BrowserModule, HttpClientModule
+    BrowserModule, HttpClientModule, ExtstatsAngularModule
   ],
   providers: [],
   bootstrap: [GeekWidget]

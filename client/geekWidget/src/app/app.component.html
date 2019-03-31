@@ -11,14 +11,25 @@
 
   <a href="/detailedplays.html?geek={{geek}}" *ngIf="!!data"><detailed-plays-panel [geekData]="data"></detailed-plays-panel></a>
 
+  <a href="/multiplays.html?geeks={{geek}}" *ngIf="!!data"><multiplays-panel [geekData]="data"></multiplays-panel></a>
+
   <a href="/yearly.html?geek={{geek}}" *ngIf="!!data"><yearly-panel [geekData]="data"></yearly-panel></a>
 
-  <p *ngIf="!data">
-    Geek {{geek}} doesn't seem to be in Extended Stats. Please take a look at <a href="https://pastebin.com/REGME8sF">this list</a>
-    which is everybody who has been added. If you're on that list, you should appear within a couple of hours. If you don't, please let
-    DrFriendless know as something must be broken. If you're not on that list, either DrFriendless hasn't got around to adding you
-    (it can take up to about a week), or you should send a message to Friendless on boardgamegeek and ask to be added.
-  </p>
+  <div *ngIf="!data">
+    <p>
+      Geek {{geek}} doesn't seem to be in Extended Stats. Please take a look at <a href="https://pastebin.com/REGME8sF">this list</a>
+      which is everybody who has been added. If you're on that list, you should appear within a couple of hours. If you don't, please let
+      DrFriendless know as something must be broken. If you're not on that list, either DrFriendless hasn't got around to adding you
+      (it can take up to about a week), or you should send a message to Friendless on boardgamegeek and ask to be added.
+    </p>
+    <p>
+      If you're not sure about the user name, check with this handy finder:
+    </p>
+    <geek-combo (geekChosen)="choose($event)" [placeholder]="'BGG user name'"></geek-combo>
+    <p *ngIf="!!foundGeek">
+      The correct page is <a href="/geek.html?geek={{foundGeek}}">https://extstats.drfriendless.com/geek.html?geek={{foundGeek}}</a>
+    </p>
+  </div>
 </div>
 
 <h2>News</h2>

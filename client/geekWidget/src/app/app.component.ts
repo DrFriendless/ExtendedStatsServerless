@@ -1,7 +1,8 @@
 import { Component, AfterViewInit, OnDestroy } from '@angular/core';
-import { GeekSummary, fromExtStatsStorage } from "extstats-core";
-import { Subscription } from "rxjs/internal/Subscription";
-import { HttpClient, HttpHeaders } from "@angular/common/http";
+import { GeekSummary, fromExtStatsStorage } from 'extstats-core';
+import { Subscription } from 'rxjs/internal/Subscription';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { UserDataService } from 'extstats-angular';
 
 @Component({
   selector: 'extstats-geek',
@@ -12,16 +13,17 @@ export class GeekWidget implements AfterViewInit, OnDestroy {
   public data: GeekSummary;
   private subscription: Subscription;
   public geek: string;
+  public foundGeek: string;
 
-  public constructor(private http: HttpClient) {
+  public constructor(private http: HttpClient, private userDataService: UserDataService) {
   }
 
   public ngAfterViewInit() {
-    this.geek = fromExtStatsStorage(storage => storage.geek);
+    this.geek = this.userDataService.getAGeek();
     const options = {
-      headers: new HttpHeaders().set("x-api-key", "gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ")
+      headers: new HttpHeaders().set('x-api-key', 'gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ')
     };
-    this.loadData$ = this.http.get("https://api.drfriendless.com/v1/summary?geek=" + encodeURIComponent(this.geek), options);
+    this.loadData$ = this.http.get('https://api.drfriendless.com/v1/summary?geek=' + encodeURIComponent(this.geek), options);
     this.subscription = this.loadData$.subscribe(result => {
       console.log(result);
       if (result.warData) {
@@ -34,5 +36,9 @@ export class GeekWidget implements AfterViewInit, OnDestroy {
 
   public ngOnDestroy(): void {
     if (this.subscription) this.subscription.unsubscribe();
+  }
+
+  public choose(geek: string) {
+    this.foundGeek = geek;
   }
 }
