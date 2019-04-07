@@ -1,11 +1,11 @@
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
-import {HttpClientModule} from "@angular/common/http";
-import {NgbModule} from "@ng-bootstrap/ng-bootstrap";
+import { HttpClientModule } from "@angular/common/http";
+import { NgbModule } from "@ng-bootstrap/ng-bootstrap";
 import { TooltipModule } from 'ngx-bootstrap/tooltip';
-import {ExtstatsAngularModule} from "extstats-angular";
+import { ExtstatsAngularModule } from "extstats-angular";
 import { FormsModule } from '@angular/forms';
-import {DataTableModule} from "extstats-datatable";
+import { DataTableModule } from "extstats-datatable";
 import { UserCollectionComponent} from './app.component';
 import { FavesByYearTableComponent } from './faves-by-year-table/faves-by-year-table.component';
 import { RatingsByYearGraphComponent } from './ratings-by-year-graph/ratings-by-year-graph.component';

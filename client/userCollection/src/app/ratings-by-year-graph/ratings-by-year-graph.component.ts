@@ -1,8 +1,8 @@
 import { Component, OnDestroy, AfterViewInit, Input, ViewChild, ElementRef } from '@angular/core';
-import {Collection, GameData, roundRating, makeGamesIndex } from "extstats-core";
-import {Observable} from "rxjs/internal/Observable";
-import {Subscription} from "rxjs/internal/Subscription";
-import {VisualizationSpec, vega} from "vega-embed";
+import { Collection, GameData, roundRating, makeGamesIndex } from "extstats-core";
+import { Observable } from "rxjs/internal/Observable";
+import { Subscription } from "rxjs/internal/Subscription";
+import { VisualizationSpec, vega } from "vega-embed";
 import embed from "vega-embed";
 
 @Component({
@@ -41,7 +41,7 @@ export class RatingsByYearGraphComponent implements OnDestroy, AfterViewInit {
   private emptyData(): { [year: number]: { counts: number[], names: string[][] } } {
     const thisYear = (new Date()).getFullYear();
     const result = {};
-    for (let y=this.startYear; y<=thisYear; y++) {
+    for (let y = this.startYear; y <= thisYear; y++) {
       result[y] = {
         counts: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
         names: [[], [], [], [], [], [], [], [], [], []]
@@ -58,8 +58,8 @@ export class RatingsByYearGraphComponent implements OnDestroy, AfterViewInit {
       if (g && gg.rating > 0) {
         if (g.yearPublished >= this.startYear) {
           const rating = roundRating(gg.rating);
-          data[g.yearPublished].counts[rating-1]++;
-          data[g.yearPublished].names[rating-1].push(g.name);
+          data[g.yearPublished].counts[rating - 1]++;
+          data[g.yearPublished].names[rating - 1].push(g.name);
         }
       }
     });
@@ -68,14 +68,15 @@ export class RatingsByYearGraphComponent implements OnDestroy, AfterViewInit {
 
   private refreshChart(data: { [year: number]: { counts: number[], names: string[][] } }) {
     const chartData = [];
-    for (let year in data) {
-      for (let i=1; i<=10; i++) {
-        const count = data[year].counts[i-1];
-        chartData.push({x: year, y: count, c: i, t: data[year].names[i-1].join(", ") });
+    for (const year in data) {
+      for (let i = 1; i <= 10; i++) {
+        const count = data[year].counts[i - 1];
+        chartData.push({x: year, y: count, c: i, t: data[year].names[i - 1].join(", ") });
       }
     }
     const spec: VisualizationSpec = {
       "$schema": "https://vega.github.io/schema/vega/v4.json",
+      "hconcat": [],
       "padding": 5,
       "title": "Ratings By Published Year",
       "width": 600,
