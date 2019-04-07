@@ -15,7 +15,8 @@
 
   <a href="/yearly.html?geek={{geek}}" *ngIf="!!data"><yearly-panel [geekData]="data"></yearly-panel></a>
 
-  <div *ngIf="!data">
+  <extstats-loader *ngIf="loading"></extstats-loader>
+  <div *ngIf="!data && !loading">
     <p>
       Geek {{geek}} doesn't seem to be in Extended Stats. Please take a look at <a href="https://pastebin.com/REGME8sF">this list</a>
       which is everybody who has been added. If you're on that list, you should appear within a couple of hours. If you don't, please let

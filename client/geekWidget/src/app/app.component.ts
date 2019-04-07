@@ -14,6 +14,7 @@ export class GeekWidget implements AfterViewInit, OnDestroy {
   private subscription: Subscription;
   public geek: string;
   public foundGeek: string;
+  public loading = true;
 
   public constructor(private http: HttpClient, private userDataService: UserDataService) {
   }
@@ -31,6 +32,7 @@ export class GeekWidget implements AfterViewInit, OnDestroy {
       } else {
         this.data = undefined;
       }
+      this.loading = false;
     });
   }
 
