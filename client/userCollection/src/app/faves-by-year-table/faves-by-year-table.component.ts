@@ -1,7 +1,7 @@
 import { Component, OnDestroy, AfterViewInit, Input } from '@angular/core';
-import {Collection, GameData} from "extstats-core";
-import {Observable} from "rxjs/internal/Observable";
-import {Subscription} from "rxjs/internal/Subscription";
+import { Collection, GameData } from "extstats-core";
+import { Observable } from "rxjs/internal/Observable";
+import { Subscription } from "rxjs/internal/Subscription";
 
 @Component({
   selector: 'faves-by-year-table',
@@ -37,11 +37,11 @@ export class FavesByYearTableComponent implements OnDestroy, AfterViewInit {
         }
       }
     }
-    const years = Object.keys(byYear);
-    years.sort();
+    const years = Object.keys(byYear).map(year => parseInt(year));
+    years.sort((a, b) => a - b);
     const result = [];
-    for (let y of years) {
-      result.push({ year: y, games: byYear[y] });
+    for (let year of years) {
+      result.push({ year, games: byYear[year] });
     }
     console.log(result);
     this.rows = result;
