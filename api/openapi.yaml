@@ -30,6 +30,8 @@ tags:
     description: You do not need an API key to invoke this API
   - name: authenticated
     description: You must send authentication as a logged-in user.
+  - name: dontuse
+    description: Don't use this API. It's either incomplete or is going to change or be deleted.
 
 paths:
   /authenticate:
@@ -143,7 +145,38 @@ paths:
     post:
   /rankings:
     get:
+      tags:
+        - developer apikey
+      summary: get ranked games data
+      description: |
+        This API powers the rankings table.
+      operationId: getRankings
+      responses:
+        '200':
+          description: ranked games returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/definitions/RankingTableRow'
     post:
+      tags:
+        - developer apikey dontuse
+      summary: get ranked games data
+      description: |
+        Return ranked games data. This API is not yet in use. It is reserved for when I need a query object to specify
+        which games are to be returned and how they are to be ranked.
+      operationId: getRankings
+      responses:
+        '200':
+          description: ranked games returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/definitions/RankingTableRow'
   /summary:
     get:
       tags:
@@ -183,10 +216,12 @@ paths:
   /update:
     post:
       tags:
-        - developers nokey authenticated
+        - developers nokey authenticated dontuse
       summary: update user data
       operationId: update
-      description: save user data after it has been modified by the user.
+      description: |
+        Save user data after it has been modified by the user. The don't use tag is for the first property in UserData.
+        There is no way you should be able to set that, and it seems to be in totally the wrong place.
       requestBody:
           description: the new values for the user data
           required: true
@@ -250,7 +285,7 @@ paths:
                 preordered: 0
     post:
       tags:
-        - developers apikey
+        - developers apikey dontuse
       summary: DEPRECATED get data for the war table
       description: Get the list of war table rows for all geeks. This method will be removed.
       responses:
@@ -371,6 +406,8 @@ definitions:
       error:
         type: string
         description: description of what went wrong if the personal data could not be retrieved
+  RankingTableRow:
+    type: object
   SystemStats:
     type: object
     required:
