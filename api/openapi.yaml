@@ -113,6 +113,20 @@ paths:
           description: user data saved
   /users:
     get:
+      tags:
+        - developers apikey
+      summary: get list of all users
+      description: get the list of BGG user names for all users in Extended Stats. This is not much use.
+      responses:
+        '200':
+          description: user names returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+              example: '["Friendless", "melissa", "karlsen"]'
   /wartable:
     get:
     post:
