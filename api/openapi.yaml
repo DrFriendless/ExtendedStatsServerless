@@ -49,7 +49,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/definitions/UserData'
+                $ref: '#/components/schemas/UserData'
   /collectionWithPlays:
     get:
     post:
@@ -80,7 +80,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/definitions/FAQCount'
+                  $ref: '#/components/schemas/FAQCount'
   /findgeeks:
     get:
       tags:
@@ -137,10 +137,29 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/definitions/PersonalData'
-
+                $ref: '#/components/schemas/PersonalData'
   /plays:
     post:
+      tags:
+        - developer apikey
+      summary: get plays data
+      operationId: plays
+      description: |
+        Given a query object, retrieve plays data for some geeks.
+      requestBody:
+        description: a structured query describing the data being asked for
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaysQuery'
+      responses:
+        '200':
+          description: plays data returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultiGeekPlays'
   /query:
     post:
   /rankings:
@@ -148,9 +167,9 @@ paths:
       tags:
         - developer apikey
       summary: get ranked games data
+      operationId: getRankings
       description: |
         This API powers the rankings table.
-      operationId: getRankings
       responses:
         '200':
           description: ranked games returned
@@ -159,15 +178,15 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/definitions/RankingTableRow'
+                  $ref: '#/components/schemas/RankingTableRow'
     post:
       tags:
         - developer apikey dontuse
       summary: get ranked games data
+      operationId: getRankings
       description: |
         Return ranked games data. This API is not yet in use. It is reserved for when I need a query object to specify
         which games are to be returned and how they are to be ranked.
-      operationId: getRankings
       responses:
         '200':
           description: ranked games returned
@@ -176,12 +195,13 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/definitions/RankingTableRow'
+                  $ref: '#/components/schemas/RankingTableRow'
   /summary:
     get:
       tags:
         - developer apikey
       summary: get summary data for a geek
+      operationId: getGeekSummary
       parameters:
         - in: query
           name: geek
@@ -196,12 +216,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/definitions/GeekSummary'
+                $ref: '#/components/schemas/GeekSummary'
   /systemStats:
     get:
       tags:
         - admin apikey
       summary: get system stats
+      operationId: adminGatherSystemStats
       description: |
         Return stats about the performance of the system.
         This is currently not restricted to admins, but will possibly become so in the future.
@@ -212,7 +233,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/definitions/SystemStats'
+                $ref: '#/components/schemas/SystemStats'
   /update:
     post:
       tags:
@@ -228,7 +249,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/definitions/UserData'
+                $ref: '#/components/schemas/UserData'
       responses:
         '200':
           description: user data saved
@@ -237,6 +258,7 @@ paths:
       tags:
         - developers apikey
       summary: get list of all users
+      operationId: getUserList
       description: Get the list of BGG user names for all users in Extended Stats. This is not much use.
       responses:
         '200':
@@ -253,6 +275,7 @@ paths:
       tags:
         - developers apikey
       summary: get data for the war table
+      operationId: getWarTable
       description: Get the list of war table rows for all geeks.
       responses:
         '200':
@@ -262,7 +285,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/definitions/WarTableRow'
+                  $ref: '#/components/schemas/WarTableRow'
               example:
                 geek: 1
                 geekName: 'Friendless'
@@ -287,6 +310,7 @@ paths:
       tags:
         - developers apikey dontuse
       summary: DEPRECATED get data for the war table
+      operationId: getWarTable
       description: Get the list of war table rows for all geeks. This method will be removed.
       responses:
         '200':
@@ -296,288 +320,435 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/definitions/WarTableRow'
+                  $ref: '#/components/schemas/WarTableRow'
 
-definitions:
-  BuddySet:
-    type: object
-    required:
-      - name
-      - buddies
-    properties:
-      name:
-        type: string
-        example: 'gaming group'
-        description: the name of the buddy set as specified by the user
-      buddies:
-        type: array
-        description: BGG user names of the users in the set
-        items:
+components: 
+  schemas: 
+    BuddySet:
+      type: object
+      required:
+        - name
+        - buddies
+      properties:
+        name:
           type: string
-        example:
-          - 'Friendless'
-          - 'jmdsplotter'
-          - 'tallboy'
-  Decoded:
-    type: object
-    required:
-      - nickname
-      - sub
-    properties:
-      nickname:
-        type: string
-        example: friendless
-        description: the user's login name from auth0
-      sub:
-        type: string
-        example: 'ABC123'
-        description: the user's unique identity from auth0
-  FAQCount:
-    type: object
-    description: The number of views of this question in the previous corresponding time periods.
-    required:
-      - day
-      - week
-      - month
-      - year
-      - ever
-    properties:
-      day:
-        type: integer
-      week:
-        type: integer
-      month:
-        type: integer
-      year:
-        type: integer
-      ever:
-        type: integer
-    example:
-      day: 1
-      week: 2
-      month: 3
-      year: 4
-      ever: 5
-  GeekSummary:
-    type: object
-    required:
-      - rated
-      - average
-      - monthsPlayed
-    properties:
-      warData:
-        $ref: '#/definitions/WarTableRow'
-      rated:
-        type: integer
-      average:
-        type: number
-      monthsPlayed:
-        type: integer
-      error:
-        type: string
-      geekId:
-        type: integer
-  NewsItem:
-    type: object
-    required:
-      - id
-      - date
-      - html
-    properties:
-      id:
-        type: integer
-        description: primary key for the news item in the database
-      date:
-        type: string
-        description: the date the news item was added
-      html:
-        type: string
-        description: HTML content of the news item
-  PersonalData:
-    type: object
-    properties:
-      userData:
-        $ref: '#/definitions/UserData'
-      allData:
-        type: object
-        description: a lump of JSON data with no specified schema
-        example:
-          name: 'Friendless'
-      error:
-        type: string
-        description: description of what went wrong if the personal data could not be retrieved
-  RankingTableRow:
-    type: object
-  SystemStats:
-    type: object
-    required:
-      - userRows
-      - gameRows
-      - geekGamesRows
-      - expansionRows
-      - mechanics
-      - categories
-      - gameMechanics
-      - gameCategories
-      - notGames
-      - fileRows
-      - ggForZero
-      - distinctGGOwners
-      - playsRows
-      - normalisedPlaysRows
-    properties:
-      userRows:
-        type: integer
-      gameRows:
-        type: integer
-      geekGamesRows:
-        type: integer
-      expansionRows:
-        type: integer
-      mechanics:
-        type: integer
-      categories:
-        type: integer
-      gameMechanics:
-        type: integer
-      gameCategories:
-        type: integer
-      notGames:
-        type: integer
-      fileRows:
-        type: array
-        items:
-          $ref: '#/definitions/TypeCount'
-      ggForZero:
-        type: integer
-      distinctGGOwners:
-        type: integer
-      playsRows:
-        type: integer
-      normalisedPlaysRows:
-        type: integer
-  TypeCount:
-    type: object
-    required:
-      - type
-      - existing
-      - waiting
-      - unprocessed
-    properties:
-      type:
-        type: string
-      existing:
-        type: integer
-      waiting:
-        type: integer
-      unprocessed:
-        type: integer
-  UserConfig:
-    type: object
-    required:
-      - usernames
-      - buddies
-    properties:
-      usernames:
-        type: array
-        description: the user's favourite user names on BGG
-        items:
+          example: 'gaming group'
+          description: the name of the buddy set as specified by the user
+        buddies:
+          type: array
+          description: BGG user names of the users in the set
+          items:
+            type: string
+          example:
+            - 'Friendless'
+            - 'jmdsplotter'
+            - 'tallboy'
+    Decoded:
+      type: object
+      required:
+        - nickname
+        - sub
+      properties:
+        nickname:
           type: string
-        example:
-          - Friendless
-          - Scrabblette
-          - harley22
-      buddies:
-        type: array
-        description: the user's defined buddy groups
-        items:
-          $ref: '#/definitions/BuddySet'
-        example:
-          - name: 'Critical Mass'
-            buddies:
-              - 'Critical Mass'
-              - 'cyberkev63'
-              - 'OzVortex'
-              - 'Ozgamer'
-          - name: 'IWG'
-            buddies:
-              - 'trif'
-              - 'ferrao'
-              - 'Simonocles'
-              - 'ozjesting'
-  UserData:
-    type: object
-    properties:
-      first:
-        type: boolean
-        example: false
-      config:
-        $ref: '#/definitions/UserConfig'
-      jwt:
-        $ref: '#/definitions/Decoded'
-  WarTableRow:
-    type: object
-    description: |
-      A row of the war table in the database. This table is populated to support the war table in the UI, and some of
-      these values are not otherwise available.
-    required:
-      - geek
-      - geekName
-      - totalPlays
-      - distinctGames
-      - top50
-      - sdj
-      - owned
-      - want
-      - wish
-      - trade
-      - prevOwned
-      - friendless
-      - cfm
-      - utilisation
-      - tens
-      - zeros
-      - ext100
-      - hindex
-      - preordered
-    properties:
-      geek:
-        type: integer
-        description: primary key for the geek in Extended Stats
-      geekName:
-        type: string
-        description: BGG user name for this geek.
-      totalPlays:
-        type: integer
-      distinctGames:
-        type: integer
-      top50:
-        type: integer
-      sdj:
-        type: integer
-      owned:
-        type: integer
-      want:
-        type: integer
-      wish:
-        type: integer
-      trade:
-        type: integer
-      prevOwned:
-        type: integer
-      friendless:
-        type: integer
-      cfm:
-        type: number
-      utilisation:
-        type: number
-      tens:
-        type: integer
-      zeros:
-        type: integer
-      ext100:
-        type: integer
-      hindex:
-        type: integer
-      preordered:
-        type: integer
+          example: friendless
+          description: the user's login name from auth0
+        sub:
+          type: string
+          example: 'ABC123'
+          description: the user's unique identity from auth0
+    FAQCount:
+      type: object
+      description: The number of views of this question in the previous corresponding time periods.
+      required:
+        - day
+        - week
+        - month
+        - year
+        - ever
+      properties:
+        day:
+          type: integer
+        week:
+          type: integer
+        month:
+          type: integer
+        year:
+          type: integer
+        ever:
+          type: integer
+      example:
+        day: 1
+        week: 2
+        month: 3
+        year: 4
+        ever: 5
+    GeekSummary:
+      type: object
+      required:
+        - rated
+        - average
+        - monthsPlayed
+      properties:
+        warData:
+          $ref: '#/components/schemas/WarTableRow'
+        rated:
+          type: integer
+        average:
+          type: number
+        monthsPlayed:
+          type: integer
+        error:
+          type: string
+        geekId:
+          type: integer
+    MultiGeekPlays:
+      type: object
+      required:
+        - geeks
+        - plays
+      properties:
+        geeks:
+          description: the geeks who were asked for and actually found
+          type: array
+          items:
+            type: string
+        plays:
+          description: Keys are geek names, values are PlaysWithDate[].
+          type: object
+        collection:
+          description:
+          type: array
+          items:
+            type: '#/components/schemas/GeekGame'
+        games:
+          description: data for games in this result
+          type: array
+          items:
+            type: '#/components/schemas/GameData'
+        metadata:
+          $ref: '#/components/schemas/SelectorMetadataSet'
+        extra:
+          type: array
+          items:
+            type: integer
+    NewsItem:
+      type: object
+      required:
+        - id
+        - date
+        - html
+      properties:
+        id:
+          type: integer
+          description: primary key for the news item in the database
+        date:
+          type: string
+          description: the date the news item was added
+        html:
+          type: string
+          description: HTML content of the news item
+    PersonalData:
+      type: object
+      properties:
+        userData:
+          $ref: '#/components/schemas/UserData'
+        allData:
+          type: object
+          description: a lump of JSON data with no specified schema
+          example:
+            name: 'Friendless'
+        error:
+          type: string
+          description: description of what went wrong if the personal data could not be retrieved
+    PlaysQuery:
+      type: object
+      required:
+        - geek
+      properties:
+        geek:
+          description: The sole geek data is being requested for. This may be removed in favour of using geeks.
+          type: string
+        geeks:
+          description: The geeks that data is being requested for.
+          type: array
+          items:
+            type: string
+        year:
+          description: If present, restrict to plays from this year.
+          type: integer
+        month:
+          description: If present, restrict to plays from this month.
+          type: integer
+        date:
+          description: If present, restrict to plays from this date.
+          type: integer
+        filter:
+          description: As yet unused. Will apply further conditions on the search.
+          type: string
+    PlaysWithDate:
+      type: object
+      required:
+        - game
+        - quantity
+        - year
+        - month
+        - date
+      properties:
+        geek:
+          description: The geek who played the play. Will be populated if required to disambiguate.
+          type: string
+        game:
+          description: BGG ID of the base game that was played.
+          type: integer
+        expansions:
+          description: BGG IDs of expansions that were used.
+          type: array
+          items:
+            type: integer
+        quantity:
+          description: How many times the game was played.
+          type: integer
+        year:
+          description: The year in which the play took place.
+          type: integer
+        month:
+          description: The month in which the play took place.
+          type: integer
+        date:
+          description: The date on which the play took place.
+          type: integer
+    RankingTableRow:
+      type: object
+      required:
+        - game
+        - game_name
+        - total_ratings
+        - num_ratings
+        - bgg_ranking
+        - bgg_rating
+        - normalised_ranking
+        - total_plays
+        - ranking
+      properties:
+        game:
+          description: the game's BGG number
+          type: integer
+        game_name:
+          description: the game's name
+          type: string
+        total_ratings:
+          description: the total of ratings for this game in Extended Stats - this is the score used for the ranking value
+          type: integer
+        num_ratings:
+          description: the number of geeks rating this game in Extended Stats
+          type: integer
+        bgg_ranking:
+          description: a recent ranking of the game on BGG
+          type: integer
+        bgg_rating:
+          type: number
+        normalised_ranking:
+          description: the game's ranking by the Extended Stats normalised method
+          type: integer
+        total_plays:
+          type: integer
+        ranking:
+          description: the game's ranking by the Extended Stats method
+          type: integer
+    SelectorMetadata:
+      type: object
+      description: Metadata related to a game based on the selector that was used to select it.
+      required:
+        - game
+      properties:
+        game:
+          type: integer
+        colour:
+          description: A colour that was assigned to this game by the selector.
+          type: string
+        owner:
+          description: The owner of this game which caused it to be selected.
+          type: string
+        player:
+          description: The player of this game which caused it to be selected.
+          type: string
+        rater:
+          description: The rater of this game which caused it to be selected.
+          type: string
+    SelectorMetadataSet:
+      type: object
+      description: Keys are BGG game IDs, values are SelectorMetadata.
+    SystemStats:
+      type: object
+      required:
+        - userRows
+        - gameRows
+        - geekGamesRows
+        - expansionRows
+        - mechanics
+        - categories
+        - gameMechanics
+        - gameCategories
+        - notGames
+        - fileRows
+        - ggForZero
+        - distinctGGOwners
+        - playsRows
+        - normalisedPlaysRows
+      properties:
+        userRows:
+          type: integer
+        gameRows:
+          type: integer
+        geekGamesRows:
+          type: integer
+        expansionRows:
+          type: integer
+        mechanics:
+          type: integer
+        categories:
+          type: integer
+        gameMechanics:
+          type: integer
+        gameCategories:
+          type: integer
+        notGames:
+          type: integer
+        fileRows:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeCount'
+        ggForZero:
+          type: integer
+        distinctGGOwners:
+          type: integer
+        playsRows:
+          type: integer
+        normalisedPlaysRows:
+          type: integer
+    TypeCount:
+      type: object
+      required:
+        - type
+        - existing
+        - waiting
+        - unprocessed
+      properties:
+        type:
+          type: string
+        existing:
+          type: integer
+        waiting:
+          type: integer
+        unprocessed:
+          type: integer
+    UserConfig:
+      type: object
+      required:
+        - usernames
+        - buddies
+      properties:
+        usernames:
+          type: array
+          description: the user's favourite user names on BGG
+          items:
+            type: string
+          example:
+            - Friendless
+            - Scrabblette
+            - harley22
+        buddies:
+          type: array
+          description: the user's defined buddy groups
+          items:
+            $ref: '#/components/schemas/BuddySet'
+          example:
+            - name: 'Critical Mass'
+              buddies:
+                - 'Critical Mass'
+                - 'cyberkev63'
+                - 'OzVortex'
+                - 'Ozgamer'
+            - name: 'IWG'
+              buddies:
+                - 'trif'
+                - 'ferrao'
+                - 'Simonocles'
+                - 'ozjesting'
+    UserData:
+      type: object
+      properties:
+        first:
+          type: boolean
+          example: false
+        config:
+          $ref: '#/components/schemas/UserConfig'
+        jwt:
+          $ref: '#/components/schemas/Decoded'
+    WarTableRow:
+      type: object
+      description: |
+        A row of the war table in the database. This table is populated to support the war table in the UI, and some of
+        these values are not otherwise available.
+      required:
+        - geek
+        - geekName
+        - totalPlays
+        - distinctGames
+        - top50
+        - sdj
+        - owned
+        - want
+        - wish
+        - trade
+        - prevOwned
+        - friendless
+        - cfm
+        - utilisation
+        - tens
+        - zeros
+        - ext100
+        - hindex
+        - preordered
+      properties:
+        geek:
+          type: integer
+          description: primary key for the geek in Extended Stats
+        geekName:
+          type: string
+          description: BGG user name for this geek.
+        totalPlays:
+          type: integer
+        distinctGames:
+          type: integer
+        top50:
+          type: integer
+        sdj:
+          type: integer
+        owned:
+          type: integer
+        want:
+          type: integer
+        wish:
+          type: integer
+        trade:
+          type: integer
+        prevOwned:
+          type: integer
+        friendless:
+          type: integer
+        cfm:
+          type: number
+        utilisation:
+          type: number
+        tens:
+          type: integer
+        zeros:
+          type: integer
+        ext100:
+          type: integer
+        hindex:
+          type: integer
+        preordered:
+          type: integer
