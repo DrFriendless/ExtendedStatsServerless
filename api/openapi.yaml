@@ -53,6 +53,32 @@ paths:
     post:
   /faqcount:
     post:
+      tags:
+        - apikey admin
+      summary: increment FAQ counts and retrieve
+      operationId: incFAQCount
+      description: |
+        The FAQ component on the front page is meant to be a bit of a joke in that I keep stats of how many times
+        each question is accessed, because this is a stats site. This API call optionally increments some counts
+        and returns the current values.
+      requestBody:
+        description: the number of views of each FAQ question to record - first value is question 1 etc.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: integer
+      responses:
+        '200':
+          description: counts incremented
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/definitions/FAQCount'
   /findgeeks:
     get:
   /news:
@@ -234,6 +260,32 @@ definitions:
         type: string
         example: 'ABC123'
         description: the user's unique identity from auth0
+  FAQCount:
+    type: object
+    description: The number of views of this question in the previous corresponding time periods.
+    required:
+      - day
+      - week
+      - month
+      - year
+      - ever
+    properties:
+      day:
+        type: integer
+      week:
+        type: integer
+      month:
+        type: integer
+      year:
+        type: integer
+      ever:
+        type: integer
+    example:
+      day: 1
+      week: 2
+      month: 3
+      year: 4
+      ever: 5
   GeekSummary:
     type: object
     required:
