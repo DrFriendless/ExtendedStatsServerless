@@ -83,6 +83,24 @@ paths:
     post:
   /summary:
     get:
+      tags:
+        - developer apikey
+      summary: get summary data for a geek
+      parameters:
+        - in: query
+          name: geek
+          schema:
+            type: string
+          required: true
+          description: the geek to retrieve data for
+          example: Friendless
+      responses:
+        '200':
+          description: geek summary data returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/definitions/GeekSummary'
   /systemStats:
     get:
       tags:
@@ -216,6 +234,25 @@ definitions:
         type: string
         example: 'ABC123'
         description: the user's unique identity from auth0
+  GeekSummary:
+    type: object
+    required:
+      - rated
+      - average
+      - monthsPlayed
+    properties:
+      warData:
+        $ref: '#/definitions/WarTableRow'
+      rated:
+        type: integer
+      average:
+        type: number
+      monthsPlayed:
+        type: integer
+      error:
+        type: string
+      geekId:
+        type: integer
   PersonalData:
     type: object
     properties:
@@ -232,20 +269,20 @@ definitions:
   SystemStats:
     type: object
     required:
-      - userRows: number;
-      - gameRows: number;
-      - geekGamesRows: number;
-      - expansionRows: number;
-      - mechanics: number;
-      - categories: number;
-      - gameMechanics: number;
-      - gameCategories: number;
-      - notGames: number;
-      - fileRows: TypeCount[];
-      - ggForZero: number;
-      - distinctGGOwners: number;
-      - playsRows: number;
-      - normalisedPlaysRows: number;
+      - userRows
+      - gameRows
+      - geekGamesRows
+      - expansionRows
+      - mechanics
+      - categories
+      - gameMechanics
+      - gameCategories
+      - notGames
+      - fileRows
+      - ggForZero
+      - distinctGGOwners
+      - playsRows
+      - normalisedPlaysRows
     properties:
       userRows:
         type: integer
