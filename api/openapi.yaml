@@ -1,0 +1,273 @@
+openapi: 3.0.0
+# Added by API Auto Mocking Plugin
+servers:
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/DrFriendless/ExtendedStatsServerless/1.0.0
+
+info:
+  description: This is the API for Extended Stats Serverless.
+  version: "1.0.0"
+  title: Extended Stats API
+  contact:
+    email: friendless.farrell@gmail.com
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+
+tags:
+  - name: admins
+    description: Secured Admin-only calls
+  - name: developers
+    description: Operations available to regular developers
+  - name: apikey
+    description: You need an API key to invoke this API
+  - name: nokey
+    description: You do not need an API key to invoke this API
+  - name: authenticated
+    description: You must send authentication as a logged-in user.
+
+paths:
+  /authenticate:
+    get:
+      tags:
+        - developers nokey authenticated
+      summary: retrieves login data for a user
+      operationId: authenticate
+      description: |
+        Send authentication information retrieved from auth0 to receive personal user data.
+        If the authentication information does not correspond to an existing user, a new user will be created.
+      responses:
+        '200':
+          description: user data returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/definitions/UserData'
+  /collectionWithPlays:
+    get:
+    post:
+  /faqcount:
+    post:
+  /findgeeks:
+    get:
+  /news:
+    get:
+  /personal:
+    get:
+      tags:
+        - developers nokey authenticated
+      summary: retrieves all of the data stored for a user
+      operationId: personal
+      description: |
+        This call is designed not so much for the operation of the site, but more to give the user access to data stored
+        about them for purposes of GDPR and other sorts of disclosure.
+      responses:
+        '200':
+          description: personal data returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/definitions/PersonalData'
+
+  /plays:
+    post:
+  /query:
+    post:
+  /rankings:
+    get:
+    post:
+  /summary:
+    get:
+  /systemStats:
+    get:
+      tags:
+        - admin apikey
+      summary: get system stats
+      description: |
+        Return stats about the performance of the system.
+        This is currently not restricted to admins, but will possibly become so in the future.
+        In any case it's boring stuff.
+      responses:
+        '200':
+          description: stats returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/definitions/SystemStats'
+  /update:
+    post:
+      tags:
+        - developers nokey authenticated
+      summary: update user data
+      operationId: update
+      description: save user data after it has been modified by the user.
+      requestBody:
+          description: the new values for the user data
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: '#/definitions/UserData'
+      responses:
+        '200':
+          description: user data saved
+  /users:
+    get:
+  /wartable:
+    get:
+    post:
+
+definitions:
+  BuddySet:
+    type: object
+    required:
+      - name
+      - buddies
+    properties:
+      name:
+        type: string
+        example: 'gaming group'
+        description: the name of the buddy set as specified by the user
+      buddies:
+        type: array
+        description: BGG user names of the users in the set
+        items:
+          type: string
+        example:
+          - 'Friendless'
+          - 'jmdsplotter'
+          - 'tallboy'
+  Decoded:
+    type: object
+    required:
+      - nickname
+      - sub
+    properties:
+      nickname:
+        type: string
+        example: friendless
+        description: the user's login name from auth0
+      sub:
+        type: string
+        example: 'ABC123'
+        description: the user's unique identity from auth0
+  PersonalData:
+    type: object
+    properties:
+      userData:
+        $ref: '#/definitions/UserData'
+      allData:
+        type: object
+        description: a lump of JSON data with no specified schema
+        example:
+          name: 'Friendless'
+      error:
+        type: string
+        description: description of what went wrong if the personal data could not be retrieved
+  SystemStats:
+    type: object
+    required:
+      - userRows: number;
+      - gameRows: number;
+      - geekGamesRows: number;
+      - expansionRows: number;
+      - mechanics: number;
+      - categories: number;
+      - gameMechanics: number;
+      - gameCategories: number;
+      - notGames: number;
+      - fileRows: TypeCount[];
+      - ggForZero: number;
+      - distinctGGOwners: number;
+      - playsRows: number;
+      - normalisedPlaysRows: number;
+    properties:
+      userRows:
+        type: integer
+      gameRows:
+        type: integer
+      geekGamesRows:
+        type: integer
+      expansionRows:
+        type: integer
+      mechanics:
+        type: integer
+      categories:
+        type: integer
+      gameMechanics:
+        type: integer
+      gameCategories:
+        type: integer
+      notGames:
+        type: integer
+      fileRows:
+        type: array
+        items:
+          $ref: '#/definitions/TypeCount'
+      ggForZero:
+        type: integer
+      distinctGGOwners:
+        type: integer
+      playsRows:
+        type: integer
+      normalisedPlaysRows:
+        type: integer
+  TypeCount:
+    type: object
+    required:
+      - type
+      - existing
+      - waiting
+      - unprocessed
+    properties:
+      type:
+        type: string
+      existing:
+        type: integer
+      waiting:
+        type: integer
+      unprocessed:
+        type: integer
+  UserConfig:
+    type: object
+    required:
+      - usernames
+      - buddies
+    properties:
+      usernames:
+        type: array
+        description: the user's favourite user names on BGG
+        items:
+          type: string
+        example:
+          - Friendless
+          - Scrabblette
+          - harley22
+      buddies:
+        type: array
+        description: the user's defined buddy groups
+        items:
+          $ref: '#/definitions/BuddySet'
+        example:
+          - name: 'Critical Mass'
+            buddies:
+              - 'Critical Mass'
+              - 'cyberkev63'
+              - 'OzVortex'
+              - 'Ozgamer'
+          - name: 'IWG'
+            buddies:
+              - 'trif'
+              - 'ferrao'
+              - 'Simonocles'
+              - 'ozjesting'
+  UserData:
+    type: object
+    properties:
+      first:
+        type: boolean
+        example: false
+      config:
+        $ref: '#/definitions/UserConfig'
+      jwt:
+        $ref: '#/definitions/Decoded'
