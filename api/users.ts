@@ -64,8 +64,8 @@ export async function findOrCreateUser(identity: string, suggestedUsername: stri
     return asyncReturnWithConnection(conn => doFindOrCreateUser(conn, identity, suggestedUsername));
 }
 
-export async function updateUser(identity: string, userData: UserData) {
-    return asyncReturnWithConnection(conn => doUpdateUser(conn, identity, userData));
+export async function updateUser(identity: string, userConfig: UserConfig) {
+    return asyncReturnWithConnection(conn => doUpdateUserConfig(conn, identity, userConfig));
 }
 
 export async function doFindOrCreateUser(conn: mysql.Connection, identity: string, suggestedUsername: string): Promise<User> {
@@ -83,9 +83,9 @@ export async function doFindOrCreateUser(conn: mysql.Connection, identity: strin
     }
 }
 
-async function doUpdateUser(conn: mysql.Connection, identity: string, userData: UserData) {
+async function doUpdateUserConfig(conn: mysql.Connection, identity: string, userConfig: UserConfig) {
     const updateSql = "update users set configuration = ? where identity = ?";
-    await conn.query(updateSql, [JSON.stringify(userData), identity]);
+    await conn.query(updateSql, [JSON.stringify(userConfig), identity]);
 }
 
 async function recordLoginForUser(conn: mysql.Connection, user: User) {

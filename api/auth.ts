@@ -1,7 +1,7 @@
 import { Callback } from "aws-lambda";
 import jwt = require('jsonwebtoken');
 import { findOrCreateUser, retrieveAllData, updateUser } from "./users";
-import { Decoded, UserData, PersonalData } from "extstats-core";
+import { Decoded, UserData, PersonalData, UserConfig } from "extstats-core";
 // import jwksClient = require('jwks-rsa');
 // import {Jwk} from "jwks-rsa";
 //
@@ -79,7 +79,7 @@ export async function update(event, context, callback: Callback) {
                 callback(new Error("Bzzzt!"));
             }
         } else {
-            callback(undefined, await saveUserData(decoded, event.body as UserData));
+            callback(undefined, await saveUserData(decoded, event.body as UserConfig));
         }
     });
 }
@@ -89,8 +89,8 @@ async function getUserData(decoded: Decoded): Promise<UserData> {
     return { jwt: decoded, first: user.isFirstLogin(), config: user.getConfig(), username: user.getUsername() } as UserData;
 }
 
-async function saveUserData(decoded: Decoded, userData: UserData) {
-    await updateUser(decoded.sub, userData);
+async function saveUserData(decoded: Decoded, userConfig: UserConfig) {
+    await updateUser(decoded.sub, userConfig);
     return undefined;
 }
 

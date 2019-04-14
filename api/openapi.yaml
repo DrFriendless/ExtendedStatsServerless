@@ -257,19 +257,17 @@ paths:
   /update:
     post:
       tags:
-        - developers nokey authenticated dontuse
+        - developers nokey authenticated
       summary: update user data
       operationId: update
-      description: |
-        Save user data after it has been modified by the user. The don't use tag is for the first property in UserData.
-        There is no way you should be able to set that, and it seems to be in totally the wrong place.
+      description: Save user config after it has been modified by the user.
       requestBody:
-          description: the new values for the user data
+          description: the new user config
           required: true
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserData'
+                $ref: '#/components/schemas/UserConfig'
       responses:
         '200':
           description: user data saved
