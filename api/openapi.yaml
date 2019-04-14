@@ -11,6 +11,10 @@ info:
     The term geek refers exclusively to a user of boardgamegeek.com who is in the list of BGG users for Extended Stats.
     A user of Extended Stats is a person who has created an account on drfriendless.com, and may or may not be a user
     of boardgamegeek.com.
+
+    Notes on v1.0.0: in writing this specification, quite a few things have confused me and there are things I would
+    like to change. I will be making breaking changes to the API until version 2.0.0, at which point I will adopt semver.
+    Luckily at this point there are not many users other than me who will be inconvenienced.
   version: "1.0.0"
   title: Extended Stats API
   contact:
@@ -50,9 +54,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserData'
-  /collectionWithPlays:
-    get:
-    post:
   /faqcount:
     post:
       tags:
@@ -121,7 +122,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: NewsItem
+                  $ref: '#/components/schemas/NewsItem'
   /personal:
     get:
       tags:
@@ -162,12 +163,31 @@ paths:
                 $ref: '#/components/schemas/MultiGeekPlays'
   /query:
     post:
+      tags:
+        - developer apikey
+      summary: get selected game data
+      operationId: query
+      description: Given a selector and other query data, return a list of matching games.
+      requestBody:
+        description: a structured query describing the data being asked for
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeekGameQuery'
+      responses:
+        '200':
+          description: game data returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
   /rankings:
     get:
       tags:
         - developer apikey
       summary: get ranked games data
-      operationId: getRankings
+      operationId: getRankingsGET
       description: |
         This API powers the rankings table.
       responses:
@@ -183,7 +203,7 @@ paths:
       tags:
         - developer apikey dontuse
       summary: get ranked games data
-      operationId: getRankings
+      operationId: getRankingsPOST
       description: |
         Return ranked games data. This API is not yet in use. It is reserved for when I need a query object to specify
         which games are to be returned and how they are to be ranked.
@@ -275,7 +295,7 @@ paths:
       tags:
         - developers apikey
       summary: get data for the war table
-      operationId: getWarTable
+      operationId: getWarTableGET
       description: Get the list of war table rows for all geeks.
       responses:
         '200':
@@ -310,7 +330,7 @@ paths:
       tags:
         - developers apikey dontuse
       summary: DEPRECATED get data for the war table
-      operationId: getWarTable
+      operationId: getWarTablePOST
       description: Get the list of war table rows for all geeks. This method will be removed.
       responses:
         '200':
@@ -343,6 +363,34 @@ components:
             - 'Friendless'
             - 'jmdsplotter'
             - 'tallboy'
+    Collection:
+      type: object
+      required:
+        - collection
+        - games
+      properties:
+        collection:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeekGame'
+        games:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameData'
+        metadata:
+          $ref: '#/components/schemas/SelectorMetadataSet'
+        extra:
+          type: array
+          items:
+            type: integer
+        plays:
+          type: array
+          items:
+            $ref: '#/components/schemas/GamePlaysOrMonthlyPlays'
+        lastYearPlays:
+          type: array
+          items:
+            $ref: '#/components/schemas/GamePlays'
     Decoded:
       type: object
       required:
@@ -383,6 +431,138 @@ components:
         month: 3
         year: 4
         ever: 5
+    GameData:
+      type: object
+      required:
+        - bggid
+        - name
+        - bggRating
+        - bggRanking
+        - yearPublished
+        - minPlayers
+        - maxPlayers
+        - playTime
+        - subdomain
+        - weight
+        - isExpansion
+      properties:
+        bggid:
+          type: integer
+        name:
+          type: string
+        bggRating:
+          type: number
+        bggRanking:
+          type: integer
+        yearPublished:
+          type: integer
+        minPlayers:
+          type: integer
+        maxPlayers:
+          type: integer
+        playTime:
+          type: integer
+        subdomain:
+          type: string
+        weight:
+          type: number
+        isExpansion:
+          type: boolean
+    GamePlays:
+      type: object
+      required:
+        - game
+        - plays
+        - expansion
+        - distinctYears
+        - distinctMonths
+      properties:
+        game:
+          type: integer
+        plays:
+          type: integer
+        expansion:
+          type: boolean
+        firstPlay:
+          type: integer
+          description: date of first play of this game
+          example: 20130902
+        lastPlay:
+          type: integer
+          description: date of last play of this game
+          example: 20180112
+        distinctYears:
+          type: integer
+        distinctMonths:
+          type: integer
+    GamePlaysOrMonthlyPlays:
+      type: object
+      description: There is no such type. The type will be GamePlays or MonthlyPlays depending on context. This will change.
+    GeekGame:
+      type: object
+      description: relationship between a geek and a game
+      required:
+        - bggid
+        - rating
+        - owned
+        - wantToBuy
+        - wantToPlay
+        - preordered
+        - prevOwned
+      properties:
+        bggid:
+          type: integer
+          description: BGG ID for the game
+        rating:
+          type: number
+          description: the geek's rating for the game
+        owned:
+          type: boolean
+        wantToBuy:
+          type: boolean
+        wantToPlay:
+          type: boolean
+        preordered:
+          type: boolean
+        prevOwned:
+          type: boolean
+    GeekGameQuery:
+      type: object
+      required:
+        - geek
+        - query
+        - format
+        - vars
+      properties:
+        geek:
+          type: string
+          description: the primary geek for this collection, known as "ME"
+        geeks:
+          type: array
+          description: other geeks involved in this query
+          items:
+            type: string
+        query:
+          type: string
+          description: the selector for this query
+        extra:
+          type: string
+        format:
+          type: string
+          enum: [Collection, CollectionWithPlays, CollectionWithMonthlyPlays]
+          description: The JavaScript interface for the data to be returned. Use this to specify what data you want.
+        vars:
+          type: object
+          description: other parameters to the selector (not yet used)
+          properties:
+            THEM:
+              type: string
+            YEAR:
+              type: integer
+            RATING:
+              type: integer
+            MONTH:
+              type: integer
     GeekSummary:
       type: object
       required:
@@ -402,6 +582,29 @@ components:
           type: string
         geekId:
           type: integer
+    MonthlyPlays:
+      type: object
+      required:
+        - year
+        - month
+        - game
+        - expansion
+        - quantity
+      properties:
+        year:
+          type: integer
+          description: the year of the month that the data is for
+        month:
+          type: integer
+          description: the month that the data is for
+        game:
+          type: integer
+          description: the BGG ID for the game
+        expansion:
+          type: boolean
+        quantity:
+          type: integer
+          description: how many times the game was played
     MultiGeekPlays:
       type: object
       required:
@@ -414,18 +617,22 @@ components:
           items:
             type: string
         plays:
-          description: Keys are geek names, values are PlaysWithDate[].
+          description: Keys are geek names.
           type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/PlaysWithDate'
         collection:
-          description:
+          description: relevant geekgames
           type: array
           items:
-            type: '#/components/schemas/GeekGame'
+            $ref: '#/components/schemas/GeekGame'
         games:
           description: data for games in this result
           type: array
           items:
-            type: '#/components/schemas/GameData'
+            $ref: '#/components/schemas/GameData'
         metadata:
           $ref: '#/components/schemas/SelectorMetadataSet'
         extra:
@@ -448,6 +655,10 @@ components:
         html:
           type: string
           description: HTML content of the news item
+      example:
+        id: 8
+        date: '14 April 2019'
+        html: 'Defined the Swagger specification version 1.0.0!'
     PersonalData:
       type: object
       properties:
@@ -455,12 +666,36 @@ components:
           $ref: '#/components/schemas/UserData'
         allData:
           type: object
-          description: a lump of JSON data with no specified schema
+          description: a lump of JSON data with no specified schema - it is not intended that this data be used
           example:
             name: 'Friendless'
         error:
           type: string
           description: description of what went wrong if the personal data could not be retrieved
+    Plays:
+      type: object
+      required:
+        - game
+        - quantity
+      properties:
+        geek:
+          type: string
+          description: included only if there is ambiguity
+        game:
+          type: integer
+          description: BGG ID of the game that was played
+        expansions:
+          type: array
+          items:
+            type: integer
+          description: BGG IDs of any expansions that were used. May be omitted if empty.
+        quantity:
+          type: integer
+          description: the number of plays
+      example:
+        geek: Friendless
+        quantity: 1
+        game: 42
     PlaysQuery:
       type: object
       required:
