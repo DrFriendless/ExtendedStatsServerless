@@ -2,7 +2,7 @@ import mysql = require('promise-mysql');
 import { asyncReturnWithConnection, count, countTableRows, getGeekId, getGeekIds } from './library';
 import { selectGames } from "./selector";
 import { RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
-    TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery, Plays,
+    TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery,
     MultiGeekPlays, PlaysWithDate } from "extstats-core";
 import * as moment from 'moment';
 
@@ -222,7 +222,7 @@ export async function updateFAQCount(views: number[]): Promise<FAQCount[]> {
 
 async function doUpdateFAQCount(conn: mysql.Connection, views: number[]): Promise<FAQCount[]> {
     const now = moment();
-    const today = now.year() * 10000 + (now.month()+1) * 100 + now.date();
+    const today = now.year() * 10000 + (now.month() + 1) * 100 + now.date();
     for (const v of views) {
         await doIncFAQCount(conn, v, today);
     }
@@ -239,14 +239,14 @@ async function doUpdateFAQCount(conn: mysql.Connection, views: number[]): Promis
         result.push({ day: 0, week: 0, month: 0, year: 0, ever: row["c"] });
         index++;
     });
-    const yearRows = await conn.query(countSql, [today-10000]);
+    const yearRows = await conn.query(countSql, [today - 10000]);
     patchFAQCount(yearRows, "year", result);
     const aMonthAgo = moment().subtract(1, "month");
-    const aMonthAgoNumber = aMonthAgo.year() * 10000 + (aMonthAgo.month()+1) * 100 + aMonthAgo.date();
+    const aMonthAgoNumber = aMonthAgo.year() * 10000 + (aMonthAgo.month() + 1) * 100 + aMonthAgo.date();
     const monthRows = await conn.query(countSql, [aMonthAgoNumber]);
     patchFAQCount(monthRows, "month", result);
     const aWeekAgo = moment().subtract(1, "week");
-    const aWeekAgoNumber = aWeekAgo.year() * 10000 + (aWeekAgo.month()+1) * 100 + aWeekAgo.date();
+    const aWeekAgoNumber = aWeekAgo.year() * 10000 + (aWeekAgo.month() + 1) * 100 + aWeekAgo.date();
     const weekRows = await conn.query(countSql, [aWeekAgoNumber]);
     patchFAQCount(weekRows, "week", result);
     const dayRows = await conn.query(countSql, [today]);
@@ -257,7 +257,7 @@ async function doUpdateFAQCount(conn: mysql.Connection, views: number[]): Promis
 function patchFAQCount(rows: object[], key: string, result: FAQCount[]) {
     for (const row of rows) {
         const i = row["faq_index"];
-        result[i-1][key] = row["c"];
+        result[i - 1][key] = row["c"];
     }
 }
 
@@ -281,7 +281,7 @@ async function doIncFAQCount(conn: mysql.Connection, view: number, today: number
     }
     if (todayRow) {
         const count = todayRow["count"];
-        await conn.query(updateSql, [count+1, today, view]);
+        await conn.query(updateSql, [count + 1, today, view]);
     }
 }
 
