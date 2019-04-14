@@ -15,7 +15,7 @@ info:
     Notes on v1.0.0: in writing this specification, quite a few things have confused me and there are things I would
     like to change. I will be making breaking changes to the API until version 2.0.0, at which point I will adopt semver.
     Luckily at this point there are not many users other than me who will be inconvenienced.
-  version: "1.0.0"
+  version: "1.0.1"
   title: Extended Stats API
   contact:
     email: friendless.farrell@gmail.com
@@ -177,11 +177,14 @@ paths:
               $ref: '#/components/schemas/GeekGameQuery'
       responses:
         '200':
-          description: game data returned
+          description: game data returned, according to the schema requested
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Collection'
+               oneOf:
+                  - $ref: '#/components/schemas/Collection'
+                  - $ref: '#/components/schemas/CollectionWithPlays'
+                  - $ref: '#/components/schemas/CollectionWithMonthlyPlays'
   /rankings:
     get:
       tags:
@@ -381,14 +384,60 @@ components:
           type: array
           items:
             type: integer
+    CollectionWithPlays:
+      type: object
+      required:
+        - collection
+        - games
+        - plays
+        - lastYearPlays
+      properties:
+        collection:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeekGame'
+        games:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameData'
+        metadata:
+          $ref: '#/components/schemas/SelectorMetadataSet'
+        extra:
+          type: array
+          items:
+            type: integer
         plays:
           type: array
           items:
-            $ref: '#/components/schemas/GamePlaysOrMonthlyPlays'
+            $ref: '#/components/schemas/GamePlays'
         lastYearPlays:
           type: array
           items:
             $ref: '#/components/schemas/GamePlays'
+    CollectionWithMonthlyPlays:
+      type: object
+      required:
+        - collection
+        - games
+      properties:
+        collection:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeekGame'
+        games:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameData'
+        metadata:
+          $ref: '#/components/schemas/SelectorMetadataSet'
+        extra:
+          type: array
+          items:
+            type: integer
+        plays:
+          type: array
+          items:
+            $ref: '#/components/schemas/MonthlyPlays'
     Decoded:
       type: object
       required:
@@ -493,9 +542,6 @@ components:
           type: integer
         distinctMonths:
           type: integer
-    GamePlaysOrMonthlyPlays:
-      type: object
-      description: There is no such type. The type will be GamePlays or MonthlyPlays depending on context. This will change.
     GeekGame:
       type: object
       description: relationship between a geek and a game
