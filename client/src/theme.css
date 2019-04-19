@@ -7,8 +7,8 @@ body {
     border-top: 0;
 }
 .table.extstats-table, div.extstats-doc {
-    margin-left: 1rem;
-    margin-right: 1rem;
+    border-collapse: collapse;
+    margin: 0;
     width: 95%;
     border: none;
 }
@@ -69,4 +69,53 @@ h2 {
 }
 .mat-form-field-underline {
     display: none;
+}
+
+.extstats-table-block {
+    display: inline-block;
+}
+.extstats-table-controller {
+    height: 40px;
+    width: 100%;
+}
+div.extstats-table-controller {
+    border-bottom: 1px solid white;
+}
+.extstats-table-controller mfPaginator {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: stretch;
+    height: 100%;
+}
+.extstats-table-controller .help {
+    display: inline-block;
+    flex-grow: 0;
+    height: 100%;
+    margin-left: 8px;
+    margin-right: 4px;
+}
+.extstats-table-controller input {
+    margin-top: 4px;
+}
+.extstats-pagination {
+    display: inline-block;
+    flex-grow: 0;
+    height: 100%;
+}
+.filler {
+    flex-grow: 1;
+}
+.extstats-page-item {
+    width: 40px;
+    height: 100%;
+    background-color: transparent;
+    border: none;
+}
+.extstats-page-item:hover {
+    color: black;
+    background-color: white;
+}
+.extstats-page-item:hover a.extstats-page-link {
+    color: black;
 }
