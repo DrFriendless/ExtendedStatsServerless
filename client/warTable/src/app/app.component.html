@@ -41,25 +41,27 @@
     </div>
   </div>
 
+  <div class="extstats-table-block">
+  <extstats-table-controller [table]="warTable" [searchColumn]="'geekName'" [placeholder]="'geek'"></extstats-table-controller>
   <table class="table table-striped extstats-table" [mfData]="rows" #warTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'geekName'" [mfSortOrder]="'asc'">
     <thead>
     <tr>
       <th><mfDefaultSorter by="geekName">Geek</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="totalPlays" tooltip="Total plays of all games as recorded by Extended Stats">Total Plays</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="distinctGames" tooltip="Number of different games with recorded plays">Distinct Games</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="owned" tooltip="Number of games this geek owns">Owned</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="want" tooltip="Number of games this geek wants in trade">Want in Trade</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="wish" tooltip="Number of games on this geek's wishlist">Wishlist</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="trade" tooltip="Number of games this geek has for trade">For Trade</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="sdj" tooltip="Number of different Spiel des Jahre winners played">Spiel des Jahre</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="top50" tooltip="Number of different games in the BGG Top 50 played">BGG Top 50</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="ext100" tooltip="Number of different games in the Extended Stats Top 100 played">Ext Stats Top 100</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="prevOwned" tooltip="Number of games previously owned by this geek">Prev Owned</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="friendless" tooltip="Friendless Metric for this geek">Friendless</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="cfm" tooltip="Continuous Friendless Metric for this geek">CFM</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="zeros" tooltip="Number of games this geek owns that they have played 0 times">0s</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="tens" tooltip="Number of games this geek owns that they have played 10+ times">10s</mfDefaultSorter></th>
-      <th><mfDefaultSorter by="hindex" tooltip="This geek's H-Index">H-Index</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="totalPlays" title="Total plays of all games as recorded by Extended Stats">Total Plays</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="distinctGames" title="Number of different games with recorded plays">Distinct Games</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="owned" title="Number of games this geek owns">Owned</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="want" title="Number of games this geek wants in trade">Want in Trade</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="wish" title="Number of games on this geek's wishlist">Wishlist</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="trade" title="Number of games this geek has for trade">For Trade</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="sdj" title="Number of different Spiel des Jahre winners played">Spiel des Jahre</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="top50" title="Number of different games in the BGG Top 50 played">BGG Top 50</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="ext100" title="Number of different games in the Extended Stats Top 100 played">Ext Stats Top 100</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="prevOwned" title="Number of games previously owned by this geek">Prev Owned</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="friendless" title="Friendless Metric for this geek">Friendless</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="cfm" title="Continuous Friendless Metric for this geek">CFM</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="zeros" title="Number of games this geek owns that they have played 0 times">0s</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="tens" title="Number of games this geek owns that they have played 10+ times">10s</mfDefaultSorter></th>
+      <th><mfDefaultSorter by="hindex" title="This geek's H-Index">H-Index</mfDefaultSorter></th>
     </tr>
     </thead>
     <tbody>
@@ -82,13 +84,7 @@
       <td>{{row.hindex}}</td>
     </tr>
     </tbody>
-    <tfoot>
-    <tr>
-      <td colspan="4">
-        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]" [mfTable]="warTable"></mfBootstrapPaginator>
-      </td>
-    </tr>
-    </tfoot>
   </table>
+  </div>
 </div>
 

@@ -1,11 +1,29 @@
 /* Styles for war-table */
-
-.war-table table.extstats-table tfoot ul.pagination li:not(.active) a:hover {
-  background-color: #ddd;
+.extstats-page-item.active {
+  background-color: rgba(255, 232, 255, 0.5);
 }
-.war-table table.extstats-table tfoot ul.pagination li.active a {
-  background-color: green;
+.extstats-table-controller {
+  background-color: #673fb4;
   color: white;
+}
+.extstats-table-controller a.extstats-page-link {
+  color: white;
+}
+.war-table {
+  margin-left: 16px;
+  margin-right: 16px;
+}
+.war-table .table.extstats-table thead td,
+.war-table .table.extstats-table tbody td {
+  border-right-width: 0;
+  border-left-width: 0;
+}
+.war-table th {
+  background-color: #673fb4;
+  color: white;
+}
+.extstats-table-controller {
+  border: 1px solid #673fb4;
 }
 
 .war-table table.extstats-table td,
@@ -14,11 +32,11 @@
 .war-table table.extstats-table.table thead th {
   border-color: #673fb4;
 }
-/* border colour modified to 16 saturation */
-.war-table table.table-striped.extstats-table tbody tr:nth-child(odd){
-  background-color: rgba(170, 146, 174, 0.5);
-}
+/* border colour lightened 60% with 0.5 alpha */
 .war-table table.table-striped.extstats-table tbody tr:nth-child(even){
+  background-color: rgba(255, 232, 255, 0.5);
+}
+.war-table table.table-striped.extstats-table tbody tr:nth-child(odd){
   background-color: white;
 }
 

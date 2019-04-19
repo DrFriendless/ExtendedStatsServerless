@@ -1,0 +1,26 @@
+<div class="extstats-table-controller">
+  <mfPaginator #p [mfTable]="table">
+    <div class="extstats-pagination" *ngIf="p.dataLength > p.rowsOnPage">
+      <div class="help">Page:</div>
+      <button type="button" class="extstats-page-item" *ngFor="let page of pages()" [class.active]="p.activePage === page" (click)="p.setPage(page)">
+        <a class="extstats-page-link" style="cursor: pointer">{{page}}</a>
+      </button>
+    </div>
+
+    <div class="filler"></div>
+
+    <div *ngIf="!!searchColumn">
+      <div class="help">Search:</div>
+      <input type="text" [value]="searchValue" [placeholder]="placeholder" (input)="search($event)">
+    </div>
+
+    <div class="filler" *ngIf="!!searchColumn"></div>
+
+    <div class="extstats-pagination" *ngIf="p.dataLength > minRowsOnPage">
+      <div class="help">Rows per page:</div>
+      <button type="button" class="extstats-page-item" *ngFor="let rows of rowsOnPageSet" [class.active]="p.rowsOnPage===rows" (click)="p.setRowsOnPage(rows)">
+        <a class="extstats-page-link" style="cursor: pointer">{{rows}}</a>
+      </button>
+    </div>
+  </mfPaginator>
+</div>
