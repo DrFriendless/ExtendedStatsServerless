@@ -42,7 +42,7 @@
   </div>
 
   <div class="extstats-table-block">
-  <extstats-table-controller [table]="warTable" [searchColumn]="'geekName'" [placeholder]="'geek'"></extstats-table-controller>
+  <mfTableController [table]="warTable" [searchColumn]="'geekName'" [placeholder]="'geek'"></mfTableController>
   <table class="table table-striped extstats-table" [mfData]="rows" #warTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'geekName'" [mfSortOrder]="'asc'">
     <thead>
     <tr>
