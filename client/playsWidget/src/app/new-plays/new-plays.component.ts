@@ -65,7 +65,6 @@ export class NewPlaysComponent extends PlaysViewComponent<MultiGeekPlays> {
           });
         }
       }
-      console.log(firstPlays);
       const spec: VisualizationSpec = {
         "$schema": "https://vega.github.io/schema/vega/v4.json",
         "hconcat": [],

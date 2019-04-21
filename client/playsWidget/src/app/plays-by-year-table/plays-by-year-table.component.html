@@ -1,0 +1,33 @@
+<div class="plays-table">
+  <div class="extstats-table-block">
+    <mfTableController [table]="pbyTable"></mfTableController>
+    <table class="table table-striped extstats-table" [mfData]="rows" #pbyTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'name'" [mfSortOrder]="'asc'">
+      <thead>
+      <tr>
+        <th><mfDefaultSorter by="year">Year</mfDefaultSorter></th>
+        <th><mfDefaultSorter by="plays" title="Number of plays this year">Plays</mfDefaultSorter></th>
+        <th><mfDefaultSorter by="distinct" title="Number of different games played">Distinct</mfDefaultSorter></th>
+        <th><mfDefaultSorter by="dates" title="Number of different days played on">Dates</mfDefaultSorter></th>
+        <th><mfDefaultSorter by="new" title="Number of new (ever) games played">New Games</mfDefaultSorter></th>
+        <th><mfDefaultSorter by="nickel" title="Number of games played 5 times or more (ever)">Nickel</mfDefaultSorter></th>
+        <th><mfDefaultSorter by="dime" title="Number of games played 10 times or more (ever)">Dime</mfDefaultSorter></th>
+        <th><mfDefaultSorter by="quarter" title="Number of games played 25 times or more (ever)">Quarter</mfDefaultSorter></th>
+        <th><mfDefaultSorter by="dollar" title="Number of games played 100 times or more (ever)">Dollar</mfDefaultSorter></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let row of pbyTable.data">
+        <td>{{row.year}}</td>
+        <td>{{row.plays}}</td>
+        <td>{{row.distinct}}</td>
+        <td>{{row.dates}}</td>
+        <td title="{{row.newTooltip}}">{{row.new}}</td>
+        <td title="{{row.nickelTooltip}}">{{row.nickel}}</td>
+        <td title="{{row.dimeTooltip}}">{{row.dime}}</td>
+        <td title="{{row.quarterTooltip}}">{{row.quarter}}</td>
+        <td title="{{row.dollarTooltip}}">{{row.dollar}}</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

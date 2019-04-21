@@ -1,5 +1,18 @@
 <div style="text-align:center">
   <extstats-loader *ngIf="loading"></extstats-loader>
+
+  <!--<h2 id="playsbyweek">Plays By Week</h2>-->
+  <!--<plays-by-week-graph></plays-by-week-graph>-->
+
+  <h2 id="playsbyyear">Plays By Year</h2>
+  <plays-by-year-table></plays-by-year-table>
+
+  <h2 id="playsbymonth">Plays By Month</h2>
+  <plays-by-month-table></plays-by-month-table>
+
+  <!--<h2 id="allplays">All Plays</h2>-->
+  <!--<all-plays-table></all-plays-table>-->
+
   <h2 id="newplays">Rate of Play of Games New to You</h2>
   <new-plays [data]="data$"></new-plays>
 </div>
