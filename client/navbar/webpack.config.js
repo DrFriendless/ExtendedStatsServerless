@@ -14,13 +14,8 @@ module.exports = {
             {
                 test: /\.css$/,
                 use: ["style-loader", "css-loader"],
-            },
-            {
-                test: /\.js$/,
-                use: ["source-map-loader"],
-                enforce: "pre"
             }
         ],
     },
-    // plugins: [new UglifyJsPlugin()],
+    plugins: [new UglifyJsPlugin()],
 };
