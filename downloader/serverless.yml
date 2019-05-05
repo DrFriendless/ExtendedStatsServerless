@@ -94,6 +94,8 @@ functions:
       "invokeLambdas"
   processPlays:
     handler: functions.processPlays
+    tags:
+      component: downloader
     role:
       "invokeLambdas"
   processCollection:
@@ -104,6 +106,12 @@ functions:
       downloaderPassword: ${self:custom.secret.downloaderPassword}
     timeout: 300
     memorySize: 256
+    role:
+      "invokeLambdas"
+  processBGGTop50:
+    handler: functions.processBGGTop50
+    tags:
+      component: downloader
     role:
       "invokeLambdas"
 

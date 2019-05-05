@@ -44,7 +44,7 @@ export function invokeLambdaSync(context: string, func: string, payload: object)
 export function between(s: string, before: string, after: string): string {
     const i = s.indexOf(before);
     if (i < 0) return "";
-    s = s.substring(i+before.length);
+    s = s.substring(i + before.length);
     const j = s.indexOf(after);
     if (j < 0) return "";
     return s.substring(0, j);

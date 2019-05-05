@@ -1,4 +1,4 @@
-import {Callback} from "aws-lambda";
+import { Callback } from "aws-lambda";
 import {
     ProcessCollectionResult,
     FileToProcess,
@@ -11,8 +11,8 @@ import {
     MetadataRule,
     METADATA_RULE_BASEGAME,
     Metadata, PlayData
-} from "./interfaces"
-import {between, invokeLambdaAsync, invokeLambdaSync, promiseToCallback} from "./library";
+} from "./interfaces";
+import { between, invokeLambdaAsync, invokeLambdaSync, promiseToCallback } from "./library";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
@@ -38,6 +38,7 @@ const METHOD_PROCESS_PLAYS = "processPlays";
 const FUNCTION_RETRIEVE_FILES = "getToProcessList";
 const FUNCTION_UPDATE_USER_LIST = "updateUserList";
 const FUNCTION_UPDATE_METADATA = "updateMetadata";
+const FUNCTION_UPDATE_TOP50 = "updateBGGTop50";
 const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
@@ -104,7 +105,26 @@ export async function processMetadata(event, context, callback: Callback) {
         }
         const toUpdate: Metadata = { series, rules };
         invokeLambdaAsync("processMetadata", INSIDE_PREFIX + FUNCTION_UPDATE_METADATA, toUpdate);
-        callback(null);
+        callback();
+    } catch (e) {
+        callback(e);
+    }
+}
+
+export async function processBGGTop50(event, context, callback: Callback) {
+    const TOP50_URL = "https://www.boardgamegeek.com/browse/boardgame";
+    try {
+        const data = await request(TOP50_URL);
+        const lines: string[] = data
+            .split(/\r?\n/)
+            .map(s => s.trim());
+        const top100 = _.dropWhile(lines, s => s.indexOf("<th class='collection_bggrating'>") < 0)
+            .filter(s => s.indexOf('href="/boardgame/') >= 0)
+            .filter(s => s.indexOf('<img') >= 0)
+            .map(s => between(s, 'href="/boardgame/', '/'))
+            .map(s => parseInt(s));
+        const top50 = _.take(top100, 50);
+        invokeLambdaAsync("processBGGTop50", INSIDE_PREFIX + FUNCTION_UPDATE_TOP50, top50);
     } catch (e) {
         callback(e);
     }
@@ -112,7 +132,6 @@ export async function processMetadata(event, context, callback: Callback) {
 
 // Lambda to get files to be processed and invoke the lambdas to do that
 export function fireFileProcessing(event, context, callback: Callback) {
-    console.log(event);
     let count = PROCESS_COUNT;
     const envCount = process.env["COUNT"];
     if (parseInt(envCount)) count = parseInt(envCount);
@@ -139,7 +158,7 @@ export function fireFileProcessing(event, context, callback: Callback) {
                     return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
                 }
             });
-            return files.length;
+            return { count: files.length };
         });
     promiseToCallback(promise, callback);
 }
@@ -188,7 +207,7 @@ export async function processCollection(event, context, callback: Callback) {
     } catch (e) {
         console.log(e);
         await markAsUnprocessed("processCollection", invocation);
-        callback(null, e);
+        callback(undefined, e);
     }
 }
 
@@ -253,7 +272,7 @@ async function markTryAgainTomorrow(context: string, fileDetails: FileToProcess)
 
 function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {
     return _.chunk(original.items, MAX_GAMES_PER_CALL)
-        .map(items => { return { geek: original.geek, items: items } as ProcessCollectionResult});
+        .map(items => { return { geek: original.geek, items: items } as ProcessCollectionResult; });
 }
 
 export async function processPlayed(event, context, callback: Callback) {
@@ -281,10 +300,10 @@ export async function processPlays(event, context, callback: Callback) {
     let pagesNeeded = -1;
     while (pagesSoFar === 0 || pagesSoFar < pagesNeeded) {
         pagesSoFar++;
-        let data = await request(invocation.url + "&page=" + pagesSoFar) as string;
+        const data = await request(invocation.url + "&page=" + pagesSoFar) as string;
         const processResult: { count: number, plays: PlayData[] } = await processPlaysFile(data, invocation);
         playsData = playsData.concat(processResult.plays);
-        pagesNeeded = Math.ceil(processResult.count/100);
+        pagesNeeded = Math.ceil(processResult.count / 100);
     }
     const playsResult = { geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url } as ProcessPlaysResult;
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
