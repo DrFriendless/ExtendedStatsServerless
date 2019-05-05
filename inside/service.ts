@@ -9,7 +9,7 @@ import {
     ProcessPlaysResult, SeriesMetadata,
     ToProcessElement
 } from "./interfaces";
-import {returnWithConnection, withConnectionAsync} from "./library";
+import { returnWithConnection, withConnectionAsync } from "./library";
 import {
     doEnsureGames,
     doEnsureUsers,
@@ -19,10 +19,10 @@ import {
     doMarkUrlTryTomorrow, doMarkUrlUnprocessed, doProcessCollectionCleanup,
     doProcessGameResult,
     doProcessPlayedMonths,
-    doProcessPlaysResult,
+    doProcessPlaysResult, doUpdateBGGTop50,
     doUpdateGamesForGeek, doUpdateMetadata,
     doUpdateProcessUserResult, doUpdateRankings
-} from "./mysql-rds";
+} from './mysql-rds';
 
 export async function runProcessGameResult(data: ProcessGameResult) {
     await withConnectionAsync(async conn => await doProcessGameResult(conn, data));
@@ -38,7 +38,7 @@ export async function runUpdateGamesForGeek(geek: string, games: CollectionGame[
 
 export async function runEnsureUsers(users: string[]) {
     const uniques: string[] = [];
-    for (let i=0; i<users.length; i++) {
+    for (let i = 0; i < users.length; i++) {
         if (uniques.indexOf(users[i]) >= 0) {
             console.log("User " + users[i] + " is duplicated in the users list.");
         } else {
@@ -82,6 +82,10 @@ export async function runListToProcess(count: number, processMethod: string, upd
 
 export async function runUpdateMetadata(series: SeriesMetadata[], rules: MetadataRule[]) {
     await withConnectionAsync(async conn => await doUpdateMetadata(conn, series, rules));
+}
+
+export async function runUpdateBGGTop50(games: number[]) {
+    await withConnectionAsync(async conn => await doUpdateBGGTop50(conn, games));
 }
 
 export async function runUpdateRankings() {

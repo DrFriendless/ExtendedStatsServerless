@@ -9,8 +9,8 @@ import {
     ProcessCollectionResult,
     ProcessGameResult, ProcessMonthsPlayedResult, ProcessPlaysResult,
     ProcessUserResult
-} from "./interfaces";
-import {getConnection} from "./library";
+} from './interfaces';
+import {getConnection} from './library';
 import {
     runEnsureGames,
     runEnsureUsers,
@@ -23,8 +23,8 @@ import {
     runProcessPlayedMonths,
     runProcessPlaysResult,
     runProcessUserResult,
-    runUpdateGamesForGeek, runUpdateMetadata, runUpdateRankings
-} from "./service";
+    runUpdateGamesForGeek, runUpdateMetadata, runUpdateRankings, runUpdateBGGTop50
+} from './service';
 
 
 export async function processGameResult(event, context, callback: Callback) {
@@ -56,7 +56,7 @@ export async function updateUserList(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const body = event as string;
     const usernames = body.split(/\r?\n/);
-    console.log("checking for " + usernames.length + " users");
+    console.log('checking for ' + usernames.length + ' users');
     try {
         await runEnsureUsers(usernames);
         callback();
@@ -71,6 +71,18 @@ export async function updateMetadata(event, context, callback: Callback) {
     const body = event as Metadata;
     try {
         await runUpdateMetadata(body.series, body.rules);
+        callback();
+    } catch (e) {
+        console.log(e);
+        callback(e);
+    }
+}
+
+export async function updateBGGTop50(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    const body = event as number[];
+    try {
+        await runUpdateBGGTop50(body);
         callback();
     } catch (e) {
         console.log(e);

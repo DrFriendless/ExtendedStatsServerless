@@ -16,7 +16,11 @@ import {
     count, extractNormalisedPlayFromPlayRow, listIntersect, listMinus, playDate
 } from "./library";
 import * as _ from "lodash";
-import {inferExtraPlays} from "./plays";
+import { inferExtraPlays } from "./plays";
+
+export async function doUpdateBGGTop50(conn: mysql.Connection, games: number[]) {
+    await doUpdateSeries(conn, [ { name: "BGG Top 50", games } ]);
+}
 
 export async function doUpdateMetadata(conn: mysql.Connection, series: SeriesMetadata[], rules: MetadataRule[]) {
     await doUpdateSeries(conn, series);
@@ -36,7 +40,6 @@ async function doUpdateSeries(conn: mysql.Connection, seriesMetada: SeriesMetada
         for (const game of gamesToUse) {
             values.push([sid, game]);
         }
-        console.log(values);
         await conn.query(insertSql, [values]);
     }
 }
@@ -263,6 +266,7 @@ export async function doMarkUrlProcessedWithUpdate(conn: mysql.Connection, proce
 }
 
 export async function doMarkUrlUnprocessed(conn: mysql.Connection, processMethod: string, url: string) {
+    console.log(url);
     const sqlSet = "update files set last_scheduled = null where url = ? and processMethod = ?";
     await conn.query(sqlSet, [url, processMethod]);
 }
@@ -373,7 +377,7 @@ export async function doEnsureProcessPlaysFiles(conn: mysql.Connection, geek: st
             .replace("%d", month.month.toString());
         if (month.month === 0 && month.year === 0) url = timelessPlaysUrl;
         await doRecordFile(conn, url, "processPlays", geek, "Plays for " + geek + " for " + month.month + "/" + month.year,
-            null, month.month, month.year, geekId);
+            undefined, month.month, month.year, geekId);
     }
 }
 
@@ -416,7 +420,7 @@ async function doRecordGame(conn: mysql.Connection, bggid: number) {
     const url = GAME_URL.replace("%d", bggid.toString());
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
     const tillNext = tillNextUpdate("processGame");
-    const insertParams = [url, "processGame", null, null, tillNext, "Game #" + bggid, bggid];
+    const insertParams = [url, "processGame", undefined, undefined, tillNext, "Game #" + bggid, bggid];
     await conn.query(insertSql, insertParams).catch(err => {});
 }
 
@@ -428,24 +432,26 @@ async function doRecordFile(conn: mysql.Connection, url: string, processMethod: 
     const found = await count(conn, countSql, [url, processMethod]);
     if (found === 0) {
         const tillNext = tillNextUpdate(processMethod);
-        const insertParams = [url, processMethod, user, null, tillNext, description, bggid, month, year, geekid];
+        const insertParams = [url, processMethod, user, undefined, tillNext, description, bggid, month, year, geekid];
         await conn.query(insertSql, insertParams).catch(err => {});
     }
 }
 
 async function doEnsureFileProcessUser(conn: mysql.Connection, geek: string, geekid: number) {
     const url = `https://boardgamegeek.com/user/${geek}`;
-    await doRecordFile(conn, url, "processUser", geek, "User's profile", null, null, null, geekid);
+    await doRecordFile(conn, url, "processUser", geek, "User's profile", undefined, undefined, undefined, geekid);
 }
 
 async function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: string, geekid: number) {
     const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
-    await doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", null, null, null, geekid);
+    await doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", undefined,
+        undefined, undefined, geekid);
 }
 
 async function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string, geekid: number) {
     const url = `https://boardgamegeek.com/plays/bymonth/user/${geek}/subtype/boardgame`;
-    await doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", null, null, null, geekid);
+    await doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", undefined,
+        undefined, undefined, geekid);
 }
 
 export async function doListToProcess(conn: mysql.Connection, count: number, processMethod: string, updateLastScheduled: boolean): Promise<ToProcessElement[]> {
@@ -563,11 +569,11 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
     const rows = await conn.query(selectSql, [geekId, month, year]);
     const rawData = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
     const byDate = _.groupBy(rawData, playDate);
-    const allPlays = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays as NormalisedPlays[], expansionData))) as WorkingNormalisedPlays[];
+    const allPlays: WorkingNormalisedPlays[] = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays as NormalisedPlays[], expansionData)));
     await conn.query(deleteSql, [geekId, month, year]);
     // insert all of the base plays
     const basePlays = [];
-    for (let np of allPlays) {
+    for (const np of allPlays) {
         basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, 0]);
     }
     if (basePlays.length > 0) {
@@ -575,10 +581,10 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
     }
     // construct the expansion plays with references to the base plays
     const expPlays = [];
-    for (let np of allPlays) {
+    for (const np of allPlays) {
         if (np.expansions.length > 0) {
             const id = (await conn.query(getIdSql, [np.game, geekId, np.quantity, np.year, np.month, np.date]))[0].id;
-            for (let e of np.expansions) {
+            for (const e of np.expansions) {
                 expPlays.push([e, geekId, np.quantity, np.year, np.month, np.date, 1, id]);
             }
         }
