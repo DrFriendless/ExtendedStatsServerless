@@ -515,19 +515,26 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
     const geekId = await getGeekId(conn, geekName);
+    const top50Id = await getIdForSeries(conn, "BGG Top 50");
+    const top50 = await getGamesForSeries(conn, top50Id);
     const owned = await countWhere(conn, "geekgames where geekId = ? and owned > 0", [geekId]);
     const want = await countWhere(conn, "geekgames where geekId = ? and want > 0", [geekId]);
     const wish = await countWhere(conn, "geekgames where geekId = ? and wish > 0", [geekId]);
     const trade = await countWhere(conn, "geekgames where geekId = ? and trade > 0", [geekId]);
     const prevOwned = await countWhere(conn, "geekgames where geekId = ? and prevowned > 0", [geekId]);
     const preordered = await countWhere(conn, "geekgames where geekId = ? and preordered > 0", [geekId]);
+    let top50Count = 0;
+    if (top50.length > 0) {
+        const sql = "select distinct game from plays_normalised where geek = ? and game in (?);";
+        top50Count = (await conn.query(sql, [geekId, top50])).length;
+    }
     const playsDataForWarTable = await doGatherPlaysDataForWarTable(conn, geekId);
     const fpg: WarTableRow = {
         geek: geekId,
         geekName: geekName,
         totalPlays: playsDataForWarTable.totalPlays,
         distinctGames: playsDataForWarTable.distinctGames,
-        top50: 0, // TODO
+        top50: top50Count,
         sdj: playsDataForWarTable.sdj,
         owned: owned,
         want: want,
@@ -643,6 +650,11 @@ async function getGamesThatDontExist(conn: mysql.Connection): Promise<number[]> 
 async function getIdForSeries(conn: mysql.Connection, seriesName: string): Promise<number> {
     const sql = "select id from series_metadata where name = ?";
     return (await conn.query(sql, [seriesName]))[0]["id"];
+}
+
+async function getGamesForSeries(conn: mysql.Connection, seriesId: number): Promise<number[]> {
+    const sql = "select game from series where series_id = ?";
+    return (await conn.query(sql, [seriesId])).map(row => row["game"]);
 }
 
 async function loadExpansionData(conn: mysql.Connection): Promise<ExpansionData> {
