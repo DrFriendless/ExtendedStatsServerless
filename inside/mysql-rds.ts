@@ -490,14 +490,25 @@ async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string
     }
 }
 
-export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<{
-    totalPlays: number, distinctGames: number, tens: number, zeros: number, hindex: number, sdj: number, ext100: number }> {
+type PlaysDataForWarTable = {
+    totalPlays: number,
+    distinctGames: number,
+    tens: number,
+    zeros: number,
+    hindex: number,
+    sdj: number,
+    ext100: number,
+    uses: number[]
+};
+
+export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<PlaysDataForWarTable> {
     const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
     const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
     const tensSql = "select count(plays.g) t from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
     const zerosSql = "select count(game) z from geekgames where geekid = ? and owned > 0 and game not in (select game from plays_normalised where geek = ?)";
     const hindexSql = "select sum(quantity) q from plays_normalised where geek = ? and expansion_play = 0 group by game order by q desc";
     const seriesPlaysSql = "select count(distinct series.game) c from plays_normalised,series where series.series_id = ? and series.game = plays_normalised.game and plays_normalised.geek = ?";
+    const usesSql = "select sum(plays_normalised.quantity) c, geekgames.game from plays_normalised,geekgames where plays_normalised.game=geekgames.game and geekgames.owned>0 and geekgames.geekid = ? and plays_normalised.geek=? and plays_normalised.expansion_play=0 group by plays_normalised.game order by 1 desc";
     const distinctGames = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
     const totalPlays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
@@ -509,8 +520,8 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
     const ext100Id = await getIdForSeries(conn, "Extended Stats Top 100");
     const ext100 = (await conn.query(seriesPlaysSql, [ext100Id, geekId]))[0]["c"];
-    // TODO
-    return { totalPlays, distinctGames, tens, zeros, hindex, sdj, ext100 };
+    const uses = (await conn.query(usesSql, [geekId, geekId])).map(row => row["c"]);
+    return { totalPlays, distinctGames, tens, zeros, hindex, sdj, ext100, uses };
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
@@ -528,7 +539,8 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         const sql = "select distinct game from plays_normalised where geek = ? and game in (?);";
         top50Count = (await conn.query(sql, [geekId, top50])).length;
     }
-    const playsDataForWarTable = await doGatherPlaysDataForWarTable(conn, geekId);
+    const playsDataForWarTable: PlaysDataForWarTable = await doGatherPlaysDataForWarTable(conn, geekId);
+    const fm = calcFriendlessMetrics(playsDataForWarTable.uses);
     const fpg: WarTableRow = {
         geek: geekId,
         geekName: geekName,
@@ -541,9 +553,9 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         wish: wish,
         trade: trade,
         prevOwned: prevOwned,
-        friendless: 0, // TODO
-        cfm: 0.0, // TODO
-        utilisation: 0.0, // TODO
+        friendless: fm.friendless,
+        cfm: fm.cfm,
+        utilisation: fm.utilisation,
         tens: playsDataForWarTable.tens,
         zeros: playsDataForWarTable.zeros,
         ext100: playsDataForWarTable.ext100,
@@ -566,6 +578,84 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
             fpg.ext100, fpg.hindex, fpg.preordered, fpg.geek]);
     }
 }
+
+type FriendlessMetrics = {
+    friendless: number;
+    utilisation: number;
+    cfm: number;
+};
+
+// exponential distribution cumulative distribution function
+function cdf(n: number, lambda: number) {
+    return 1.0 - Math.exp(-lambda * n);
+}
+
+function invcdf(n: number, lambda: number) {
+    return -Math.log(1 - n) / lambda;
+}
+
+function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
+    const LAMBDA = Math.log(0.1) / -10.0;
+    let tens = 0;
+    let zeros = 0;
+    for (const u of uses) {
+        if (u >= 10) {
+            tens++;
+        } else if (u === 0) {
+            zeros++;
+        }
+    }
+    let friendless;
+    let cfm = 0;
+    let utilisation = 0;
+    if (uses.length === 0) {
+        friendless = 0;
+    } else if (uses.length === tens) {
+        friendless = uses[-1];
+    } else {
+        friendless = uses[-tens - 1];
+    }
+    if (friendless === 0) friendless = tens - zeros;
+    if (uses.length > 0) {
+        let total = 0;
+        for (const u of uses) {
+            total += cdf(u, LAMBDA);
+        }
+        utilisation = Math.round(total * 10000 / uses.length + Number.EPSILON) / 100;
+        cfm = Math.round(invcdf(total / uses.length, LAMBDA) * 100) / 100;
+    }
+    return { utilisation, cfm, friendless };
+}
+
+// def calcFriendless(data):
+// import library
+// data.sort(uses)
+// ld = len(data)
+// tens = 0
+// zeros = 0
+// for p in data:
+// if p >= 10:
+// tens = tens + 1
+// elif p == 0:
+// zeros = zeros + 1
+// if ld == 0:
+// friendless = 0
+// elif tens == ld:
+// friendless = data[-1]
+// else:
+// friendless = data[-tens-1]
+// if friendless == 0:
+// friendless = tens - zeros
+// if ld == 0:
+// cfm = 0.0
+// utilisation = 0.0
+// else:
+// tot = 0.0
+// for p in data:
+// tot = tot + library.cdf(p, LAMBDA)
+// utilisation = int(tot / ld * 10000.0) / 100.0
+// cfm = int(library.invcdf(tot / ld, LAMBDA) * 100.0) / 100.0
+// return (friendless, utilisation, cfm, tens, zeros)
 
 export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, expansionData: ExpansionData) {
     const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
