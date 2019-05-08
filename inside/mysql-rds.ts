@@ -296,18 +296,20 @@ export async function doEnsureUsers(conn: mysql.Connection, users: string[]) {
         await doEnsureUser(conn, user);
     }
     await doDeleteExtraUsers(conn, extraUsers);
+    console.log("doEnsureUsers complete");
 }
 
 async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) {
     console.log("Deleting " + extraUsers.length + " unwanted users.");
+    console.log(extraUsers);
     const idsToDelete = [];
     for (const u of extraUsers) {
         const geekId = await getGeekId(conn, u);
         idsToDelete.push(geekId);
     }
-    const deleteOneFile = "delete from files where geek = ?";
+    const deleteOneFile = "delete from files where geekid = ?";
     const deleteOneGeek = "delete from geeks where username = ?";
-    const deleteSomeFiles = "delete from files where geek in (?)";
+    const deleteSomeFiles = "delete from files where geekid in (?)";
     const deleteSomeGeeks = "delete from geeks where username in (?)";
     const deleteOnePlays = "delete from plays where geek = ?";
     const deleteSomePlays = "delete from plays where geek in (?)";
@@ -315,19 +317,28 @@ async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) 
     const deleteSomeNormalisedPlays = "delete from plays_normalised where geek in (?)";
     const deleteOneWarTable = "delete from war_table where geek = ?";
     const deleteSomeWarTable = "delete from war_table where geek in (?)";
+    const deleteOneGeekGames = "delete from geekgames where geekid = ?";
+    const deleteSomeGeekGames = "delete from geekgames where geekid in (?)";
+    const deleteOneMonthPlayed = "delete from months_played where geek = ?";
+    const deleteSomeMonthsPlayed = "delete from months_played where geek in (?)";
     if (extraUsers.length === 1) {
-        await conn.query(deleteOneWarTable, extraUsers);
-        await conn.query(deleteOnePlays, extraUsers);
-        await conn.query(deleteOneNormalisedPlays, extraUsers);
-        await conn.query(deleteOneFile, extraUsers);
+        await conn.query(deleteOneWarTable, idsToDelete);
+        await conn.query(deleteOnePlays, idsToDelete);
+        await conn.query(deleteOneNormalisedPlays, idsToDelete);
+        await conn.query(deleteOneFile, idsToDelete);
+        await conn.query(deleteOneGeekGames, idsToDelete);
+        await conn.query(deleteOneMonthPlayed, idsToDelete);
         await conn.query(deleteOneGeek, extraUsers);
     } else if (extraUsers.length > 0) {
-        await conn.query(deleteSomeWarTable, [extraUsers]);
-        await conn.query(deleteSomePlays, [extraUsers]);
-        await conn.query(deleteSomeNormalisedPlays, [extraUsers]);
-        await conn.query(deleteSomeFiles, [extraUsers]);
+        await conn.query(deleteSomeWarTable, [idsToDelete]);
+        await conn.query(deleteSomePlays, [idsToDelete]);
+        await conn.query(deleteSomeNormalisedPlays, [idsToDelete]);
+        await conn.query(deleteSomeFiles, [idsToDelete]);
+        await conn.query(deleteSomeGeekGames, [idsToDelete]);
+        await conn.query(deleteSomeMonthsPlayed, [idsToDelete]);
         await conn.query(deleteSomeGeeks, [extraUsers]);
     }
+    console.log("doDeleteExtraUsers complete");
 }
 
 async function doEnsureUser(conn: mysql.Connection, user: string) {
@@ -339,10 +350,10 @@ async function doEnsureUser(conn: mysql.Connection, user: string) {
         // user already there
         return;
     }
-    const geekid = await getGeekId(conn, user);
-    await doEnsureFileProcessUser(conn, user, geekid);
-    await doEnsureFileProcessUserCollection(conn, user, geekid);
-    await doEnsureFileProcessUserPlayed(conn, user, geekid);
+    const geekId = await getGeekId(conn, user);
+    await doEnsureFileProcessUser(conn, user, geekId);
+    await doEnsureFileProcessUserCollection(conn, user, geekId);
+    await doEnsureFileProcessUserPlayed(conn, user, geekId);
 }
 
 export async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: CollectionGame[]) {

@@ -46,6 +46,7 @@ export async function runEnsureUsers(users: string[]) {
         }
     }
     await withConnectionAsync(conn => doEnsureUsers(conn, uniques));
+    console.log("runEnsureUsers complete");
 }
 
 export async function runEnsureGames(games: CollectionGame[]) {

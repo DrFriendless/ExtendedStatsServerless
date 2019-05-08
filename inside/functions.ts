@@ -64,6 +64,7 @@ export async function updateUserList(event, context, callback: Callback) {
         console.log(e);
         callback(e);
     }
+    console.log("updateUserList complete");
 }
 
 export async function updateMetadata(event, context, callback: Callback) {
