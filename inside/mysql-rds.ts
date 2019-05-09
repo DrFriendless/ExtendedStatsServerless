@@ -519,7 +519,8 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const zerosSql = "select count(game) z from geekgames where geekid = ? and owned > 0 and game not in (select game from plays_normalised where geek = ?)";
     const hindexSql = "select sum(quantity) q from plays_normalised where geek = ? and expansion_play = 0 group by game order by q desc";
     const seriesPlaysSql = "select count(distinct series.game) c from plays_normalised,series where series.series_id = ? and series.game = plays_normalised.game and plays_normalised.geek = ?";
-    const usesSql = "select sum(plays_normalised.quantity) c, geekgames.game from plays_normalised,geekgames where plays_normalised.game=geekgames.game and geekgames.owned>0 and geekgames.geekid = ? and plays_normalised.geek=? and plays_normalised.expansion_play=0 group by plays_normalised.game order by 1 desc";
+    const usesSql = "select sum(quantity) c from plays_normalised where geek=? and game in (?) group by game order by 1 desc";
+    const ownedSql = "select distinct game from geekgames where owned>0 and geekid = ?";
     const distinctGames = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
     const totalPlays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
@@ -531,7 +532,9 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
     const ext100Id = await getIdForSeries(conn, "Extended Stats Top 100");
     const ext100 = (await conn.query(seriesPlaysSql, [ext100Id, geekId]))[0]["c"];
-    const uses = (await conn.query(usesSql, [geekId, geekId])).map(row => row["c"]);
+    const owned = (await conn.query(ownedSql, [geekId])).map(row => row["game"]);
+    const uses = (owned.length === 0) ? [] : (await conn.query(usesSql, [geekId, owned])).map(row => row["c"]);
+    while (uses.length < owned.length) uses.push(0);
     return { totalPlays, distinctGames, tens, zeros, hindex, sdj, ext100, uses };
 }
 
@@ -622,9 +625,9 @@ function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
     if (uses.length === 0) {
         friendless = 0;
     } else if (uses.length === tens) {
-        friendless = uses[-1];
+        friendless = uses[uses.length - 1];
     } else {
-        friendless = uses[-tens - 1];
+        friendless = uses[uses.length - tens - 1];
     }
     if (friendless === 0) friendless = tens - zeros;
     if (uses.length > 0) {
@@ -637,36 +640,6 @@ function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
     }
     return { utilisation, cfm, friendless };
 }
-
-// def calcFriendless(data):
-// import library
-// data.sort(uses)
-// ld = len(data)
-// tens = 0
-// zeros = 0
-// for p in data:
-// if p >= 10:
-// tens = tens + 1
-// elif p == 0:
-// zeros = zeros + 1
-// if ld == 0:
-// friendless = 0
-// elif tens == ld:
-// friendless = data[-1]
-// else:
-// friendless = data[-tens-1]
-// if friendless == 0:
-// friendless = tens - zeros
-// if ld == 0:
-// cfm = 0.0
-// utilisation = 0.0
-// else:
-// tot = 0.0
-// for p in data:
-// tot = tot + library.cdf(p, LAMBDA)
-// utilisation = int(tot / ld * 10000.0) / 100.0
-// cfm = int(library.invcdf(tot / ld, LAMBDA) * 100.0) / 100.0
-// return (friendless, utilisation, cfm, tens, zeros)
 
 export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, expansionData: ExpansionData) {
     const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
