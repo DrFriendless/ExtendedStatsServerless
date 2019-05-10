@@ -1,8 +1,8 @@
 import { Component, ViewChild, ElementRef } from '@angular/core';
-import { Collection, GameData, makeGamesIndex, roundRating } from "extstats-core";
-import {VisualizationSpec, vega} from "vega-embed";
+import { DataViewComponent } from "extstats-angular";
+import { Collection, makeGamesIndex } from "extstats-core";
+import { VisualizationSpec } from "vega-embed";
 import embed from "vega-embed";
-import {DataViewComponent} from "../data-view-component";
 
 @Component({
   selector: 'owned-by-year-graph',
@@ -28,7 +28,7 @@ export class OwnedByPublishedYearComponent extends DataViewComponent<Collection>
   private emptyData(): { [year: number]: { counts: number[], names: string[][] } } {
     const thisYear = (new Date()).getFullYear();
     const result = {};
-    for (let y=this.startYear; y<=thisYear; y++) {
+    for (let y = this.startYear; y <= thisYear; y++) {
       result[y] = {
         counts: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
         names: [ [], [], [], [], [], [], [], [], [], [], [] ] };
@@ -61,10 +61,10 @@ export class OwnedByPublishedYearComponent extends DataViewComponent<Collection>
 
   private refreshChart(data: { [year: number]: { counts: number[], names: string[][] } }) {
     const chartData = [];
-    for (let year in data) {
-      for (let i=1; i<=10; i++) {
-        const count = data[year].counts[i-1];
-        const names = data[year].names[i-1];
+    for (const year in data) {
+      for (let i = 1; i <= 10; i++) {
+        const count = data[year].counts[i - 1];
+        const names = data[year].names[i - 1];
         chartData.push({x: year, y: count, c: i, t: names.join(", ") });
       }
     }

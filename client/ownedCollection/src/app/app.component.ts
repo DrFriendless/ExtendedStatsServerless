@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
-import {HttpClient} from "@angular/common/http";
+import { HttpClient } from "@angular/common/http";
+import { DataSourceComponent, UserDataService } from "extstats-angular";
 import { Collection } from "extstats-core";
-import {DataSourceComponent} from "./data-source-component";
 
 @Component({
   selector: 'owned-collection',
@@ -10,8 +10,8 @@ import {DataSourceComponent} from "./data-source-component";
 export class UserOwnedComponent extends DataSourceComponent<Collection> {
   private static DEFAULT_SELECTOR = "owned(ME)";
 
-  constructor(http: HttpClient) {
-    super(http, UserOwnedComponent.DEFAULT_SELECTOR);
+  constructor(http: HttpClient, userDataService: UserDataService) {
+    super(http, userDataService, UserOwnedComponent.DEFAULT_SELECTOR);
   }
 
   public getId(): string {

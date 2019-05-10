@@ -1,8 +1,8 @@
 import { Component, ViewChild, ElementRef } from '@angular/core';
-import { Collection, GameData, makeGamesIndex, roundRating } from "extstats-core";
-import {VisualizationSpec, vega} from "vega-embed";
+import { Collection, makeGamesIndex, roundRating } from "extstats-core";
+import { DataViewComponent } from "extstats-angular";
+import { VisualizationSpec } from "vega-embed";
 import embed from "vega-embed";
-import {DataViewComponent} from "../data-view-component";
 
 @Component({
   selector: 'bgg-ratings-owned',
@@ -37,8 +37,8 @@ export class BggRatingsOfOwnedGamesComponent extends DataViewComponent<Collectio
       const g = gamesIndex[gg.bggid];
       if (g && gg.rating > 0) {
         const rating = roundRating(g.bggRating);
-        data.counts[rating-1]++;
-        data.names[rating-1].push(g.name);
+        data.counts[rating - 1]++;
+        data.names[rating - 1].push(g.name);
       }
     });
     this.refreshChart(data);
@@ -46,11 +46,11 @@ export class BggRatingsOfOwnedGamesComponent extends DataViewComponent<Collectio
 
   private refreshChart(data: { counts: number[], names: string[][] }) {
     const chartData = [];
-    for (let rating=1; rating<=10; rating++) {
-      const count = data.counts[rating-1];
-      const names = data.names[rating-1];
+    for (let rating = 1; rating <= 10; rating++) {
+      const count = data.counts[rating - 1];
+      const names = data.names[rating - 1];
       names.sort();
-      chartData.push({rating: rating+1, count, tooltip: "" + rating + ". " + names.join(", ") });
+      chartData.push({rating: rating + 1, count, tooltip: "" + rating + ". " + names.join(", ") });
     }
     const spec: VisualizationSpec = {
       "$schema": "https://vega.github.io/schema/vega/v4.json",
