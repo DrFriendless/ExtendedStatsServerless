@@ -1,12 +1,12 @@
 import { Component, OnInit } from '@angular/core';
-import {CollectionWithPlays, GameData, GamePlays, makeGamesIndex } from "extstats-core";
-import { ExtstatsTable, DataViewComponent, ChartSet, ChartDefinition } from "extstats-angular";
-import {VisualizationSpec, vega} from "vega-embed";
+import { CollectionWithPlays, GameData, GamePlays, makeGamesIndex } from "extstats-core";
+import { DataViewComponent } from "extstats-angular";
+import { ChartSet, ChartDefinition } from "extstats-vega";
+import { VisualizationSpec } from "vega-embed";
 
 @Component({
   selector: 'favourites-table',
-  templateUrl: './favourites-table.component.html',
-  styleUrls: ['./favourites-table.component.css']
+  templateUrl: './favourites-table.component.html'
 })
 export class FavouritesTableComponent extends DataViewComponent<CollectionWithPlays> implements OnInit {
   public columns = [
@@ -101,6 +101,7 @@ export class FavouritesTableComponent extends DataViewComponent<CollectionWithPl
 
 
   protected processData(data: CollectionWithPlays) {
+    if (!data) return;
     this.data = data;
     const HUBER_BASELINE = 4.5;
     const collection = data.collection;
@@ -248,8 +249,8 @@ class Column<R extends object> {
   name: string;
   field: string;
   tooltip: string;
-  valueHtml(r:R): string { return r[this.field] };
-  valueTooltip(r: R): string | undefined { return undefined };
+  valueHtml(r: R): string { return r[this.field]; }
+  valueTooltip(r: R): string | undefined { return undefined; }
 
   constructor(obj: object) {
     if (obj["name"]) this.name = obj["name"];

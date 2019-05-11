@@ -1,24 +1,26 @@
 <div style="text-align:center">
+  <extstats-loader *ngIf="loading"></extstats-loader>
+
   <extstats-button-group #buttongroup>
-    <button type="button" class="btn table-button extstats-button" [extstatsButtonGroup]="buttongroup" selector="charts">Charts</button>
     <button type="button" class="btn table-button svg-button extstats-button" [extstatsButtonGroup]="buttongroup" selector="settings">
       <img src="/img/settings.svg">
     </button>
   </extstats-button-group>
 
-  <div id="favouritesTableCharts" *ngIf="buttongroup.selected === 'charts'">
-    <button type="button" class="btn chart-button extstats-button" *ngFor="let chart of chartSet.charts" [extstatsChart]="chart" [chartData]="data" [chartPane]="chartPane"></button>
-  </div>
-
   <div id="favouritesSettings" *ngIf="buttongroup.selected === 'settings'">
-    <extstats-table-config [table]="this"></extstats-table-config>
+    <extstats-config [initial]="INITIAL_SELECTOR" [alternatives]="[]" (select)="selectorChanged($event)"></extstats-config>
   </div>
 
-  <extstats-chartpane #chartPane></extstats-chartpane>
+  <h2 id="avr">Average vs Rating</h2>
+  <extstats-average-vs-rating [data]="data$"></extstats-average-vs-rating>
+
+  <h2 id="rvmp">Rating vs Months Played</h2>
+  <extstats-rating-vs-months-played [data]="data$"></extstats-rating-vs-months-played>
+
+  <h2 id="rvp">Rating vs Plays</h2>
+  <extstats-rating-vs-plays [data]="data$"></extstats-rating-vs-plays>
+
 
   <h2 id="faves">Your Favourite Games</h2>
   <favourites-table [data]="data$"></favourites-table>
-
-  <!--<h2 id="pbpy">Plays By Published Year</h2>-->
-  <!--<plays-by-published-year [data]="data$"></plays-by-published-year>-->
 </div>

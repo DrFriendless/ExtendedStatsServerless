@@ -15,24 +15,20 @@
     </extstats-documentation>
   </div>
 
-  <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'fhm'" [mfSortOrder]="'desc'">
-    <thead>
-    <tr>
-      <th *ngFor="let column of columns"><mfDefaultSorter by="{{column.field}}" tooltip="{{column.tooltip}}">{{column.name}}</mfDefaultSorter></th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr *ngFor="let row of favouritesTable.data">
-      <td *ngFor="let column of columns" title="{{column.valueTooltip(row)}}" [innerHtml]="column.valueHtml(row)"></td>
-    </tr>
-    </tbody>
-    <tfoot>
-    <tr>
-      <td colspan="4">
-        <mfBootstrapPaginator [rowsOnPageSet]="[20,30,50]" [mfTable]="favouritesTable"></mfBootstrapPaginator>
-      </td>
-    </tr>
-    </tfoot>
-  </table>
+  <div class="extstats-table-block">
+    <mfTableController [table]="favouritesTable" [searchColumn]="'gameName'" [placeholder]="'game'"></mfTableController>
+    <table class="table table-striped extstats-table" [mfData]="rows" #favouritesTable="mfDataTable" [mfRowsOnPage]="30" [mfSortBy]="'fhm'" [mfSortOrder]="'desc'">
+      <thead>
+      <tr>
+        <th *ngFor="let column of columns"><mfDefaultSorter by="{{column.field}}" tooltip="{{column.tooltip}}">{{column.name}}</mfDefaultSorter></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let row of favouritesTable.data">
+        <td *ngFor="let column of columns" title="{{column.valueTooltip(row)}}" [innerHtml]="column.valueHtml(row)"></td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 

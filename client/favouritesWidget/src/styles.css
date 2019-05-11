@@ -1,25 +1,55 @@
 /* Styles for favourites-table */
-
-.favourites-table table.extstats-table tfoot ul.pagination li:not(.active) a:hover {
-  background-color: #ddd;
+.favourites-table .table.extstats-table td,
+.favourites-table .table.extstats-table tbody,
+.favourites-table .table.extstats-table thead,
+.favourites-table .table.extstats-table.table thead th {
+  border-color: #159588;
 }
-.favourites-table table.extstats-table tfoot ul.pagination li.active a {
-  background-color: green;
+/* border colour lightened 60% with 0.5 alpha */
+/* https://www.hexcolortool.com/#e52464 */
+.favourites-table .table.table-striped.extstats-table tbody tr:nth-child(even){
+  background-color: rgba(174, 255, 255, 0.5);
+}
+.favourites-table .table.table-striped.extstats-table tbody tr:nth-child(odd){
+  background-color: white;
+}
+.extstats-page-item.active {
+  background-color: rgba(174, 255, 255, 0.5);
+}
+.extstats-table-controller {
+  background-color: #159588;
+  color: white;
+  border: 1px solid #159588;
+}
+.extstats-table-controller a.extstats-page-link {
   color: white;
 }
-
-.favourites-table table.extstats-table td,
-.favourites-table table.extstats-table tbody,
-.favourites-table table.extstats-table thead,
-.favourites-table table.extstats-table.table thead th {
-  border-color: #2c992d;
+.favourites-table {
+  margin-left: 16px;
+  margin-right: 16px;
 }
-/* border colour modified to 16 saturation */
-.favourites-table table.table-striped.extstats-table tbody tr:nth-child(odd){
-  background-color: rgba(129, 153, 129, 0.5);
+.favourites-table .table.extstats-table thead td,
+.favourites-table .table.extstats-table tbody td {
+  border-right-width: 0;
+  border-left-width: 0;
 }
-.favourites-table table.table-striped.extstats-table tbody tr:nth-child(even){
-  background-color: white;
+.favourites-table th {
+  background-color: #159588;
+  color: white;
+}
+.favourites-table div.extstats-doc button {
+  border: solid 1px #159588;
+}
+.favourites-table div.extstats-doc li.nav-item a.nav-link.active {
+  color: #159588;
+}
+.favourites-table div.extstats-doc li.nav-item a.nav-link {
+  color: #777777;
+  font-size: 14px;
+  border-radius: unset;
+}
+.favourites-table div.collapse {
+  margin-top: 1rem;
 }
 
 .table-button {
