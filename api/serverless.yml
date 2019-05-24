@@ -300,21 +300,6 @@ functions:
     events:
       - http:
           path: wartable
-          method: post
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-              - Accept-Encoding
-          integration: lambda
-          private: true
-      - http:
-          path: wartable
           method: get
           cors:
             origin: '*'
