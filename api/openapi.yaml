@@ -296,7 +296,7 @@ paths:
       tags:
         - developers apikey
       summary: get data for the war table
-      operationId: getWarTableGET
+      operationId: getWarTable
       description: Get the list of war table rows for all geeks.
       responses:
         '200':
@@ -327,21 +327,6 @@ paths:
                 ext100: 56
                 hindex: 17
                 preordered: 0
-    post:
-      tags:
-        - developers apikey dontuse
-      summary: DEPRECATED get data for the war table
-      operationId: getWarTablePOST
-      description: Get the list of war table rows for all geeks. This method will be removed.
-      responses:
-        '200':
-          description: war table data returned
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/WarTableRow'
 
 components: 
   schemas: 
