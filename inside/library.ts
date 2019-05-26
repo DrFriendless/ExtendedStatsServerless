@@ -1,9 +1,9 @@
 import mysql = require('promise-mysql');
-import {Callback} from 'aws-lambda';
-import {NormalisedPlays} from "./interfaces";
+import { Callback } from 'aws-lambda';
+import { NormalisedPlays } from "./interfaces";
 
 export async function withConnectionAsync(func: (conn: mysql.Connection) => Promise<any>) {
-    let connection = await getConnection();
+    const connection = await getConnection();
     try {
         await func(connection);
         connection.destroy();
@@ -71,3 +71,8 @@ export function extractNormalisedPlayFromPlayRow(row: object, geek: number, mont
     return { month, year, geek, date, game: row["game"], quantity: row["quantity"] } as NormalisedPlays;
 }
 
+export function eqSet(as, bs): boolean {
+    if (as.size !== bs.size) return false;
+    for (const a of as) if (!bs.has(a)) return false;
+    return true;
+}

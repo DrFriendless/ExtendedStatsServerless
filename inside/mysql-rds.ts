@@ -13,7 +13,7 @@ import {
 } from "./interfaces";
 import { RankingTableRow, WarTableRow, ExpansionData } from "extstats-core";
 import {
-    count, extractNormalisedPlayFromPlayRow, listIntersect, listMinus, playDate
+    count, eqSet, extractNormalisedPlayFromPlayRow, listIntersect, listMinus, playDate
 } from "./library";
 import * as _ from "lodash";
 import { inferExtraPlays } from "./plays";
@@ -70,15 +70,19 @@ async function doUpdateMetadataRules(conn: mysql.Connection, rules: MetadataRule
 }
 
 export async function doRecordGameExpansions(conn: mysql.Connection, gameId: number, expansions: number[]) {
+    const selectSql = "select expansion from expansions where basegame = ?";
     const deleteSql = "delete from expansions where basegame = ?";
     const insertSql = "insert into expansions (basegame, expansion) values (?, ?)";
-    await conn.query(deleteSql, gameId);
-    for (const exp of expansions) {
-        try {
-            await conn.query(insertSql, [gameId, exp]);
-        } catch (e) {
-            // probably foreign key constraint because the expansion is not in the database
-            // I see no need to put it there.
+    const current = (await conn.query(selectSql, gameId)).map(row => row.expansion);
+    if (!eqSet(new Set(expansions), new Set(current))) {
+        await conn.query(deleteSql, gameId);
+        for (const exp of expansions) {
+            try {
+                await conn.query(insertSql, [gameId, exp]);
+            } catch (e) {
+                // probably foreign key constraint because the expansion is not in the database
+                // I see no need to put it there.
+            }
         }
     }
 }
@@ -99,6 +103,7 @@ async function doSetCategoriesForGame(conn: mysql.Connection, game: number, cate
     const getCatsSqlOne = "select id from categories where name = ?";
     const getCatsSqlMany = "select id from categories where name in (?)";
     const deleteAllGameCatsSql = "delete from game_categories where game = ?";
+    const selectSql = "select category from game_categories where game = ?";
     const insertSql = "insert into game_categories (game, category) values (?,?)";
     let getCatsSql;
     let getCatsParams;
@@ -112,13 +117,12 @@ async function doSetCategoriesForGame(conn: mysql.Connection, game: number, cate
         await conn.query(deleteAllGameCatsSql, [game]);
         return;
     }
-    for (const cat of categories) {
-        await doEnsureCategory(conn, cat);
-    }
-    const catIds = (await conn.query(getCatsSql, getCatsParams)).map(row => row.id);
-    await conn.query(deleteAllGameCatsSql, [game]);
-    for (const id of catIds) {
-        await conn.query(insertSql, [game, id]);
+    for (const cat of categories) await doEnsureCategory(conn, cat);
+    const current = (await conn.query(selectSql, game)).map(row => row.category);
+    const required = (await conn.query(getCatsSql, getCatsParams)).map(row => row.id);
+    if (!eqSet(new Set(current), new Set(required))) {
+        await conn.query(deleteAllGameCatsSql, [game]);
+        for (const id of required) await conn.query(insertSql, [game, id]);
     }
 }
 
@@ -126,6 +130,7 @@ async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mecha
     const getMecsSqlOne = "select id from mechanics where name = ?";
     const getMecsSqlMany = "select id from mechanics where name in (?)";
     const deleteAllGameMecsSql = "delete from game_mechanics where game = ?";
+    const selectSql = "select mechanic from game_mechanics where game = ?";
     const insertSql = "insert into game_mechanics (game, mechanic) values (?,?)";
     let getMecsSql;
     let getMecsParams;
@@ -139,28 +144,25 @@ async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mecha
         await conn.query(deleteAllGameMecsSql, [game]);
         return;
     }
-    for (const mec of mechanics) {
-        await doEnsureMechanic(conn, mec);
-    }
-    const mecIds = (await conn.query(getMecsSql, getMecsParams)).map(row => row.id);
-    await conn.query(deleteAllGameMecsSql, [game]);
-    for (const id of mecIds) {
-        await conn.query(insertSql, [game, id]);
+    for (const mec of mechanics) await doEnsureMechanic(conn, mec);
+    const current = (await conn.query(selectSql, game)).map(row => row.mechanic);
+    const required = (await conn.query(getMecsSql, getMecsParams)).map(row => row.id);
+    if (!eqSet(new Set(current), new Set(required))) {
+        await conn.query(deleteAllGameMecsSql, [game]);
+        for (const id of required) await conn.query(insertSql, [game, id]);
     }
 }
 
 async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
-    const countSql = "select count(*) from games where bggid = ?";
     const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
-        "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+      "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update games set name = ?, average = ?, rank = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
-        "averageWeight = ?, bayesAverage = ?, numComments = ?, usersOwned = ?, subdomain = ? where bggid = ?";
-    const c = await count(conn, countSql, [data.gameId]);
-    if (c == 0) {
+      "averageWeight = ?, bayesAverage = ?, numComments = ?, usersOwned = ?, subdomain = ? where bggid = ?";
+    try {
         await conn.query(insertSql, [data.gameId, data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
             data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
             data.numComments, data.usersOwned, data.subdomain]);
-    } else {
+    } catch (e) {
         await conn.query(updateSql, [data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
             data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
             data.numComments, data.usersOwned, data.subdomain, data.gameId]);
@@ -243,15 +245,21 @@ async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: numbe
 const TILL_NEXT_UPDATE = { "processCollection" : "72:00:00", "processMarket" : "72:00:00", "processPlayed" : "72:00:00",
     "processGame" : "838:00:00", "processTop50" : "72:00:00", "processFrontPage" : "24:00:00", "processUser": "838:00:00"  };
 
-function about3Days() {
+function about3Days(): string {
     const minutes = 3600 + Math.floor(Math.random() * 1440);
+    const ms = minutes % 60;
+    return "" + Math.floor(minutes / 60) + ":" + (ms < 10 ? "0" : "") + ms + ":00";
+}
+
+function about30Days() {
+    const minutes = 43200 + Math.floor(Math.random() * 7000);
     const ms = minutes % 60;
     return "" + Math.floor(minutes / 60) + ":" + (ms < 10 ? "0" : "") + ms + ":00";
 }
 
 function tillNextUpdate(processMethod: string) {
     const orig = TILL_NEXT_UPDATE[processMethod];
-    return (orig === "72:00:00") ? about3Days() : orig;
+    return (orig === "72:00:00") ? about3Days() : (orig === "838:00:00") ? about30Days() : orig;
 }
 
 export async function doMarkUrlProcessed(conn: mysql.Connection, processMethod: string, url: string) {
@@ -382,13 +390,13 @@ export async function doEnsureProcessPlaysFiles(conn: mysql.Connection, geek: st
     const geekId = await getGeekId(conn, geek);
     for (const month of months) {
         let url = playsUrl
-            .replace("%d", month.year.toString())
-            .replace("%d", month.month.toString())
-            .replace("%d", month.year.toString())
-            .replace("%d", month.month.toString());
+          .replace("%d", month.year.toString())
+          .replace("%d", month.month.toString())
+          .replace("%d", month.year.toString())
+          .replace("%d", month.month.toString());
         if (month.month === 0 && month.year === 0) url = timelessPlaysUrl;
         await doRecordFile(conn, url, "processPlays", geek, "Plays for " + geek + " for " + month.month + "/" + month.year,
-            undefined, month.month, month.year, geekId);
+          undefined, month.month, month.year, geekId);
     }
 }
 
@@ -456,13 +464,13 @@ async function doEnsureFileProcessUser(conn: mysql.Connection, geek: string, gee
 async function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: string, geekid: number) {
     const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
     await doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", undefined,
-        undefined, undefined, geekid);
+      undefined, undefined, geekid);
 }
 
 async function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string, geekid: number) {
     const url = `https://boardgamegeek.com/plays/bymonth/user/${geek}/subtype/boardgame`;
     await doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", undefined,
-        undefined, undefined, geekid);
+      undefined, undefined, geekid);
 }
 
 export async function doListToProcess(conn: mysql.Connection, count: number, processMethod: string, updateLastScheduled: boolean): Promise<ToProcessElement[]> {
@@ -577,11 +585,11 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         preordered: preordered
     };
     const insertSql = "insert into war_table (geek, geekName, totalPlays, distinctGames, top50, sdj, owned, want, wish, " +
-        "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, ext100, hindex, preordered) values " +
-        "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+      "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, ext100, hindex, preordered) values " +
+      "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update war_table set geekName = ?, totalPlays = ?, distinctGames = ?, top50 = ?, sdj = ?, owned = ?, "
-        + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, "
-        + "ext100 = ?, hindex = ?, preordered = ? where geek = ?";
+      + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, "
+      + "ext100 = ?, hindex = ?, preordered = ? where geek = ?";
     try {
         await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.totalPlays, fpg.distinctGames, fpg.top50, fpg.sdj, fpg.owned,
             fpg.want, fpg.wish, fpg.trade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros,

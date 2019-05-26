@@ -1,6 +1,6 @@
 import * as _ from "lodash";
-import {NormalisedPlays, WorkingNormalisedPlays} from "./interfaces";
-import {ExpansionData} from "extstats-core";
+import { NormalisedPlays, WorkingNormalisedPlays } from "./interfaces";
+import { ExpansionData } from "extstats-core";
 
 function toWorkingPlay(expansionData: ExpansionData, play: NormalisedPlays): WorkingNormalisedPlays {
     return {
@@ -61,7 +61,7 @@ function toWorkingPlay(expansionData: ExpansionData, play: NormalisedPlays): Wor
 
 function sumQuantities(plays: WorkingNormalisedPlays[]): WorkingNormalisedPlays {
     if (plays.length === 1) return plays[0];
-    const total = plays.map(p => p.quantity).reduce((a,b) => a + b);
+    const total = plays.map(p => p.quantity).reduce((a, b) => a + b);
     plays[0].quantity = total;
     return plays[0];
 }
@@ -79,7 +79,7 @@ export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: 
     while (iterations < 100) {
         iterations++;
         const newPlays = inferNewPlays(current, expansionData);
-        if (newPlays == null) return current;
+        if (!newPlays) return current;
         current = newPlays;
     }
     console.log("Too many iterations");
@@ -89,8 +89,8 @@ export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: 
 
 function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: ExpansionData): WorkingNormalisedPlays[] {
     const expansionPlays = current.filter(play => play.isExpansion);
-    for (let expansionPlay of expansionPlays) {
-        for (let basegamePlay of current) {
+    for (const expansionPlay of expansionPlays) {
+        for (const basegamePlay of current) {
             if (Object.is(expansionPlay, basegamePlay)) continue;
             const couldExpand = expansionData.isBasegameOf(basegamePlay.game, expansionPlay.game) || expansionData.isAnyBasegameOf(basegamePlay.expansions, expansionPlay.game);
             if (couldExpand && basegamePlay.expansions.indexOf(expansionPlay.game) < 0) {
@@ -133,5 +133,5 @@ function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: Expansi
             return newPlays;
         }
     }
-    return null;
+    return undefined;
 }

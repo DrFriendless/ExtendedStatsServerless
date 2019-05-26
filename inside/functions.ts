@@ -2,7 +2,7 @@
 // Functions in this file are responsible for marshalling data in and out and dealing with the callback.
 // Functions in this file may not access a database connection.
 
-import {Callback} from 'aws-lambda';
+import { Callback } from 'aws-lambda';
 import {
     CleanUpCollectionResult,
     FileToProcess, Metadata,
@@ -10,9 +10,8 @@ import {
     ProcessGameResult, ProcessMonthsPlayedResult, ProcessPlaysResult,
     ProcessUserResult
 } from './interfaces';
-import {getConnection} from './library';
+import { getConnection } from './library';
 import {
-    runEnsureGames,
     runEnsureUsers,
     runListToProcess,
     runMarkGameDoesNotExist,
