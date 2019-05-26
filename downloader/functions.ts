@@ -276,7 +276,6 @@ function splitCollection(original: ProcessCollectionResult): ProcessCollectionRe
 }
 
 export async function processPlayed(event, context, callback: Callback) {
-    console.log(event);
     const invocation = event as FileToProcess;
     const data = await request(encodeURI(invocation.url)) as string;
     const toAdd = [] as MonthPlayed[];
@@ -293,8 +292,8 @@ export async function processPlayed(event, context, callback: Callback) {
 }
 
 export async function processPlays(event, context, callback: Callback) {
-    console.log(event);
     const invocation = event as FileToProcess;
+    console.log(invocation.url);
     let playsData = [];
     let pagesSoFar = 0;
     let pagesNeeded = -1;
@@ -305,7 +304,15 @@ export async function processPlays(event, context, callback: Callback) {
         playsData = playsData.concat(processResult.plays);
         pagesNeeded = Math.ceil(processResult.count / 100);
     }
-    const playsResult = { geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url } as ProcessPlaysResult;
-    await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
+    const playsResult = {
+        geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url
+    } as ProcessPlaysResult;
+    if (playsData.length > 2000) {
+        // synchronous invocations can take a much larger payload than async ones, and around 2000 plays we hit the limit.
+        // https://www.stackery.io/blog/RequestEntityTooLargeException-aws-lambda-message-invocation-limits/
+        await invokeLambdaSync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
+    } else {
+        await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, playsResult);
+    }
 }
 

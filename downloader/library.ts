@@ -1,5 +1,5 @@
-import {Lambda} from 'aws-sdk';
-import {Callback} from "aws-lambda";
+import { Lambda } from 'aws-sdk';
+import { Callback } from "aws-lambda";
 
 export function invokeLambdaAsync(context: string, func: string, payload: object): Promise<void> {
     const params = {
