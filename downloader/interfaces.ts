@@ -11,7 +11,6 @@ export interface FileToProcess {
 export interface ToProcessElement extends FileToProcess {
     lastUpdate: any;
     nextUpdate: any;
-    tillNextUpdate: any;
     description: string;
     lastattempt: any;
     last_scheduled: any;

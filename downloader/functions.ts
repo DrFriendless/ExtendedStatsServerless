@@ -165,8 +165,8 @@ export function fireFileProcessing(event, context, callback: Callback) {
 
 // Lambda to harvest data about a game
 export async function processGame(event, context, callback: Callback) {
-    console.log(event);
     const invocation = event as FileToProcess;
+    console.log(invocation.url);
     const data = await request(encodeURI(invocation.url));
     try {
         const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data.toString());
