@@ -70,6 +70,7 @@ async function doUpdateMetadataRules(conn: mysql.Connection, rules: MetadataRule
 }
 
 export async function doRecordGameExpansions(conn: mysql.Connection, gameId: number, expansions: number[]) {
+    console.log("doRecordGameExpansions");
     const selectSql = "select expansion from expansions where basegame = ?";
     const deleteSql = "delete from expansions where basegame = ?";
     const insertSql = "insert into expansions (basegame, expansion) values (?, ?)";
@@ -100,6 +101,7 @@ async function doEnsureMechanic(conn: mysql.Connection, name: string) {
 }
 
 async function doSetCategoriesForGame(conn: mysql.Connection, game: number, categories: string[]) {
+    console.log("doSetCategoriesForGame");
     const getCatsSqlOne = "select id from categories where name = ?";
     const getCatsSqlMany = "select id from categories where name in (?)";
     const deleteAllGameCatsSql = "delete from game_categories where game = ?";
@@ -127,6 +129,7 @@ async function doSetCategoriesForGame(conn: mysql.Connection, game: number, cate
 }
 
 async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mechanics: string[]) {
+    console.log("doSetMechanicsForGame");
     const getMecsSqlOne = "select id from mechanics where name = ?";
     const getMecsSqlMany = "select id from mechanics where name in (?)";
     const deleteAllGameMecsSql = "delete from game_mechanics where game = ?";
@@ -154,6 +157,7 @@ async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mecha
 }
 
 async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
+    console.log("doUpdateGame");
     const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
       "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update games set name = ?, average = ?, rank = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
@@ -173,6 +177,7 @@ async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
 }
 
 async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: number, data: ProcessGameResult) {
+    console.log("doUpdateRankingTableStatsForGame");
     const ratingSql = "select sum(rating), count(rating) from geekgames where game = ? and rating > 0";
     const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays) values (?,?,?,?,?,?,?,?)";
     const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ? where game = ?";
@@ -263,6 +268,7 @@ function tillNextUpdate(processMethod: string) {
 }
 
 export async function doMarkUrlProcessed(conn: mysql.Connection, processMethod: string, url: string) {
+    console.log("doMarkUrlProcessed");
     const delta = tillNextUpdate(processMethod);
     const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
     await conn.query(sqlSet, [delta, url, processMethod]);
@@ -437,7 +443,7 @@ export async function doEnsureGames(conn: mysql.Connection, ids: number[]): Prom
 async function doRecordGame(conn: mysql.Connection, bggid: number) {
     const GAME_URL = "https://boardgamegeek.com/xmlapi/boardgame/%d&stats=1";
     const url = GAME_URL.replace("%d", bggid.toString());
-    const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
     const tillNext = tillNextUpdate("processGame");
     const insertParams = [url, "processGame", undefined, undefined, tillNext, "Game #" + bggid, bggid];
     await conn.query(insertSql, insertParams).catch(err => {});
@@ -447,7 +453,7 @@ async function doRecordGame(conn: mysql.Connection, bggid: number) {
 async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string,
                             bggid: number | null, month: number | null, year: number | null, geekid: number | null) {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
-    const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     const found = await count(conn, countSql, [url, processMethod]);
     if (found === 0) {
         const tillNext = tillNextUpdate(processMethod);
