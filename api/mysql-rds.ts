@@ -1,10 +1,10 @@
-import mysql = require('promise-mysql');
-import { asyncReturnWithConnection, count, countTableRows, getGeekId, getGeekIds } from './library';
+import * as mysql from "promise-mysql";
+import { asyncReturnWithConnection, count, countTableRows, getGeekId, getGeekIds } from "./library";
 import { selectGames } from "./selector";
 import { RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
     TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery,
-    MultiGeekPlays, PlaysWithDate } from "extstats-core";
-import * as moment from 'moment';
+    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount } from "extstats-core";
+import * as moment from "moment";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
     return await asyncReturnWithConnection(async conn => await doRankGames(conn, query));
@@ -66,7 +66,11 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
         }
         case "CollectionWithMonthlyPlays": {
             const plays = (await getMonthlyPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-            return { collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata, extra } as CollectionWithMonthlyPlays;
+            const counts = (await getMonthlyCounts(conn, query.geek));
+            const result: CollectionWithMonthlyPlays = {
+                collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata, extra, counts
+            };
+            return result;
         }
         default: {
             return { collection: queryResult.geekGames, games, metadata: queryResult.metadata, extra } as Collection;
@@ -74,34 +78,6 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
     }
 }
 
-// export interface PlaysQuery {
-//     geek: string;
-//     geeks?: string[];
-//     year?: number;
-//     month?: number;
-//     date?: number;
-//     filter?: string;
-// }
-// export interface Collection {
-//     collection: GeekGame[];
-//     games: GameData[];
-//     metadata?: SelectorMetadataSet;
-//     extra?: number[];
-// }
-// export interface PlaysWithDate {
-//     geek?: string;
-//     game: number;
-//     expansions?: number[];
-//     quantity: number;
-//     year: number;
-//     month: number;
-//     date: number;
-// }
-//
-// export interface MultiGeekPlays extends Collection {
-//     geeks: string[];
-//     plays: { [geek: string]: PlaysWithDate[] }
-// }
 export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): Promise<MultiGeekPlays> {
     const geeks = query.geeks || [query.geek];
     const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
@@ -135,7 +111,7 @@ export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): P
     const gameIds: number[] = [];
     for (const row of playsResult) {
         if (gameIds.indexOf(row.game) < 0) gameIds.push(row.game);
-        if (row['expansion_play']) {
+        if (row["expansion_play"]) {
             expPlays.push(row);
         } else {
             const pwd: PlaysWithDate = { year: row.year, month: row.month, date: row.date, expansions: [], game: row.game, geek: undefined, quantity: row.quantity };
@@ -179,6 +155,12 @@ async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<Mo
         return { game: row["game"], expansion: row["x"] > 0, quantity: row["q"], year: row["year"],
             month: row["month"]} as MonthlyPlays;
     });
+}
+
+async function getMonthlyCounts(conn: mysql.Connection, geek: string): Promise<MonthlyPlayCount[]> {
+    const countSql = "select year, month, count(distinct date) dates from plays_normalised where geek = ? group by year, month";
+    const geekId = await getGeekId(conn, geek);
+    return (await conn.query(countSql, [geekId])).map(row => { return { year: row["year"], month: row["month"], count: row["dates"] }; });
 }
 
 async function getLastYearOfPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
@@ -347,7 +329,7 @@ export async function getWarTableRow(geekId: number): Promise<WarTableRow> {
 
 export async function listUsers(): Promise<string[]> {
     const sql = "select username from geeks";
-    return asyncReturnWithConnection(conn => conn.query(sql).then(data => data.map(row => row['username'])));
+    return asyncReturnWithConnection(conn => conn.query(sql).then(data => data.map(row => row["username"])));
 }
 
 export async function loadExpansionData(conn: mysql.Connection): Promise<ExpansionData> {

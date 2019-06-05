@@ -423,6 +423,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MonthlyPlays'
+        counts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MonthlyPlayCount'
     Decoded:
       type: object
       required:
@@ -611,6 +615,22 @@ components:
           type: string
         geekId:
           type: integer
+    MonthlyPlayCount:
+      type: object
+      required:
+        - year
+        - month
+        - count
+      properties:
+        year:
+          type: integer
+          description: the year of the month that the data is for
+        month:
+          type: integer
+          description: the month that the data is for
+        count:
+          type: integer
+          description: the number of dates in that month for which plays were recorded
     MonthlyPlays:
       type: object
       required:

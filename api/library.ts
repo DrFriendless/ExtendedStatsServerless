@@ -1,4 +1,4 @@
-import mysql = require('promise-mysql');
+import * as mysql from 'promise-mysql';
 
 export async function asyncReturnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
     const connection = await getConnection();

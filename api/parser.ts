@@ -1,7 +1,7 @@
 // probably something like an LL(1) recursive descent parser
 // I couldn't get nearleyc to produce code that didn't crash node so I wrote this rather than muck with it.
 
-const moo = require('moo');
+import * as moo from 'moo';
 
 const tokens = {
     whitespace: /[ \t]+/,
@@ -109,9 +109,9 @@ function parseArg(state: ParseState): Arg {
     if (next.type === "keyword") {
         return { kind: Argument.Keyword, keyword: next.value } as Keyword;
     } else if (next.type === "int") {
-        return { kind: Argument.Integer, value: parseInt(next.value) } as Integer
+        return { kind: Argument.Integer, value: parseInt(next.value) } as Integer;
     } else if (next.type === "str") {
-        return { kind: Argument.StringValue, value: next.value } as StringValue
+        return { kind: Argument.StringValue, value: next.value } as StringValue;
     } else {
         state.pushback();
         return parseExpression(state);
