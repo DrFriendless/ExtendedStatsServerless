@@ -44,8 +44,45 @@ functions:
       - http:
           path: authenticate
           method: get
-          cors: true
-          integration: lambda
+          cors:
+            origin: 'https://extstats.drfriendless.com'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
+              - Cookie
+              - Set-Cookie
+            allowCredentials: true
+          integration: lambda-proxy
+          private: false
+  login:
+    handler: auth.login
+    environment:
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
+    events:
+      - http:
+          path: login
+          method: get
+          cors:
+            origin: 'https://extstats.drfriendless.com'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
+              - Cookie
+            allowCredentials: true
+          integration: lambda-proxy
           private: false
   personal:
     handler: auth.personal
@@ -59,7 +96,7 @@ functions:
           path: personal
           method: get
           cors:
-            origin: '*'
+            origin: 'https://extstats.drfriendless.com'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -68,7 +105,9 @@ functions:
               - X-Amz-Security-Token
               - X-Amz-User-Agent
               - Accept-Encoding
-          integration: lambda
+              - Cookie
+            allowCredentials: true
+          integration: lambda-proxy
           private: false
   update:
     handler: auth.update

@@ -1,7 +1,8 @@
 import { Callback } from "aws-lambda";
-import jwt = require('jsonwebtoken');
-import { findOrCreateUser, retrieveAllData, updateUser } from "./users";
+import jwt = require("jsonwebtoken");
+import { findOrCreateUser, findUser, retrieveAllData, updateUser } from "./users";
 import { Decoded, UserData, PersonalData, UserConfig } from "extstats-core";
+import { getCookiesFromHeader } from "./library";
 // import jwksClient = require('jwks-rsa');
 // import {Jwk} from "jwks-rsa";
 //
@@ -9,7 +10,7 @@ import { Decoded, UserData, PersonalData, UserConfig } from "extstats-core";
 //     jwksUri: 'https://drfriendless.au.auth0.com/.well-known/jwks.json'
 // });
 
-// this is the contents of a public file - Lambda can't access it from the UR unless I pay for a NAT gateway.
+// this is the contents of a public file - Lambda can't access it from the URL unless I pay for a NAT gateway.
 const jwks = {
     "keys": [
         {
@@ -23,9 +24,10 @@ const jwks = {
         }
     ]
 };
+const clientId = "z7FL2jZnXI9C66WcmCMC7V1STnQbFuQl";
 
 async function withAuthentication(event, callback: (Error?, Decoded?) => Promise<void>): Promise<void> {
-    let token = event["headers"]["Authorization"] as string;
+    let token = (event["headers"]["Authorization"] as string).trim();
     if (token.slice(0, 7) === "Bearer ") {
         token = token.substring(7);
     } else {
@@ -52,18 +54,55 @@ async function withAuthentication(event, callback: (Error?, Decoded?) => Promise
     }
 }
 
+export async function login(event, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    const cookies = getCookiesFromHeader(event.headers);
+    console.log(cookies);
+    const headers = {
+        "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
+        "Access-Control-Allow-Credentials": true
+    };
+    const body = {};
+    if (cookies['extstatsid']) {
+        const userData = await getUserDataForID(cookies['extstatsid']);
+        if (userData) {
+            Object.assign(body, userData);
+        }
+    }
+    const result = { "statusCode": 200, headers, body: JSON.stringify(body) };
+    callback(undefined, result);
+}
+
 export async function authenticate(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    await withAuthentication(event, async (error, decoded) => {
+    await withAuthentication(event, async (error, decoded: Decoded) => {
         if (error) {
-            if (error.name === 'TokenExpiredError') {
-                callback(new Error('TokenExpiredError'));
+            if (error.name === "TokenExpiredError") {
+                callback(undefined, { statusCode: 403, body: "token expired" });
             } else {
                 console.log(error);
-                callback(new Error("Bzzzt!"));
+                callback(undefined, { statusCode: 403, body: error.toString() });
             }
         } else {
-            callback(undefined, await getUserData(decoded));
+            const seconds = (new Date()).getTime() / 1000;
+            if (decoded["exp"] > seconds &&
+              decoded["iss"] === "https://drfriendless.au.auth0.com/" &&
+              decoded["aud"] === clientId) {
+                const body = JSON.stringify(await getUserData(decoded));
+                // Chrome ignores the cookie if there's an Expires
+                // can't be HttpOnly as the browser needs to delete the cookie on a logout.
+                const cookie = "extstatsid=" + decoded.sub + "; Domain=drfriendless.com; Secure; Path=/; Max-Age=36000";
+                const headers = {
+                    "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
+                    "Access-Control-Expose-Headers": "Set-Cookie",
+                    "Access-Control-Allow-Credentials": true,
+                    "Set-Cookie": cookie
+                };
+                const result = { "statusCode": 200, headers, body };
+                callback(undefined, result);
+            } else {
+                callback(undefined, { statusCode: 403, body: "Invalid JWT" });
+            }
         }
     });
 }
@@ -72,8 +111,8 @@ export async function update(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     await withAuthentication(event, async (error, decoded) => {
         if (error) {
-            if (error.name === 'TokenExpiredError') {
-                callback(new Error('TokenExpiredError'));
+            if (error.name === "TokenExpiredError") {
+                callback(new Error("TokenExpiredError"));
             } else {
                 console.log(error);
                 callback(new Error("Bzzzt!"));
@@ -86,7 +125,22 @@ export async function update(event, context, callback: Callback) {
 
 async function getUserData(decoded: Decoded): Promise<UserData> {
     const user = await findOrCreateUser(decoded.sub, decoded.nickname);
-    return { jwt: decoded, first: user.isFirstLogin(), config: user.getConfig(), username: user.getUsername() } as UserData;
+    return { jwt: decoded, first: user.isFirstLogin(), config: user.getConfig(), userName: user.getUsername() } as UserData;
+}
+
+async function getUserDataForID(sub: string): Promise<UserData | undefined> {
+    const user = await findUser(sub);
+    if (user) {
+        return { first: user.isFirstLogin(), config: user.getConfig(), userName: user.getUsername() } as UserData;
+    } else {
+        return undefined;
+    }
+}
+
+async function getPersonalDataForID(sub: string): Promise<PersonalData> {
+    const userData = await getUserDataForID(sub);
+    const allData = await retrieveAllData(sub);
+    return { userData, allData, error: undefined };
 }
 
 async function saveUserData(decoded: Decoded, userConfig: UserConfig) {
@@ -94,22 +148,19 @@ async function saveUserData(decoded: Decoded, userConfig: UserConfig) {
     return undefined;
 }
 
-async function getPersonalData(decoded: Decoded): Promise<PersonalData> {
-    const userData = await getUserData(decoded);
-    const allData = await retrieveAllData(decoded.sub);
-    return { userData, allData, error: undefined };
-}
-
 export async function personal(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    await withAuthentication(event, async (error, decoded) => {
-        if (error) {
-            console.log(error);
-            callback(undefined, { error: error.name });
-        } else {
-            callback(undefined, await getPersonalData(decoded));
-        }
-    });
+    const cookies = getCookiesFromHeader(event.headers);
+    console.log(cookies);
+    if (cookies['extstatsid']) {
+        const body = JSON.stringify(await getPersonalDataForID(cookies['extstatsid']));
+        const headers = { "Access-Control-Allow-Origin": "https://extstats.drfriendless.com" };
+        const result = { "statusCode": 200, body, headers };
+        callback(undefined, result);
+    } else {
+        const result = { "statusCode": 403, body: "{}" };
+        callback(undefined, result);
+    }
 }
 
 function getKey(header, callback) {
@@ -122,23 +173,11 @@ function getKey(header, callback) {
     } else {
         callback(new Error("Unknown key"));
     }
-    // client.getSigningKey(header.kid, function(err, key: Jwk) {
-    //     if (err) {
-    //         callback(err);
-    //     } else {
-    //         console.log("inner");
-    //         console.log(key);
-    //         const signingKey = key.publicKey || key.rsaPublicKey;
-    //         console.log("signingKey");
-    //         console.log(signingKey);
-    //         callback(null, signingKey);
-    //     }
-    // });
 }
 
 // stolen from https://github.com/auth0/node-jwks-rsa/blob/master/src/utils.js
 function certToPEM(cert) {
-    cert = cert.match(/.{1,64}/g).join('\n');
+    cert = cert.match(/.{1,64}/g).join("\n");
     cert = `-----BEGIN CERTIFICATE-----\n${cert}\n-----END CERTIFICATE-----\n`;
     return cert;
 }

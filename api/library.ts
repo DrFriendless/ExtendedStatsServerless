@@ -52,3 +52,29 @@ export async function getGeekIds(conn: mysql.Connection, geeks: string[]): Promi
     }
     return result;
 }
+
+// https://stackoverflow.com/questions/35572887/using-aws-gateway-api-can-i-access-the-cookies
+/**
+ * Receives an array of headers and extract the value from the cookie header
+ * @param  {String}   errors List of errors
+ * @return {Object}
+ */
+export function getCookiesFromHeader(headers) {
+    if (headers === null || headers === undefined || headers.Cookie === undefined) {
+        return {};
+    }
+
+    // Split a cookie string in an array (Originally found http://stackoverflow.com/a/3409200/1427439)
+    const list = {};
+    const rc = headers.Cookie;
+
+    rc && rc.split(';').forEach(function( cookie ) {
+        const parts = cookie.split('=');
+        const key = parts.shift().trim()
+        const value = decodeURI(parts.join('='));
+        if (key !== '') {
+            list[key] = value;
+        }
+    });
+    return list;
+}

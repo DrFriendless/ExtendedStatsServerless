@@ -1,6 +1,6 @@
 import mysql = require('promise-mysql');
 import { asyncReturnWithConnection } from "./library";
-import { UserConfig, UserData } from "extstats-core";
+import { UserConfig } from "extstats-core";
 
 export class User {
     private readonly identity: string;
@@ -64,6 +64,10 @@ export async function findOrCreateUser(identity: string, suggestedUsername: stri
     return asyncReturnWithConnection(conn => doFindOrCreateUser(conn, identity, suggestedUsername));
 }
 
+export async function findUser(identity: string): Promise<User | undefined> {
+    return asyncReturnWithConnection(conn => doFindUser(conn, identity));
+}
+
 export async function updateUser(identity: string, userConfig: UserConfig) {
     return asyncReturnWithConnection(conn => doUpdateUserConfig(conn, identity, userConfig));
 }
@@ -75,6 +79,19 @@ export async function doFindOrCreateUser(conn: mysql.Connection, identity: strin
     if (findResult.length === 0) {
         await conn.query(createSql, [identity, suggestedUsername, new Date()]);
         return (await conn.query(findSql, [identity])).map(row => extractUser(row, true))[0];
+    } else {
+        const user = findResult[0];
+        user.incrementLoginCount();
+        await recordLoginForUser(conn, user);
+        return user;
+    }
+}
+
+export async function doFindUser(conn: mysql.Connection, identity: string): Promise<User | undefined> {
+    const findSql = "select * from users where identity = ?";
+    const findResult = (await conn.query(findSql, [identity])).map(row => extractUser(row, false));
+    if (findResult.length === 0) {
+        return undefined;
     } else {
         const user = findResult[0];
         user.incrementLoginCount();
