@@ -198,16 +198,24 @@ export function processUser(event, context, callback: Callback) {
 
 // Lambda to harvest a user's collection
 export async function processCollection(event, context, callback: Callback) {
-    console.log(event);
     const invocation = event as FileToProcess;
     try {
-        await tryToProcessCollection(invocation);
-        await markTryAgainTomorrow("processCollection", invocation);
+        const code = await tryToProcessCollection(invocation);
+        if (code === 202) {
+            await markAsUnprocessed("processCollection", invocation);
+        } else if (code > 500) {
+            await markTryAgainTomorrow("processCollection", invocation);
+        }
         callback();
     } catch (e) {
-        console.log(e);
-        await markAsUnprocessed("processCollection", invocation);
-        callback(undefined, e);
+        console.log(event);
+        if (e.toString().includes("Collection exceeds maximum export size")) {
+            console.log("try again tomorrow");
+            await markTryAgainTomorrow("processCollection", invocation);
+        } else {
+            await markAsUnprocessed("processCollection", invocation);
+        }
+        callback(e);
     }
 }
 
@@ -217,10 +225,7 @@ async function tryToProcessCollection(invocation: FileToProcess): Promise<number
     let response;
     try {
         response = await request.get(options);
-        if (response.statusCode == 202) {
-            throw new Error("BGG says to wait a bit.");
-            // return 202;
-        }
+        if (response.statusCode == 202) return 202;
     } catch (e) {
         // 504 is a BGG timeout.
         if ((e as Error).message.lastIndexOf("504") >= 0) return 504;

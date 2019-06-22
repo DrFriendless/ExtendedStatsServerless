@@ -4,7 +4,7 @@ import {
     ProcessGameResult, CollectionGame,
     FileToProcess, PlayData
 } from "./interfaces";
-import { between, invokeLambdaAsync, logError } from "./library";
+import { between, logError } from "./library";
 const xml2js = require('xml2js-es6-promise');
 
 export async function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
@@ -14,9 +14,13 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
         throw new Error("BGG says come back later to get collection for " + geek);
     }
     if (!dom || !dom.items) {
+        if (pageContent.includes("Collection exceeds maximum export size")) {
+            await logError("Collection exceeds maximum export size for " + geek);
+            throw new Error("Collection exceeds maximum export size for " + geek);
+        }
         console.log("Found incorrect DOM");
         await logError("Found incorrect DOM for " + geek);
-        throw new Error("Found no games in collection for " + geek);
+        throw new Error("Found incorrect DOM for " + geek);
     }
     if (!dom.items.item || dom.items.item.length === 0) {
         console.log("Found no games in collection");
