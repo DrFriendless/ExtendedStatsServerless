@@ -362,7 +362,6 @@ async function doEnsureUser(conn: mysql.Connection, user: string) {
         console.log("added user " + user);
     } catch (e) {
         // user already there
-        return;
     }
     const geekId = await getGeekId(conn, user);
     await doEnsureFileProcessUser(conn, user, geekId);
@@ -453,12 +452,12 @@ async function doRecordGame(conn: mysql.Connection, bggid: number) {
 async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string,
                             bggid: number | null, month: number | null, year: number | null, geekid: number | null) {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
-    const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     const found = await count(conn, countSql, [url, processMethod]);
     if (found === 0) {
-        const tillNext = tillNextUpdate(processMethod);
-        const insertParams = [url, processMethod, user, undefined, tillNext, description, bggid, month, year, geekid];
-        await conn.query(insertSql, insertParams).catch(err => {});
+        console.log("adding " + url);
+        const insertParams = [url, processMethod, user, undefined, description, bggid, month, year, geekid];
+        await conn.query(insertSql, insertParams).catch(err => console.log(err));
     }
 }
 
