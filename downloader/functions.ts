@@ -80,7 +80,7 @@ export async function processMetadata(event, context, callback: Callback) {
         const data = await request(encodeURI(metadataFile));
         const lines = data.split(/\r?\n/).map(s => s.trim());
         for (const line of lines) {
-            if (line.length == 0) continue;
+            if (line.length === 0) continue;
             if (line.startsWith('#')) continue;
             let handled = false;
             if (line.indexOf(':') > 0) {
@@ -104,7 +104,7 @@ export async function processMetadata(event, context, callback: Callback) {
             if (!handled) console.log("Did not understand metadata: " + line);
         }
         const toUpdate: Metadata = { series, rules };
-        invokeLambdaAsync("processMetadata", INSIDE_PREFIX + FUNCTION_UPDATE_METADATA, toUpdate);
+        await invokeLambdaAsync("processMetadata", INSIDE_PREFIX + FUNCTION_UPDATE_METADATA, toUpdate);
         callback();
     } catch (e) {
         callback(e);
@@ -124,7 +124,7 @@ export async function processBGGTop50(event, context, callback: Callback) {
             .map(s => between(s, 'href="/boardgame/', '/'))
             .map(s => parseInt(s));
         const top50 = _.take(top100, 50);
-        invokeLambdaAsync("processBGGTop50", INSIDE_PREFIX + FUNCTION_UPDATE_TOP50, top50);
+        await invokeLambdaAsync("processBGGTop50", INSIDE_PREFIX + FUNCTION_UPDATE_TOP50, top50);
     } catch (e) {
         callback(e);
     }
@@ -237,7 +237,6 @@ async function tryToProcessCollection(invocation: FileToProcess): Promise<number
         console.log("invoked " + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES + " for " + games.items.length + " games.");
     }
     await cleanupCollection(collection, invocation.url);
-    console.log("cleaned up collection");
     return 200;
 }
 

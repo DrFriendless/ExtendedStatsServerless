@@ -4,7 +4,7 @@ import {
     ProcessGameResult, CollectionGame,
     FileToProcess, PlayData
 } from "./interfaces";
-import {between} from "./library";
+import { between, invokeLambdaAsync, logError } from "./library";
 const xml2js = require('xml2js-es6-promise');
 
 export async function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
@@ -15,10 +15,12 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
     }
     if (!dom || !dom.items) {
         console.log("Found incorrect DOM");
+        await logError("Found incorrect DOM for " + geek);
         throw new Error("Found no games in collection for " + geek);
     }
     if (!dom.items.item || dom.items.item.length === 0) {
         console.log("Found no games in collection");
+        await logError("Found no games in collection for " + geek);
     }
     const items: CollectionGame[] = [];
     const byId = {};
@@ -185,6 +187,7 @@ export async function processPlaysFile(fileContents: string, invocation: FileToP
     if (!dom || !dom.plays || !dom.plays.play) {
         console.log("Plays not found");
         console.log(dom);
+        await logError("Plays not found in " + invocation.url);
         return { count: -1, plays: result };
     }
     const playCount = parseInt(dom.plays.$.total);

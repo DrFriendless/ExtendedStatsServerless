@@ -1,5 +1,10 @@
 import { Lambda } from 'aws-sdk';
 import { Callback } from "aws-lambda";
+const INSIDE_PREFIX = "inside-dev-";
+
+export function logError(message: string): Promise<void> {
+    return invokeLambdaAsync("inside.logError", INSIDE_PREFIX + "logError", { source: "downloader", message });
+}
 
 export function invokeLambdaAsync(context: string, func: string, payload: object): Promise<void> {
     const params = {
