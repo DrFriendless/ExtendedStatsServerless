@@ -186,9 +186,22 @@ export async function gatherGeekUpdates(geek: string): Promise<ToProcessElement[
     return await asyncReturnWithConnection(async conn => await doGetGeekUpdates(conn, geek));
 }
 
+export async function markUrlForUpdate(url: string): Promise<ToProcessElement> {
+    return await asyncReturnWithConnection(async conn => await doMarkUrlForUpdate(conn, url));
+}
+
 async function doGetGeekUpdates(conn: mysql.Connection, geek: string): Promise<ToProcessElement[]> {
     const updatesSQL = "select * from files where geek = ?";
     return await conn.query(updatesSQL, [geek]) as ToProcessElement[];
+}
+
+async function doMarkUrlForUpdate(conn: mysql.Connection, url: string): Promise<ToProcessElement> {
+    const markSQL = "update files set lastUpdate = null where url = ?";
+    const updatesSQL = "select * from files where url = ?";
+    await conn.query(markSQL, [url]);
+    const rows = await conn.query(updatesSQL, [url]) as ToProcessElement[];
+    if (rows.length > 0) return rows[0];
+    return undefined;
 }
 
 async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary> {

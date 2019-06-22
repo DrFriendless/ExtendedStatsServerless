@@ -1,7 +1,7 @@
-import { Callback } from 'aws-lambda';
+import { Callback } from "aws-lambda";
 import {
     doGetNews, doQuery, gatherGeekSummary, doPlaysQuery, gatherGeekUpdates,
-    gatherSystemStats, listUsers, listWarTable, rankGames, updateFAQCount
+    gatherSystemStats, listUsers, listWarTable, rankGames, updateFAQCount, markUrlForUpdate
 } from "./mysql-rds";
 import { asyncReturnWithConnection } from "./library";
 import { GeekGameQuery, PlaysQuery } from "extstats-core";
@@ -9,6 +9,15 @@ import { GeekGameQuery, PlaysQuery } from "extstats-core";
 export async function getUpdates(event, context, callback: Callback) {
     try {
         callback(undefined, await gatherGeekUpdates(event["query"]["geek"]));
+    } catch (err) {
+        console.log(err);
+        callback(err);
+    }
+}
+
+export async function markForUpdate(event, context, callback: Callback) {
+    try {
+        callback(undefined, await markUrlForUpdate(event.body.url));
     } catch (err) {
         console.log(err);
         callback(err);
