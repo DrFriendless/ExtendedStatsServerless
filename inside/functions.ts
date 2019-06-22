@@ -12,7 +12,7 @@ import {
 } from './interfaces';
 import { getConnection } from './library';
 import {
-    runEnsureUsers,
+    runEnsureUsers, recordError,
     runListToProcess,
     runMarkGameDoesNotExist,
     runMarkUrlProcessed,
@@ -208,6 +208,16 @@ export async function updateRankings(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     try {
         await runUpdateRankings();
+        callback();
+    } catch (e) {
+        callback(e);
+    }
+}
+
+export async function logError(event: { message: string, source: string }, context, callback: Callback) {
+    context.callbackWaitsForEmptyEventLoop = false;
+    try {
+        await recordError(event.message, event.source);
         callback();
     } catch (e) {
         callback(e);

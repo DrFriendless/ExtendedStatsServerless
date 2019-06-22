@@ -21,8 +21,8 @@ import {
     doProcessPlayedMonths,
     doProcessPlaysResult, doUpdateBGGTop50,
     doUpdateGamesForGeek, doUpdateMetadata,
-    doUpdateProcessUserResult, doUpdateRankings
-} from './mysql-rds';
+    doUpdateProcessUserResult, doUpdateRankings, doRecordError
+} from "./mysql-rds";
 
 export async function runProcessGameResult(data: ProcessGameResult) {
     await withConnectionAsync(async conn => await doProcessGameResult(conn, data));
@@ -91,6 +91,10 @@ export async function runUpdateBGGTop50(games: number[]) {
 
 export async function runUpdateRankings() {
     await withConnectionAsync(async conn => await doUpdateRankings(conn));
+}
+
+export async function recordError(message: string, source: string) {
+    await withConnectionAsync(async conn => await doRecordError(conn, message, source));
 }
 
 export async function runProcessCollectionCleanup(geek: string, items: number[], url: string) {

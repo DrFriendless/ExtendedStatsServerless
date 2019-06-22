@@ -3,17 +3,17 @@
 // Exported functions in this file have a name starting with do and take a connection as their first parameter.
 // This file may not import from functions or service.
 
-import mysql = require('promise-mysql');
+import mysql = require("promise-mysql");
 import {
     CollectionGame, MetadataRule,
     MonthPlayed, NormalisedPlays, PlayData,
     ProcessGameResult, ProcessPlaysResult,
     SeriesMetadata,
-    ToProcessElement, WorkingNormalisedPlays
+    ToProcessElement, WorkingNormalisedPlays, ErrorMessage
 } from "./interfaces";
 import { RankingTableRow, WarTableRow, ExpansionData } from "extstats-core";
 import {
-    count, eqSet, extractNormalisedPlayFromPlayRow, listIntersect, listMinus, playDate
+    count, eqSet, extractNormalisedPlayFromPlayRow, listIntersect, listMinus, playDate, logError
 } from "./library";
 import * as _ from "lodash";
 import { inferExtraPlays } from "./plays";
@@ -183,8 +183,8 @@ async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: nu
     const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ? where game = ?";
     const howManyPlaysSql = "select sum(plays_normalised.quantity) s from plays_normalised where plays_normalised.game = ?";
     const ratings = await conn.query(ratingSql, [game]);
-    const total = ratings[0]['sum(rating)'];
-    const count = ratings[0]['count(rating)'];
+    const total = ratings[0]["sum(rating)"];
+    const count = ratings[0]["count(rating)"];
     const howManyPlays = (await conn.query(howManyPlaysSql, [game]))[0]["s"];
     const row: RankingTableRow = {
         game: game,
@@ -461,7 +461,12 @@ async function doRecordFile(conn: mysql.Connection, url: string, processMethod: 
     if (found === 0) {
         console.log("adding " + url);
         const insertParams = [url, processMethod, user, undefined, description, bggid, month, year, geekid];
-        await conn.query(insertSql, insertParams).catch(err => console.log(err));
+        try {
+            await conn.query(insertSql, insertParams);
+        } catch (err) {
+            console.log(err);
+            await logError(err.toString());
+        }
     }
 }
 
@@ -509,9 +514,9 @@ async function doListToProcessByMethod(conn: mysql.Connection, count: number, pr
 async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string[]) {
     const sqlOne = "update files set last_scheduled = now() where url = ?";
     const sqlMany = "update files set last_scheduled = now() where url in (?)";
-    if (urls.length == 0) {
+    if (urls.length === 0) {
         return;
-    } else if (urls.length == 1) {
+    } else if (urls.length === 1) {
         await conn.query(sqlOne, urls);
     } else {
         await conn.query(sqlMany, [urls]);
@@ -722,9 +727,23 @@ export async function doUpdateRankings(conn: mysql.Connection) {
     // TODO
 }
 
+export async function doRecordError(conn: mysql.Connection, message: string, source: string) {
+    const findSql = "select * from errors where message = ? and source = ?";
+    const createSql = "insert into errors (first, last, source, message, count) values (?, ?, ?, ?, ?)";
+    const updateSql = "update errors set last = ?, count = ? where message = ? and source = ?";
+    const found: object[] = await conn.query(findSql, [message, source]);
+    const now = new Date();
+    if (found.length === 0) {
+        await conn.query(createSql, [ now, now, source, message, 1]);
+    } else {
+        const toUpdate: ErrorMessage = found[0] as ErrorMessage;
+        await conn.query(updateSql, [ now, toUpdate.count + 1, message, source ]);
+    }
+}
+
 async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {
     const getIdSql = "select id from geeks where geeks.username = ?";
-    return (await conn.query(getIdSql, [geek]))[0]['id'];
+    return (await conn.query(getIdSql, [geek]))[0]["id"];
 }
 
 async function countWhere(conn: mysql.Connection, where: string, params: any[]) {
@@ -773,11 +792,11 @@ export async function doProcessPlaysResult(conn: mysql.Connection, data: Process
     const thenMonth = data.year * 12 + data.month;
     let delta;
     if (nowMonth - thenMonth > 6) {
-        delta = '838:00:00';
+        delta = "838:00:00";
     } else if (nowMonth - thenMonth > 2) {
-        delta = '168:00:00';
+        delta = "168:00:00";
     } else {
-        delta = '72:00:00';
+        delta = "72:00:00";
     }
     await doMarkUrlProcessedWithUpdate(conn, "processPlays", data.url, delta);
 }

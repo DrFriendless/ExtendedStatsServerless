@@ -136,3 +136,11 @@ export interface WorkingNormalisedPlays extends NormalisedPlays {
     expansions: number[];
     isExpansion: boolean;
 }
+
+export interface ErrorMessage {
+    first: Date;
+    last: Date;
+    source: string;
+    message: string;
+    count: number;
+}

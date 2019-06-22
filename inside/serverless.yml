@@ -198,7 +198,18 @@ functions:
       mysqlPassword: ${self:custom.database.mysqlPassword}
       mysqlDatabase: ${self:custom.database.mysqlDatabase}
     role:
-        "doStuffFromInsideVPC"
+      "doStuffFromInsideVPC"
+  logError:
+    handler: functions.logError
+    tags:
+      component: inside
+    environment:
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
+    role:
+      "doStuffFromInsideVPC"
 
 resources:
   Resources:
