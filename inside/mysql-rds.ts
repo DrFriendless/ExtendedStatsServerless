@@ -322,8 +322,10 @@ async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) 
         idsToDelete.push(geekId);
     }
     const deleteOneFile = "delete from files where geekid = ?";
+    const deleteOneFileByName = "delete from files where geek = ?";
     const deleteOneGeek = "delete from geeks where username = ?";
     const deleteSomeFiles = "delete from files where geekid in (?)";
+    const deleteSomeFilesByName = "delete from files where geek in (?)";
     const deleteSomeGeeks = "delete from geeks where username in (?)";
     const deleteOnePlays = "delete from plays where geek = ?";
     const deleteSomePlays = "delete from plays where geek in (?)";
@@ -340,6 +342,7 @@ async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) 
         await conn.query(deleteOnePlays, idsToDelete);
         await conn.query(deleteOneNormalisedPlays, idsToDelete);
         await conn.query(deleteOneFile, idsToDelete);
+        await conn.query(deleteOneFileByName, extraUsers);
         await conn.query(deleteOneGeekGames, idsToDelete);
         await conn.query(deleteOneMonthPlayed, idsToDelete);
         await conn.query(deleteOneGeek, extraUsers);
@@ -348,6 +351,7 @@ async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) 
         await conn.query(deleteSomePlays, [idsToDelete]);
         await conn.query(deleteSomeNormalisedPlays, [idsToDelete]);
         await conn.query(deleteSomeFiles, [idsToDelete]);
+        await conn.query(deleteSomeFilesByName, [extraUsers]);
         await conn.query(deleteSomeGeekGames, [idsToDelete]);
         await conn.query(deleteSomeMonthsPlayed, [idsToDelete]);
         await conn.query(deleteSomeGeeks, [extraUsers]);
