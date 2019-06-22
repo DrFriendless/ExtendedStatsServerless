@@ -9,7 +9,7 @@
     "aws-lambda-typescript": "3.0.0",
     "aws-sdk": "^2.302.0",
     "node-aws-lambda": "^0.1.8",
-    "extstats-core": "^1.5.0",
+    "extstats-core": "^1.6.0",
     "graphql": "^0.12.3",
     "graphql-tag": "^2.7.3",
     "jsonwebtoken": "^8.3.0",

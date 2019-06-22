@@ -3,7 +3,7 @@ import { asyncReturnWithConnection, count, countTableRows, getGeekId, getGeekIds
 import { selectGames } from "./selector";
 import { RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
     TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery,
-    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount } from "extstats-core";
+    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount, ToProcessElement } from "extstats-core";
 import * as moment from "moment";
 
 export async function rankGames(query: object): Promise<RankingTableRow[]> {
@@ -180,6 +180,15 @@ export async function gatherSystemStats(): Promise<SystemStats> {
 
 export async function gatherGeekSummary(geek: string): Promise<GeekSummary> {
     return await asyncReturnWithConnection(async conn => await doGetGeekSummary(conn, geek));
+}
+
+export async function gatherGeekUpdates(geek: string): Promise<ToProcessElement[]> {
+    return await asyncReturnWithConnection(async conn => await doGetGeekUpdates(conn, geek));
+}
+
+async function doGetGeekUpdates(conn: mysql.Connection, geek: string): Promise<ToProcessElement[]> {
+    const updatesSQL = "select * from files where geek = ?";
+    return await conn.query(updatesSQL, [geek]) as ToProcessElement[];
 }
 
 async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary> {
