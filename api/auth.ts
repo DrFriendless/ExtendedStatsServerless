@@ -57,7 +57,6 @@ async function withAuthentication(event, callback: (Error?, Decoded?) => Promise
 export async function login(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const cookies = getCookiesFromHeader(event.headers);
-    console.log(cookies);
     const headers = {
         "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
         "Access-Control-Allow-Credentials": true
@@ -151,10 +150,12 @@ async function saveUserData(decoded: Decoded, userConfig: UserConfig) {
 export async function personal(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const cookies = getCookiesFromHeader(event.headers);
-    console.log(cookies);
     if (cookies['extstatsid']) {
         const body = JSON.stringify(await getPersonalDataForID(cookies['extstatsid']));
-        const headers = { "Access-Control-Allow-Origin": "https://extstats.drfriendless.com" };
+        const headers = {
+            "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
+            "Access-Control-Allow-Credentials": true
+        };
         const result = { "statusCode": 200, body, headers };
         callback(undefined, result);
     } else {
