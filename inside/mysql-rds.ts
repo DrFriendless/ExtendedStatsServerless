@@ -70,7 +70,6 @@ async function doUpdateMetadataRules(conn: mysql.Connection, rules: MetadataRule
 }
 
 export async function doRecordGameExpansions(conn: mysql.Connection, gameId: number, expansions: number[]) {
-    console.log("doRecordGameExpansions");
     const selectSql = "select expansion from expansions where basegame = ?";
     const deleteSql = "delete from expansions where basegame = ?";
     const insertSql = "insert into expansions (basegame, expansion) values (?, ?)";
@@ -101,7 +100,6 @@ async function doEnsureMechanic(conn: mysql.Connection, name: string) {
 }
 
 async function doSetCategoriesForGame(conn: mysql.Connection, game: number, categories: string[]) {
-    console.log("doSetCategoriesForGame");
     const getCatsSqlOne = "select id from categories where name = ?";
     const getCatsSqlMany = "select id from categories where name in (?)";
     const deleteAllGameCatsSql = "delete from game_categories where game = ?";
@@ -129,7 +127,6 @@ async function doSetCategoriesForGame(conn: mysql.Connection, game: number, cate
 }
 
 async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mechanics: string[]) {
-    console.log("doSetMechanicsForGame");
     const getMecsSqlOne = "select id from mechanics where name = ?";
     const getMecsSqlMany = "select id from mechanics where name in (?)";
     const deleteAllGameMecsSql = "delete from game_mechanics where game = ?";
@@ -157,7 +154,6 @@ async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mecha
 }
 
 async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
-    console.log("doUpdateGame");
     const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
       "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update games set name = ?, average = ?, rank = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
@@ -177,7 +173,6 @@ async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
 }
 
 async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: number, data: ProcessGameResult) {
-    console.log("doUpdateRankingTableStatsForGame");
     const ratingSql = "select sum(rating), count(rating) from geekgames where game = ? and rating > 0";
     const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays) values (?,?,?,?,?,?,?,?)";
     const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ? where game = ?";
@@ -268,7 +263,6 @@ function tillNextUpdate(processMethod: string) {
 }
 
 export async function doMarkUrlProcessed(conn: mysql.Connection, processMethod: string, url: string) {
-    console.log("doMarkUrlProcessed");
     const delta = tillNextUpdate(processMethod);
     const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
     await conn.query(sqlSet, [delta, url, processMethod]);
@@ -310,7 +304,6 @@ export async function doEnsureUsers(conn: mysql.Connection, users: string[]) {
         await doEnsureUser(conn, user);
     }
     await doDeleteExtraUsers(conn, extraUsers);
-    console.log("doEnsureUsers complete");
 }
 
 async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) {
@@ -356,7 +349,6 @@ async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) 
         await conn.query(deleteSomeMonthsPlayed, [idsToDelete]);
         await conn.query(deleteSomeGeeks, [extraUsers]);
     }
-    console.log("doDeleteExtraUsers complete");
 }
 
 async function doEnsureUser(conn: mysql.Connection, user: string) {
@@ -476,9 +468,13 @@ async function doEnsureFileProcessUser(conn: mysql.Connection, geek: string, gee
 }
 
 async function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: string, geekid: number) {
-    const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
-    await doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", undefined,
-      undefined, undefined, geekid);
+    if (!geek) {
+        throw new Error("cannot process collection for null geek");
+    } else {
+        const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
+        await doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", undefined,
+          undefined, undefined, geekid);
+    }
 }
 
 async function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string, geekid: number) {
@@ -544,7 +540,7 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const usesSql = "select sum(quantity) c from plays_normalised where geek=? and game in (?) group by game order by 1 desc";
     const ownedSql = "select distinct game from geekgames where owned>0 and geekid = ?";
     const distinctGames = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
-    const totalPlays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"];
+    const totalPlays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"] || 0;
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
     const zeros = (await conn.query(zerosSql, [geekId, geekId]))[0]["z"];
     const hindexData = (await conn.query(hindexSql, [geekId])).map(row => row["q"]);
@@ -669,10 +665,10 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
     const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values ?";
     const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
     const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values ?";
-    const rows = await conn.query(selectSql, [geekId, month, year]);
+    const rows: object[] = await conn.query(selectSql, [geekId, month, year]);
     const rawData = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
-    const byDate = _.groupBy(rawData, playDate);
-    const allPlays: WorkingNormalisedPlays[] = _.flatMap(Object.values(byDate).map(plays => inferExtraPlays(plays as NormalisedPlays[], expansionData)));
+    const byDate: Record<string, NormalisedPlays[]> = _.groupBy(rawData, playDate);
+    const allPlays: WorkingNormalisedPlays[] = _.flatMap(Object.values(byDate).map((plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData)));
     await conn.query(deleteSql, [geekId, month, year]);
     // insert all of the base plays
     const basePlays = [];
@@ -680,20 +676,34 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
         basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, 0]);
     }
     if (basePlays.length > 0) {
-        await conn.query(insertBasePlaySql, [basePlays]);
+        try {
+            await conn.query(insertBasePlaySql, [basePlays]);
+        } catch (ex) {
+            await logError("Unable to insert base play " + JSON.stringify(basePlays) + " " + ex);
+        }
     }
     // construct the expansion plays with references to the base plays
     const expPlays = [];
     for (const np of allPlays) {
         if (np.expansions.length > 0) {
-            const id = (await conn.query(getIdSql, [np.game, geekId, np.quantity, np.year, np.month, np.date]))[0].id;
+            const args = [np.game, geekId, np.quantity, np.year, np.month, np.date];
+            const result = await conn.query(getIdSql, args);
+            if (!result || result.length === 0 || !result[0]) {
+                await logError("Bad result looking for play " + JSON.stringify(args) + " => " + JSON.stringify(result));
+                continue;
+            }
+            const id = result[0].id;
             for (const e of np.expansions) {
                 expPlays.push([e, geekId, np.quantity, np.year, np.month, np.date, 1, id]);
             }
         }
     }
     if (expPlays.length > 0) {
-        await conn.query(insertExpansionPlaySql, [expPlays]);
+        try {
+            await conn.query(insertExpansionPlaySql, [expPlays]);
+        } catch (ex) {
+            await logError("Unable to insert expansion plays " + JSON.stringify(expPlays) + " " + JSON.stringify(ex));
+        }
     }
 }
 
@@ -743,7 +753,11 @@ export async function doRecordError(conn: mysql.Connection, message: string, sou
 
 async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {
     const getIdSql = "select id from geeks where geeks.username = ?";
-    return (await conn.query(getIdSql, [geek]))[0]["id"];
+    const results = await conn.query(getIdSql, [geek]);
+    if (!results || results.length === 0 || !results[0]) {
+        await logError("No geek ID for " + geek);
+    }
+    return results[0]["id"];
 }
 
 async function countWhere(conn: mysql.Connection, where: string, params: any[]) {
