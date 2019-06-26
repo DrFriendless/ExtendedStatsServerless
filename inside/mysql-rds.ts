@@ -17,6 +17,7 @@ import {
 } from "./library";
 import * as _ from "lodash";
 import { inferExtraPlays } from "./plays";
+import { PlaysRow } from "./library";
 
 export async function doUpdateBGGTop50(conn: mysql.Connection, games: number[]) {
     await doUpdateSeries(conn, [ { name: "BGG Top 50", games } ]);
@@ -414,7 +415,7 @@ export async function doEnsureMonthsPlayed(conn: mysql.Connection, geek: string,
 }
 
 export async function doEnsureGames(conn: mysql.Connection, ids: number[]): Promise<number[]> {
-    if (ids.length === 0) return;
+    if (ids.length === 0) return [];
     const sqlSome = "select bggid from files where bggid in (?) and processMethod = 'processGame'";
     const sqlOne = "select bggid from files where bggid = ? and processMethod = 'processGame'";
     let params;
@@ -438,10 +439,12 @@ export async function doEnsureGames(conn: mysql.Connection, ids: number[]): Prom
 async function doRecordGame(conn: mysql.Connection, bggid: number) {
     const GAME_URL = "https://boardgamegeek.com/xmlapi/boardgame/%d&stats=1";
     const url = GAME_URL.replace("%d", bggid.toString());
-    const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid) values (?, ?, ?, ?, ?, ?)";
     const tillNext = tillNextUpdate("processGame");
     const insertParams = [url, "processGame", undefined, undefined, tillNext, "Game #" + bggid, bggid];
-    await conn.query(insertSql, insertParams).catch(err => {});
+    await conn.query(insertSql, insertParams).catch(err => {
+        console.log(err);
+    });
 }
 
 
@@ -665,13 +668,13 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
     const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values ?";
     const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
     const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values ?";
-    const rows: object[] = await conn.query(selectSql, [geekId, month, year]);
-    const rawData = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
+    const rows: PlaysRow[] = await conn.query(selectSql, [geekId, month, year]);
+    const rawData: NormalisedPlays[] = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
     const byDate: Record<string, NormalisedPlays[]> = _.groupBy(rawData, playDate);
     const allPlays: WorkingNormalisedPlays[] = _.flatMap(Object.values(byDate).map((plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData)));
     await conn.query(deleteSql, [geekId, month, year]);
     // insert all of the base plays
-    const basePlays = [];
+    const basePlays: any[][] = [];
     for (const np of allPlays) {
         basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, 0]);
     }
@@ -679,7 +682,9 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
         try {
             await conn.query(insertBasePlaySql, [basePlays]);
         } catch (ex) {
-            await logError("Unable to insert base play " + JSON.stringify(basePlays) + " " + ex);
+            console.log(ex);
+            await logError("Unable to insert base plays " + geekId + " " + year + "-" + month);
+            throw ex;
         }
     }
     // construct the expansion plays with references to the base plays
@@ -689,7 +694,7 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
             const args = [np.game, geekId, np.quantity, np.year, np.month, np.date];
             const result = await conn.query(getIdSql, args);
             if (!result || result.length === 0 || !result[0]) {
-                await logError("Bad result looking for play " + JSON.stringify(args) + " => " + JSON.stringify(result));
+                await logError("Bad result looking for play " + geekId + " " + year + "-" + month);
                 continue;
             }
             const id = result[0].id;
@@ -702,7 +707,9 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
         try {
             await conn.query(insertExpansionPlaySql, [expPlays]);
         } catch (ex) {
-            await logError("Unable to insert expansion plays " + JSON.stringify(expPlays) + " " + JSON.stringify(ex));
+            console.log(ex);
+            await logError("Unable to insert expansion plays " + geekId + " " + year + "-" + month);
+            throw ex;
         }
     }
 }

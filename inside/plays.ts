@@ -12,7 +12,7 @@ function toWorkingPlay(expansionData: ExpansionData, play: NormalisedPlays): Wor
         year: play.year,
         isExpansion: expansionData.isExpansion(play.game),
         expansions: []
-    } as WorkingNormalisedPlays;
+    };
 }
 
 // # def _inferExtraPlaysForADate(games, plays):
@@ -61,8 +61,7 @@ function toWorkingPlay(expansionData: ExpansionData, play: NormalisedPlays): Wor
 
 function sumQuantities(plays: WorkingNormalisedPlays[]): WorkingNormalisedPlays {
     if (plays.length === 1) return plays[0];
-    const total = plays.map(p => p.quantity).reduce((a, b) => a + b);
-    plays[0].quantity = total;
+    plays[0].quantity = plays.map(p => p.quantity).reduce((a, b) => a + b);
     return plays[0];
 }
 
@@ -76,7 +75,7 @@ export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: 
     let current = initialPlays.map(play => toWorkingPlay(expansionData, play));
     current = coalescePlays(current);
     let iterations = 0;
-    while (iterations < 100) {
+    while (iterations < 20) {
         iterations++;
         const newPlays = inferNewPlays(current, expansionData);
         if (!newPlays) return current;

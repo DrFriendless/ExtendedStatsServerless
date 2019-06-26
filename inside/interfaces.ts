@@ -132,9 +132,15 @@ export interface NormalisedPlays {
     id: number;
 }
 
-export interface WorkingNormalisedPlays extends NormalisedPlays {
+export interface WorkingNormalisedPlays {
     expansions: number[];
     isExpansion: boolean;
+    quantity: number;
+    game: number;
+    geek: number;
+    date: number;
+    month: number;
+    year: number;
 }
 
 export interface ErrorMessage {
