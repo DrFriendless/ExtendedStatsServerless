@@ -109,8 +109,8 @@ functions:
             allowCredentials: true
           integration: lambda-proxy
           private: false
-  update:
-    handler: auth.update
+  updatePersonal:
+    handler: auth.updatePersonal
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
@@ -118,7 +118,7 @@ functions:
       mysqlDatabase: ${self:custom.database.mysqlDatabase}
     events:
       - http:
-          path: update
+          path: updatePersonal
           method: post
           cors: true
           integration: lambda

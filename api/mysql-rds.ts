@@ -78,6 +78,9 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
     }
 }
 
+type Ymd = { ymd: number };
+type ShellBeRight = { [geek: string]: PlaysWithDate[] };
+
 export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): Promise<MultiGeekPlays> {
     const geeks = query.geeks || [query.geek];
     const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
@@ -102,19 +105,35 @@ export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): P
         where += " and date = ?";
         args.push(query.date);
     }
-    // TODO - interpret filter
-    const playsSql = "select id, game, geek, quantity, year, month, date, expansion_play, baseplay from plays_normalised where " + where;
+    const filterTags = (query.filter || "").split(" ");
+    const first = filterTags.indexOf("first") >= 0;
+    const ymd = filterTags.indexOf("ymd") >= 0;
+    if (first) where += " order by ymd asc";
+    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay from plays_normalised where " + where;
     const playsResult = await conn.query(playsSql, args);
     const expPlays = [];
-    const basePlays: { [geek: string]: PlaysWithDate[] } = {};
+    const basePlays: { [geek: string]: object[] } = {};
     const playsById = {};
     const gameIds: number[] = [];
+    const firstKeys: string[] = [];
     for (const row of playsResult) {
         if (gameIds.indexOf(row.game) < 0) gameIds.push(row.game);
+        if (first) {
+            const firstKey = `${row.game}-${row.geek}`;
+            if (firstKeys.indexOf(firstKey) >= 0) continue;
+            firstKeys.push(firstKey);
+        }
         if (row["expansion_play"]) {
             expPlays.push(row);
         } else {
-            const pwd: PlaysWithDate = { year: row.year, month: row.month, date: row.date, expansions: [], game: row.game, geek: undefined, quantity: row.quantity };
+            const pwd: object = { game: row.game, quantity: row.quantity };
+            if (ymd) {
+                pwd['ymd'] = row.ymd;
+            } else {
+                pwd['year'] = row.year;
+                pwd['month'] = row.month;
+                pwd['date'] = row.date;
+            }
             const username = geekNameIds[row.geek];
             if (!username) {
                 console.log("No user found for " + row.geek);
@@ -131,10 +150,11 @@ export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): P
             console.log("No base play " + ep.baseplay + " found");
             continue;
         }
+        if (!pwd.expansions) pwd.expansions = [];
         pwd.expansions.push(ep.game);
     }
     const games = await doRetrieveGames(conn, gameIds);
-    return { geeks: Object.values(geekNameIds), plays: basePlays, collection: [], games };
+    return { geeks: Object.values(geekNameIds), plays: basePlays as ShellBeRight, collection: [], games };
 }
 
 async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {

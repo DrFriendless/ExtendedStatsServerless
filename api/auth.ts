@@ -106,20 +106,22 @@ export async function authenticate(event, context, callback: Callback) {
     });
 }
 
-export async function update(event, context, callback: Callback) {
+export async function updatePersonal(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    await withAuthentication(event, async (error, decoded) => {
-        if (error) {
-            if (error.name === "TokenExpiredError") {
-                callback(new Error("TokenExpiredError"));
-            } else {
-                console.log(error);
-                callback(new Error("Bzzzt!"));
-            }
-        } else {
-            callback(undefined, await saveUserData(decoded, event.body as UserConfig));
-        }
-    });
+    console.log(event);
+    const cookies = getCookiesFromHeader(event.headers);
+    const headers = {
+        "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
+        "Access-Control-Allow-Credentials": true
+    };
+    const result = { headers };
+    if (cookies['extstatsid']) {
+        await saveUserData(cookies['extstatsid'], event.body as UserConfig);
+        result["statusCode"] = 200;
+    } else {
+        result["statusCode"] = 403;
+    }
+    callback(undefined, result);
 }
 
 async function getUserData(decoded: Decoded): Promise<UserData> {

@@ -80,7 +80,7 @@ class ParseState {
 export function parse(input: string): Expression {
     const lexer = moo.compile(tokens);
     lexer.reset(input);
-    return parseExpression(new ParseState(Array.from(lexer).filter(tok => tok.type !== 'whitespace')));
+    return parseExpression(new ParseState((Array.from(lexer) as Token[]).filter(tok => tok.type !== 'whitespace')));
 }
 
 function parseExpression(state: ParseState): Expression {
@@ -92,7 +92,7 @@ function parseExpression(state: ParseState): Expression {
 }
 
 function parseArgs(state: ParseState): Arg[] {
-    const result = [];
+    const result: Arg[] = [];
     while (true) {
         const peek = state.peek();
         if (peek.type === "rparen") return result;
