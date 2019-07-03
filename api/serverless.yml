@@ -120,8 +120,20 @@ functions:
       - http:
           path: updatePersonal
           method: post
-          cors: true
-          integration: lambda
+          cors:
+            origin: 'https://extstats.drfriendless.com'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
+              - Cookie
+              - Set-Cookie
+            allowCredentials: true
+          integration: lambda-proxy
           private: false
   adminGatherSystemStats:
     handler: functions.adminGatherSystemStats

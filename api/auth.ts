@@ -116,7 +116,7 @@ export async function updatePersonal(event, context, callback: Callback) {
     };
     const result = { headers };
     if (cookies['extstatsid']) {
-        await saveUserData(cookies['extstatsid'], event.body as UserConfig);
+        await updateUser(cookies['extstatsid'], JSON.parse(event.body) as UserConfig);
         result["statusCode"] = 200;
     } else {
         result["statusCode"] = 403;
@@ -142,11 +142,6 @@ async function getPersonalDataForID(sub: string): Promise<PersonalData> {
     const userData = await getUserDataForID(sub);
     const allData = await retrieveAllData(sub);
     return { userData, allData, error: undefined };
-}
-
-async function saveUserData(decoded: Decoded, userConfig: UserConfig) {
-    await updateUser(decoded.sub, userConfig);
-    return undefined;
 }
 
 export async function personal(event, context, callback: Callback) {
