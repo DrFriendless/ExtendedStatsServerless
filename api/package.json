@@ -4,12 +4,12 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@types/aws-lambda": "0.0.17",
+    "@types/aws-lambda": "^8.10.27",
     "aws-lambda": "^0.1.2",
-    "aws-lambda-typescript": "3.0.0",
-    "aws-sdk": "^2.302.0",
+    "aws-lambda-typescript": "^3.0.0",
+    "aws-sdk": "^2.488.0",
     "node-aws-lambda": "^0.1.8",
-    "extstats-core": "^1.6.0",
+    "extstats-core": "^1.7.0",
     "graphql": "^0.12.3",
     "graphql-tag": "^2.7.3",
     "jsonwebtoken": "^8.3.0",
@@ -20,7 +20,7 @@
     "promise-mysql": "^3.3.1"
   },
   "devDependencies": {
-    "@types/node": "^8.10.28",
+    "@types/node": "^12.0.12",
     "gulp": "^3.9.1",
     "serverless": "^1.44.1",
     "serverless-domain-manager": "^2.6.0",
