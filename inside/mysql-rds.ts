@@ -528,6 +528,8 @@ type PlaysDataForWarTable = {
     tens: number,
     zeros: number,
     hindex: number,
+    gindex: number,
+    hrindex: number,
     sdj: number,
     ext100: number,
     uses: number[]
@@ -546,9 +548,18 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const totalPlays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"] || 0;
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
     const zeros = (await conn.query(zerosSql, [geekId, geekId]))[0]["z"];
-    const hindexData = (await conn.query(hindexSql, [geekId])).map(row => row["q"]);
+    const hindexData: number[] = (await conn.query(hindexSql, [geekId])).map(row => row["q"]);
     let hindex = 0;
     while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
+    let gindex = 0;
+    let gindexTotal = 0;
+    while (hindexData.length > gindex && (gindexTotal + hindexData[gindex] >= (gindex + 1) * (gindex + 1))) {
+        gindexTotal += hindexData[gindex];
+        gindex++;
+    }
+    let n = hindexData.filter(x => x > hindex).length;
+    if (hindexData.length > hindex) n += hindexData[hindex];
+    const hrindex = hindex + n / (2 * hindex + 1);
     const sdjId = await getIdForSeries(conn, "Spiel des Jahre");
     const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
     const ext100Id = await getIdForSeries(conn, "Extended Stats Top 100");
@@ -556,7 +567,7 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const owned = (await conn.query(ownedSql, [geekId])).map(row => row["game"]);
     const uses = (owned.length === 0) ? [] : (await conn.query(usesSql, [geekId, owned])).map(row => row["c"]);
     while (uses.length < owned.length) uses.push(0);
-    return { totalPlays, distinctGames, tens, zeros, hindex, sdj, ext100, uses };
+    return { totalPlays, distinctGames, tens, zeros, hindex, gindex, hrindex, sdj, ext100, uses };
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
@@ -595,22 +606,24 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         zeros: playsDataForWarTable.zeros,
         ext100: playsDataForWarTable.ext100,
         hindex: playsDataForWarTable.hindex,
+        gindex: playsDataForWarTable.gindex,
+        hrindex: playsDataForWarTable.hrindex,
         preordered: preordered
     };
     const insertSql = "insert into war_table (geek, geekName, totalPlays, distinctGames, top50, sdj, owned, want, wish, " +
-      "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, ext100, hindex, preordered) values " +
-      "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+      "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, ext100, hindex, preordered, gindex, hrindex) values " +
+      "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update war_table set geekName = ?, totalPlays = ?, distinctGames = ?, top50 = ?, sdj = ?, owned = ?, "
       + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, "
-      + "ext100 = ?, hindex = ?, preordered = ? where geek = ?";
+      + "ext100 = ?, hindex = ?, preordered = ?, gindex = ?, hrindex = ? where geek = ?";
     try {
         await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.totalPlays, fpg.distinctGames, fpg.top50, fpg.sdj, fpg.owned,
             fpg.want, fpg.wish, fpg.trade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros,
-            fpg.ext100, fpg.hindex, fpg.preordered]);
+            fpg.ext100, fpg.hindex, fpg.preordered, fpg.gindex, fpg.hrindex]);
     } catch (e) {
         await conn.query(updateSql, [fpg.geekName, fpg.totalPlays, fpg.distinctGames, fpg.top50, fpg.sdj, fpg.owned,
             fpg.want, fpg.wish, fpg.trade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros,
-            fpg.ext100, fpg.hindex, fpg.preordered, fpg.geek]);
+            fpg.ext100, fpg.hindex, fpg.preordered, fpg.gindex, fpg.hrindex, fpg.geek]);
     }
 }
 
