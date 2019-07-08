@@ -1,5 +1,5 @@
 {
-  "name": "ExtendedStatsServerlessInside",
+  "name": "extended-stats-serverless-inside",
   "description": "Extended Stats Serverless components of the downloader inside the VPC.",
   "version": "0.0.1",
   "private": true,
@@ -7,7 +7,7 @@
     "@types/aws-lambda": "^8.10.27",
     "aws-lambda": "^0.1.2",
     "aws-sdk": "^2.488.0",
-    "extstats-core": "^1.7.0",
+    "extstats-core": "^1.7.1",
     "graphql": "^0.12.3",
     "graphql-tag": "^2.7.3",
     "hoek": "^4.2.1",

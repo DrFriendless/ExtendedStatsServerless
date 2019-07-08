@@ -175,13 +175,22 @@ async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
 
 async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: number, data: ProcessGameResult) {
     const ratingSql = "select sum(rating), count(rating) from geekgames where game = ? and rating > 0";
-    const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays) values (?,?,?,?,?,?,?,?)";
-    const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ? where game = ?";
-    const howManyPlaysSql = "select sum(plays_normalised.quantity) s from plays_normalised where plays_normalised.game = ?";
+    const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays, hindex, gindex) values (?,?,?,?,?,?,?,?,?,?)";
+    const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ?, hindex = ?, gindex = ? where game = ?";
+    const playsSql = "select sum(quantity) q from plays_normalised where plays_normalised.game = ? group by geek order by q desc";
     const ratings = await conn.query(ratingSql, [game]);
     const total = ratings[0]["sum(rating)"];
     const count = ratings[0]["count(rating)"];
-    const howManyPlays = (await conn.query(howManyPlaysSql, [game]))[0]["s"];
+    const hindexData: number[] = (await conn.query(playsSql, [game])).map(row => row["q"]);
+    let hindex = 0;
+    while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
+    let gindex = 0;
+    let gindexTotal = 0;
+    while (hindexData.length > gindex && (gindexTotal + hindexData[gindex] >= (gindex + 1) * (gindex + 1))) {
+        gindexTotal += hindexData[gindex];
+        gindex++;
+    }
+    const howManyPlays = hindexData.reduce((a, b) => a + b, 0);
     const row: RankingTableRow = {
         game: game,
         game_name: data.name,
@@ -191,12 +200,15 @@ async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: nu
         total_plays: howManyPlays,
         total_ratings: total || 0,
         num_ratings: count,
-        ranking: 0
+        ranking: 0,
+        hindex,
+        gindex
     };
     try {
-        await conn.query(insertSql, [row.game, row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays]);
+        await conn.query(insertSql,
+          [row.game, row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.hindex, row.gindex]);
     } catch (e) {
-        await conn.query(updateSql, [row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.game]);
+        await conn.query(updateSql, [row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.hindex, row.gindex, row.game]);
     }
 }
 
