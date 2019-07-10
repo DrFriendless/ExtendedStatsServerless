@@ -21,7 +21,7 @@ async function doRankGames(conn: mysql.Connection, query: object): Promise<Ranki
     return rows;
 }
 
-async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<GameData[]> {
+export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<GameData[]> {
     const sqlOne = "select * from games where bggid = ?";
     const sqlMany = "select * from games where bggid in (?)";
     const expansions = await loadExpansionData(conn);

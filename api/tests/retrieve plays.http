@@ -1,0 +1,16 @@
+# For a quick start check out our HTTP Requests collection (Tools|HTTP Client|Open HTTP Requests Collection).
+#
+# Following HTTP Request Live Templates are available:
+# * 'gtrp' and 'gtr' create a GET request with or without query parameters;
+# * 'ptr' and 'ptrp' create a POST request with a simple or parameter-like body;
+# * 'mptr' and 'fptr' create a POST request to submit a form with a text or file field (multipart/form-data);
+
+GET https://api.drfriendless.com/v1/retrieve?query={getPlays(geeks: ["Friendless", "trif"]) { geeks games { bggid name } plays { game quantity ymd geek } } }
+x-api-key: gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ
+Content-Type: application/json
+
+<> 2019-07-10T083349.200.json
+<> 2019-07-10T083319.200.json
+<> 2019-07-10T081724.200.json
+
+###
