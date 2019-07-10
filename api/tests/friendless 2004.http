@@ -5,7 +5,7 @@
 # * 'ptr' and 'ptrp' create a POST request with a simple or parameter-like body;
 # * 'mptr' and 'fptr' create a POST request to submit a form with a text or file field (multipart/form-data);
 
-GET https://api.drfriendless.com/v1/retrieve?query={getPlays(geeks: ["Friendless", "trif"]) { geeks games { bggid name } plays { game quantity ymd geek } } }
+GET https://api.drfriendless.com/v1/retrieve?query={plays(geeks: ["Friendless"], startYMD: 20040000, endYMD: 20050000) { games { bggid name } plays { game ymd geek quantity } } }
 x-api-key: gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ
 Content-Type: application/json
 

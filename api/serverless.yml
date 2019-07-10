@@ -199,7 +199,7 @@ functions:
     role:
         "doStuffFromInsideVPC"
   retrieve:
-    handler: graph.retrieve
+    handler: retrieve.retrieve
     tags:
       component: api
     environment:
