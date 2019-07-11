@@ -141,8 +141,12 @@ export async function retrieve(event: APIGatewayProxyEvent, context: Context, ca
   context.callbackWaitsForEmptyEventLoop = false;
   console.log(event);
   try {
-    const result = await graphql.graphql(schema, event.queryStringParameters.query);
-    callback(undefined, {statusCode: 200, body: JSON.stringify(result)});
+    const headers = {
+      "Access-Control-Allow-Origin": "*"
+    };
+    // handle empty query for CORS
+    const result = event.queryStringParameters.query ? await graphql.graphql(schema, event.queryStringParameters.query) : {};
+    callback(undefined, {statusCode: 200, headers, body: JSON.stringify(result)});
   } catch (err) {
     console.log(err);
     callback(err);
