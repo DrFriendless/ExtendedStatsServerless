@@ -845,4 +845,5 @@ export async function doProcessPlaysResult(conn: mysql.Connection, data: Process
         delta = "72:00:00";
     }
     await doMarkUrlProcessedWithUpdate(conn, "processPlays", data.url, delta);
+    await doUpdateFrontPageGeek(conn, data.geek);
 }
