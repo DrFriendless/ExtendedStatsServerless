@@ -57,7 +57,7 @@ typings/
 # dotenv environment variables file
 .env
 
-/.idea/
+.idea
 /secrets.json
 /database.json
 .serverless

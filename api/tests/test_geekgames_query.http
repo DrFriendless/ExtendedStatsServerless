@@ -1,0 +1,5 @@
+GET https://api.drfriendless.com/v1/retrieve?query={geekgames(selector: "all(owned(ME),played(ME))", vars: [{name: "ME", value: "Friendless"}]) { geekGames { bggid firstPlay lastPlay daysSincePlayed shouldPlayScore } } }
+x-api-key: gb0l7zXSq47Aks7YHnGeEafZbIzgmGBv5FouoRjJ
+Content-Type: application/json
+
+###

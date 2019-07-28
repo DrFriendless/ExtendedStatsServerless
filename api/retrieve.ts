@@ -1,13 +1,101 @@
 import * as graphql from "graphql";
 import { APIGatewayProxyEvent, Callback, Context } from "aws-lambda";
-import { GraphQLObjectType } from "graphql";
+import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
-import { MultiGeekPlays } from "extstats-core";
+import { GeekGame, GeekGameQueryResult, MultiGeekPlays } from "extstats-core";
 import { doRetrieveGames } from "./mysql-rds";
 import { asyncReturnWithConnection, getGeekIds } from "./library";
+import { Expression, parse } from "./parser";
+import { evaluateSimple } from "./selector";
 
 const ListOfString = new graphql.GraphQLList(graphql.GraphQLString!);
 const ListOfInt = new graphql.GraphQLList(graphql.GraphQLInt!);
+const GameDataType = new graphql.GraphQLObjectType({
+  name: "GameData",
+  fields: {
+    bggid: { type: graphql.GraphQLInt! },
+    bggRanking: { type: graphql.GraphQLInt! },
+    yearPublished: { type: graphql.GraphQLInt! },
+    minPlayers: { type: graphql.GraphQLInt! },
+    maxPlayers: { type: graphql.GraphQLInt! },
+    playTime: { type: graphql.GraphQLInt! },
+    name: { type: graphql.GraphQLString! },
+    subdomain: { type: graphql.GraphQLString! },
+    bggRating: { type: graphql.GraphQLFloat! },
+    weight: { type: graphql.GraphQLFloat! },
+    isExpansion: { type: graphql.GraphQLBoolean! }
+  }
+});
+const GeekGameType = new GraphQLObjectType({
+    name: "GeekGame",
+    fields: {
+      bggid: { type: graphql.GraphQLInt! },
+      rating: { type: graphql.GraphQLFloat! },
+      owned: { type: graphql.GraphQLBoolean! },
+      wantToBuy: { type: graphql.GraphQLBoolean! },
+      wantToPlay: { type: graphql.GraphQLBoolean! },
+      preordered: { type: graphql.GraphQLBoolean! },
+      prevOwned: { type: graphql.GraphQLBoolean! },
+      lastPlay: { type: graphql.GraphQLInt! },
+      firstPlay: { type: graphql.GraphQLInt! },
+      daysSincePlayed: { type: graphql.GraphQLInt! },
+      shouldPlayScore: { type: graphql.GraphQLFloat! }
+    }
+  }
+);
+const PlaysWithDateType = new graphql.GraphQLObjectType({
+  name: "PlaysWithDate",
+  fields: {
+    geek: { type: graphql.GraphQLString! },
+    year: { type: graphql.GraphQLInt! },
+    month: { type: graphql.GraphQLInt! },
+    day: { type: graphql.GraphQLInt! },
+    ymd: { type: graphql.GraphQLInt! },
+    game: { type: graphql.GraphQLInt! },
+    expansions: { type: ListOfInt },
+    quantity: { type: graphql.GraphQLInt! }
+  }
+});
+const VarBindingInputType = new GraphQLInputObjectType({
+  name: "VarBinding",
+  fields: {
+    name: { type: graphql.GraphQLString! },
+    value: { type: graphql.GraphQLString! }
+  }
+});
+const MultiGeekPlaysType = new GraphQLObjectType({
+  name: "MultiGeekPlays",
+  fields: {
+    geeks: { type: ListOfString },
+    plays: { type: new graphql.GraphQLList(PlaysWithDateType!) },
+    games: { type: new graphql.GraphQLList(GameDataType!) }
+  }
+});
+export interface SelectorMetadata {
+  game: number;
+  colour?: string;
+  owner?: string;
+  player?: string;
+  rater?: string;
+}
+const SelectorMetadataType = new GraphQLObjectType( {
+  name: "SelectorMetadata",
+  fields: {
+    game: { type: graphql.GraphQLInt! },
+    colour: { type: graphql.GraphQLString },
+    owner: { type: graphql.GraphQLString },
+    player: { type: graphql.GraphQLString },
+    rater: { type: graphql.GraphQLString }
+  }
+});
+const GeekGamesType = new GraphQLObjectType({
+  name: "GeekGames",
+  fields: {
+    games: { type: new graphql.GraphQLList(GameDataType!) },
+    geekGames: { type: new graphql.GraphQLList(GeekGameType!) },
+    metadata: { type: new graphql.GraphQLList(SelectorMetadataType!) }
+  }
+});
 
 const schema = new graphql.GraphQLSchema({
   query: new graphql.GraphQLObjectType({
@@ -20,48 +108,21 @@ const schema = new graphql.GraphQLSchema({
           startYMD: { name: "startYMD", type: graphql.GraphQLInt },
           endYMD: { name: "endYMD", type: graphql.GraphQLInt }
         },
-        type: new GraphQLObjectType({
-          name: "MultiGeekPlays",
-          fields: {
-            geeks: { type: ListOfString },
-            plays: {
-              type: new graphql.GraphQLList(new graphql.GraphQLObjectType({
-                name: "PlaysWithDate",
-                fields: {
-                  geek: { type: graphql.GraphQLString! },
-                  year: { type: graphql.GraphQLInt! },
-                  month: { type: graphql.GraphQLInt! },
-                  day: { type: graphql.GraphQLInt! },
-                  ymd: { type: graphql.GraphQLInt! },
-                  game: { type: graphql.GraphQLInt! },
-                  expansions: { type: ListOfInt },
-                  quantity: { type: graphql.GraphQLInt! }
-                }
-              }))!
-            },
-            games: {
-              type: new graphql.GraphQLList(new graphql.GraphQLObjectType({
-                name: "GameData",
-                fields: {
-                  bggid: { type: graphql.GraphQLInt! },
-                  bggRanking: { type: graphql.GraphQLInt! },
-                  yearPublished: { type: graphql.GraphQLInt! },
-                  minPlayers: { type: graphql.GraphQLInt! },
-                  maxPlayers: { type: graphql.GraphQLInt! },
-                  playTime: { type: graphql.GraphQLInt! },
-                  name: { type: graphql.GraphQLString! },
-                  subdomain: { type: graphql.GraphQLString! },
-                  bggRating: { type: graphql.GraphQLFloat! },
-                  weight: { type: graphql.GraphQLFloat! },
-                  isExpansion: { type: graphql.GraphQLBoolean! }
-                }
-              }))!
-            }
-          }
-        }),
+        type: MultiGeekPlaysType,
         resolve: async (parent, args) =>
           await asyncReturnWithConnection(async conn =>
             await playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
+          )
+      },
+      geekgames: {
+        args: {
+          selector: { name: "selector", type: graphql.GraphQLString },
+          vars: { name: "vars", type: new graphql.GraphQLList(VarBindingInputType!) }
+        },
+        type: GeekGamesType,
+        resolve: async (parent, args) =>
+          await asyncReturnWithConnection(async conn =>
+            await geekGamesQueryForRetrieve(conn, args.selector, args.vars)
           )
       }
     }
@@ -78,6 +139,52 @@ type RetrievePlay = {
   geek: string;
   expansions: number[];
 };
+interface VarBinding {
+  name: string;
+  value: string;
+}
+
+async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBinding[]) {
+  const expr: Expression = parse(selector);
+  const vars: Record<string, string> = {};
+  for (const vb of varBindings) vars[vb.name] = vb.value;
+  const evalResult: GeekGameQueryResult = await evaluateSimple(conn, expr, vars);
+  await addLastPlayOfGamesForGeek(conn, evalResult.geekGames);
+  const gids = evalResult.geekGames.map(gg => gg.bggid);
+  const games = await doRetrieveGames(conn, gids);
+  return { ...evalResult, games };
+}
+
+async function addLastPlayOfGamesForGeek(conn: mysql.Connection, geekGames: GeekGame[]) {
+  if (geekGames.length === 0) return;
+  const geekid = geekGames[0]['geekid'];
+  const bggids = geekGames.map(gg => gg.bggid);
+  const index: Record<string, GeekGame> = {};
+  geekGames.forEach(gg => index[gg.bggid] = gg);
+  const sql = "select max(year * 10000 + month * 100 + date) lastPlayed, min(year * 10000 + month * 100 + date) firstPlayed, game from plays_normalised where geek = ? and game in (?) group by game";
+  const rows: object[] = await conn.query(sql, [geekid, bggids]);
+  rows.forEach(row => {
+    index[row['game']]['lastPlay'] = row['lastPlayed'];
+    index[row['game']]['firstPlay'] = row['firstPlayed'];
+  });
+  const now = new Date();
+  geekGames.forEach(gg => {
+    gg['shouldPlayScore'] = 0;
+    if (gg['lastPlay']) {
+      const lp = ymdToDate(gg['lastPlay']);
+      const daysSince = Math.round((now.valueOf() - lp.valueOf()) / 86400000);
+      if (gg.rating > 0) gg['shouldPlayScore'] = Math.pow(gg.rating, 4) * daysSince;
+      gg['daysSincePlayed'] = daysSince;
+    }
+  });
+}
+
+function ymdToDate(ymd: number): Date {
+  const y = Math.floor(ymd / 10000);
+  const d = ymd % 100;
+  const m = Math.floor(ymd / 100) % 100;
+  return new Date(y, m - 1, d);
+}
 
 async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], first: boolean, startInc: number, endExc: number) {
   const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
@@ -139,7 +246,6 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
 
 export async function retrieve(event: APIGatewayProxyEvent, context: Context, callback: Callback) {
   context.callbackWaitsForEmptyEventLoop = false;
-  console.log(event);
   try {
     const headers = {
       "Access-Control-Allow-Origin": "*"

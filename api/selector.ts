@@ -8,17 +8,17 @@ export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, 
     return await evaluate(conn, expr, query);
 }
 
-async function evaluateExpression(conn: mysql.Connection, expr: Expression, query: GeekGameQuery, metadata: SelectorMetadataSet):
+async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars: Record<string, string>, metadata: SelectorMetadataSet):
     Promise<number[]> {
     switch (expr.func) {
         case "all": {
             const args = [] as number[][];
-            for (let arg of expr.args) {
-                const v = await evaluateExpression(conn, arg as Expression, query, metadata);
+            for (const arg of expr.args) {
+                const v = await evaluateExpression(conn, arg as Expression, vars, metadata);
                 args.push(v);
             }
             let result = undefined;
-            for (let arg of args) {
+            for (const arg of args) {
                 if (typeof result === 'undefined') {
                     result = arg;
                 } else {
@@ -29,12 +29,12 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
         }
         case "minus": {
             const args = [] as number[][];
-            for (let arg of expr.args) {
-                const v = await evaluateExpression(conn, arg as Expression, query, metadata);
+            for (const arg of expr.args) {
+                const v = await evaluateExpression(conn, arg as Expression, vars, metadata);
                 args.push(v);
             }
             let result = undefined;
-            for (let arg of args) {
+            for (const arg of args) {
                 if (typeof result === 'undefined') {
                     result = arg;
                 } else {
@@ -45,16 +45,16 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
         }
         case "any": {
             const args = [] as number[][];
-            for (let arg of expr.args) {
-                const v = await evaluateExpression(conn, arg as Expression, query, metadata);
+            for (const arg of expr.args) {
+                const v = await evaluateExpression(conn, arg as Expression, vars, metadata);
                 args.push(v);
             }
             let result = undefined;
-            for (let arg of args) {
+            for (const arg of args) {
                 if (typeof result === 'undefined') {
                     result = arg;
                 } else {
-                    for (let id of arg) {
+                    for (const id of arg) {
                         if (result.indexOf(id) < 0) result.push(id);
                     }
                 }
@@ -62,7 +62,7 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
             return result;
         }
         case "rated": {
-            let geek = evaluateSimpleArg(expr.args[0] as Arg, query);
+            let geek = evaluateSimpleArg(expr.args[0] as Arg, vars);
             if (typeof geek === 'string') {
                 geek = await getGeekId(conn, geek as string);
             }
@@ -72,7 +72,7 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
             return ids;
         }
         case "played": {
-            let geek = evaluateSimpleArg(expr.args[0] as Arg, query);
+            let geek = evaluateSimpleArg(expr.args[0] as Arg, vars);
             let strgeek;
             if (typeof geek === 'string') {
                 strgeek = geek;
@@ -84,7 +84,7 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
             return ids;
         }
         case "owned": {
-            let geek = evaluateSimpleArg(expr.args[0] as Arg, query);
+            let geek = evaluateSimpleArg(expr.args[0] as Arg, vars);
             let strgeek;
             if (typeof geek === 'string') {
                 strgeek = geek;
@@ -99,35 +99,35 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, quer
             return (await conn.query("select distinct expansion from expansions")).map(row => row["expansion"]);
         }
         case "designer": {
-            let designer = evaluateSimpleArg(expr.args[0] as Arg, query);
+            const designer = evaluateSimpleArg(expr.args[0] as Arg, vars);
             return await selectDesigner(conn, designer as number);
         }
         case "publisher": {
-            let publisher = evaluateSimpleArg(expr.args[0] as Arg, query);
+            const publisher = evaluateSimpleArg(expr.args[0] as Arg, vars);
             return await selectPublisher(conn, publisher as number);
         }
         case "books" : {
             return await selectCategory(conn, "Book");
         }
         case "category" : {
-            let cat = evaluateSimpleArg(expr.args[0] as Arg, query);
+            const cat = evaluateSimpleArg(expr.args[0] as Arg, vars);
             return await selectCategory(conn, cat as string);
         }
         case "mechanic" : {
-            let mec = evaluateSimpleArg(expr.args[0] as Arg, query);
+            const mec = evaluateSimpleArg(expr.args[0] as Arg, vars);
             return await selectMechanic(conn, mec as string);
         }
         case "colour": {
-            let colour = evaluateSimpleArg(expr.args[0] as Arg, query) as string;
+            const colour = evaluateSimpleArg(expr.args[0] as Arg, vars) as string;
             // TODO - try to interpret non-string things as colours
-            const ids = await evaluateExpression(conn, expr.args[1] as Expression, query, metadata);
+            const ids = await evaluateExpression(conn, expr.args[1] as Expression, vars, metadata);
             ids.forEach(id => metadata.add(id, "colour", colour));
             return ids;
         }
         case "elseColour": {
-            let colour = evaluateSimpleArg(expr.args[0] as Arg, query) as string;
+            const colour = evaluateSimpleArg(expr.args[0] as Arg, vars) as string;
             // TODO - try to interpret non-string things as colours
-            const ids = await evaluateExpression(conn, expr.args[1] as Expression, query, metadata);
+            const ids = await evaluateExpression(conn, expr.args[1] as Expression, vars, metadata);
             ids.forEach(id => metadata.addIfNotPresent(id, "colour", colour));
             return ids;
         }
@@ -157,21 +157,16 @@ async function selectMechanic(conn: mysql.Connection, cat: string): Promise<numb
     return (await conn.query(sql, [cat])).map(row => row["id"]);
 }
 
-function evaluateSimpleArg(arg: Arg, query: GeekGameQuery): string | number {
+function evaluateSimpleArg(arg: Arg, vars: Record<string, string>): string | number {
     switch (arg.kind) {
         case Argument.Integer: return (arg as Integer).value;
         case Argument.StringValue: {
-            let s = (arg as StringValue).value;
+            const s = (arg as StringValue).value;
             return s.slice(1, -1);
         }
         case Argument.Keyword: {
             const kw = arg as Keyword;
-            if (kw.keyword === 'ME') {
-                return query.geek;
-            }
-            if (query.vars && query.vars[kw.keyword]) {
-                return query.vars[kw.keyword];
-            }
+            if (vars[kw.keyword]) return vars[kw.keyword];
             throw new Error("No value for keyword " + kw.keyword);
         }
         default: {
@@ -181,10 +176,17 @@ function evaluateSimpleArg(arg: Arg, query: GeekGameQuery): string | number {
 }
 
 async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGameQuery): Promise<GeekGameQueryResult> {
+    const vars: Record<string, string> = {};
+    Object.assign(vars, query.vars);
+    vars['ME'] = query.geek;
+    return evaluateSimple(conn, expr, vars);
+}
+
+export async function evaluateSimple(conn: mysql.Connection, expr: Expression, vars: Record<string, string>): Promise<GeekGameQueryResult> {
     const metadata = new SelectorMetadataSet();
-    const ids = await evaluateExpression(conn, expr, query, metadata);
+    const ids = await evaluateExpression(conn, expr, vars, metadata);
     metadata.restrictTo(ids);
-    return { geekGames: await retrieveGeekGames(conn, ids, query.geek), metadata } as GeekGameQueryResult;
+    return { geekGames: await retrieveGeekGames(conn, ids, vars['ME']), metadata } as GeekGameQueryResult;
 }
 
 async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGame[]> {
@@ -201,6 +203,7 @@ async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: st
 
 function extractGeekGame(row: object): GeekGame {
     return {
+        geekid: row["geekid"],
         bggid: row["game"],
         rating: row["rating"],
         owned: row['owned'] > 0,
