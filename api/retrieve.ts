@@ -39,7 +39,13 @@ const GeekGameType = new GraphQLObjectType({
       lastPlay: { type: graphql.GraphQLInt! },
       firstPlay: { type: graphql.GraphQLInt! },
       daysSincePlayed: { type: graphql.GraphQLInt! },
-      shouldPlayScore: { type: graphql.GraphQLFloat! }
+      shouldPlayScore: { type: graphql.GraphQLFloat! },
+      plays: { type: graphql.GraphQLInt! },
+      lyPlays: { type: graphql.GraphQLInt! },
+      years: { type: graphql.GraphQLInt! },
+      months: { type: graphql.GraphQLInt! },
+      lyMonths: { type: graphql.GraphQLInt! },
+      expansion: { type: graphql.GraphQLBoolean! }
     }
   }
 );
@@ -160,16 +166,37 @@ async function addLastPlayOfGamesForGeek(conn: mysql.Connection, geekGames: Geek
   const geekid = geekGames[0]['geekid'];
   const bggids = geekGames.map(gg => gg.bggid);
   const index: Record<string, GeekGame> = {};
-  geekGames.forEach(gg => index[gg.bggid] = gg);
-  const sql = "select max(year * 10000 + month * 100 + date) lastPlayed, min(year * 10000 + month * 100 + date) firstPlayed, game from plays_normalised where geek = ? and game in (?) group by game";
+  geekGames.forEach(gg => {
+    index[gg.bggid] = gg;
+    gg['shouldPlayScore'] = 0;
+    gg['plays'] = 0;
+    gg['years'] = 0;
+    gg['months'] = 0;
+    gg['expansion'] = false;
+    gg['lyPlays'] = 0;
+    gg['lyMonths'] = 0;
+  });
+  const sql = "select game, sum(quantity) q, max(expansion_play) x, max(year * 10000 + month * 100 + date) lastPlayed, min(year * 10000 + month * 100 + date) firstPlayed, count(distinct year) years, count(distinct year*100+month) months from plays_normalised where geek = ? and game in (?) group by game";
   const rows: object[] = await conn.query(sql, [geekid, bggids]);
   rows.forEach(row => {
     index[row['game']]['lastPlay'] = row['lastPlayed'];
     index[row['game']]['firstPlay'] = row['firstPlayed'];
+    index[row['game']]['plays'] = row['q'];
+    index[row['game']]['years'] = row['years'];
+    index[row['game']]['months'] = row['months'];
+    index[row['game']]['expansion'] = row['x'];
   });
+
   const now = new Date();
+  const today = now.getFullYear() * 10000 + now.getMonth() * 100 + now.getDate();
+  const playsSql = "select game, sum(quantity) q, count(month) months from plays_normalised where geek = ? and ? - (year * 10000 + month * 100 + date) < 10000  and game in (?) group by game";
+  const lyRows: object[] = await conn.query(playsSql, [geekid, today, bggids]);
+  lyRows.forEach(lyRow => {
+    index[lyRow['game']]['lyPlays'] = lyRow['q'];
+    index[lyRow['game']]['lyMonths'] = lyRow['months'];
+  });
+
   geekGames.forEach(gg => {
-    gg['shouldPlayScore'] = 0;
     if (gg['lastPlay']) {
       const lp = ymdToDate(gg['lastPlay']);
       const daysSince = Math.round((now.valueOf() - lp.valueOf()) / 86400000);

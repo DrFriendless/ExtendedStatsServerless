@@ -78,7 +78,6 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
     }
 }
 
-type Ymd = { ymd: number };
 type ShellBeRight = { [geek: string]: PlaysWithDate[] };
 
 export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): Promise<MultiGeekPlays> {
@@ -294,7 +293,7 @@ async function doIncFAQCount(conn: mysql.Connection, view: number, today: number
     let todayRow;
     if (todayRows.length === 0) {
         try {
-            conn.query(insertSql, [today, view]);
+            await conn.query(insertSql, [today, view]);
         } catch (e) {
             console.log(e);
             // assume simultaneous insert, it's not really that important
