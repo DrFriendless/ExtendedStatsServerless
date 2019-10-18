@@ -54,19 +54,26 @@ async function withAuthentication(event, callback: (Error?, Decoded?) => Promise
     }
 }
 
+function makeCookie(id: string) {
+    return "extstatsid=" + id + "; Domain=drfriendless.com; Secure; Path=/; Max-Age=36000; SameSite=Strict; HttpOnly";
+}
+
 export async function login(event, context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const cookies = getCookiesFromHeader(event.headers);
     const headers = {
         "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
-        "Access-Control-Allow-Credentials": true
+        "Access-Control-Allow-Credentials": true,
     };
     const body = {};
     if (cookies['extstatsid']) {
+        const cookie = makeCookie(cookies['extstatsid']);
         const userData = await getUserDataForID(cookies['extstatsid']);
         if (userData) {
             Object.assign(body, userData);
         }
+        headers["Set-Cookie"] = cookie;
+        headers["Access-Control-Expose-Headers"] = "Set-Cookie";
     }
     const result = { "statusCode": 200, headers, body: JSON.stringify(body) };
     callback(undefined, result);
@@ -90,7 +97,7 @@ export async function authenticate(event, context, callback: Callback) {
                 const body = JSON.stringify(await getUserData(decoded));
                 // Chrome ignores the cookie if there's an Expires
                 // can't be HttpOnly as the browser needs to delete the cookie on a logout.
-                const cookie = "extstatsid=" + decoded.sub + "; Domain=drfriendless.com; Secure; Path=/; Max-Age=36000";
+                const cookie = makeCookie(decoded.sub);
                 const headers = {
                     "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
                     "Access-Control-Expose-Headers": "Set-Cookie",
