@@ -1,0 +1,4 @@
+GET http://localhost:3000/login
+Cookie: extstatsid=bob
+
+###

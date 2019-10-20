@@ -14,6 +14,5 @@ export const findgeeks = async (req: Request, res: Response) => {
         if (ms.length == 0) ms = await conn.query(sql, "%" + name + "%");
         return ms.map((row: { [key: string]: any }) => row["username"]);
     });
-    res.setHeader("Content-Type", "application/json");
-    res.send(JSON.stringify(matches));
+    res.send(matches);
 };

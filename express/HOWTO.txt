@@ -4,7 +4,7 @@ Create an EC2 instance from the extstats-express AMI. Put it in a public subnet 
 
 Edit the security group to add SSH access for yourself, and HTTP access from anywhere.
 
-Start the instance. In Route 53, oint eb.drfriendless.com to the instance's address. SSH into the instance to add it to
+Start the instance. In Route 53, point eb.drfriendless.com to the instance's address. SSH into the instance to add it to
 your known_hosts file. Run deploy.sh to install the extstats-express software on the server.
 
 SSH into the server and run
