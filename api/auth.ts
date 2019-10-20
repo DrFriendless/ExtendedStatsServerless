@@ -55,7 +55,7 @@ async function withAuthentication(event, callback: (Error?, Decoded?) => Promise
 }
 
 function makeCookie(id: string) {
-    return "extstatsid=" + id + "; Domain=drfriendless.com; Secure; Path=/; Max-Age=36000; SameSite=Strict; HttpOnly";
+    return "extstatsid=" + id + "; Domain=drfriendless.com; Secure; Path=/; Max-Age=36000; SameSite=Lax; HttpOnly";
 }
 
 export async function login(event, context, callback: Callback) {
