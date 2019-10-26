@@ -1,7 +1,7 @@
 import mysql = require('promise-mysql');
 import { Arg, Argument, Expression, Integer, Keyword, parse, StringValue } from "./parser";
 import { getGeekId } from "./library";
-import { GeekGameQuery, GeekGameQueryResult, SelectorMetadataSet, GeekGame } from "extstats-core";
+import { GeekGameQuery, GeekGameQueryResult, SelectorMetadataSet } from "extstats-core";
 
 export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameQueryResult> {
     const expr = parse(q);
@@ -175,21 +175,27 @@ function evaluateSimpleArg(arg: Arg, vars: Record<string, string>): string | num
     }
 }
 
-async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGameQuery): Promise<GeekGameQueryResult> {
+async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGameQuery): Promise<GeekGameSelectResult> {
     const vars: Record<string, string> = {};
     Object.assign(vars, query.vars);
     vars['ME'] = query.geek;
     return evaluateSimple(conn, expr, vars);
 }
 
-export async function evaluateSimple(conn: mysql.Connection, expr: Expression, vars: Record<string, string>): Promise<GeekGameQueryResult> {
+/**
+ * Evaluate the expression to find out what games it represents, then retrieve them.
+ * @param conn
+ * @param expr
+ * @param vars
+ */
+export async function evaluateSimple(conn: mysql.Connection, expr: Expression, vars: Record<string, string>): Promise<GeekGameSelectResult> {
     const metadata = new SelectorMetadataSet();
     const ids = await evaluateExpression(conn, expr, vars, metadata);
     metadata.restrictTo(ids);
-    return { geekGames: await retrieveGeekGames(conn, ids, vars['ME']), metadata } as GeekGameQueryResult;
+    return { geekGames: await retrieveGeekGames(conn, ids, vars['ME']), metadata } as GeekGameSelectResult;
 }
 
-async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGame[]> {
+async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGameRow[]> {
     const sqlOne = "select * from geekgames where geekid = ? and game = ?";
     const sqlMany = "select * from geekgames where geekid = ? and game in (?)";
     if (ids.length === 0) return [];
@@ -201,7 +207,26 @@ async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: st
     }
 }
 
-function extractGeekGame(row: object): GeekGame {
+export interface GeekGameSelectResult {
+    metadata: SelectorMetadataSet;
+    geekGames: GeekGameRow[];
+}
+
+export type GeekGameRow = {
+    bggid: number;
+    rating: number;
+    owned: boolean;
+    wantToBuy: boolean;
+    wantToPlay: boolean;
+    preordered: boolean;
+    prevOwned: boolean;
+    geekid: number;
+    wantInTrade: boolean;
+    wish: number;
+    forTrade: boolean;
+}
+
+function extractGeekGame(row: object): GeekGameRow {
     return {
         geekid: row["geekid"],
         bggid: row["game"],
@@ -210,7 +235,10 @@ function extractGeekGame(row: object): GeekGame {
         prevOwned: row['prevowned'] > 0,
         wantToBuy: row['wanttobuy'] > 0,
         wantToPlay: row['wanttoplay'] > 0,
-        preordered: row['preordered'] > 0
-    } as GeekGame;
+        preordered: row['preordered'] > 0,
+        wantInTrade: row['want'] > 0,
+        wish: row['wish'],
+        forTrade: row['trade'] > 0
+    };
 }
 

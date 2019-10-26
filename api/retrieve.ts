@@ -2,11 +2,11 @@ import * as graphql from "graphql";
 import { APIGatewayProxyEvent, Callback, Context } from "aws-lambda";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
-import { GeekGame, GeekGameQueryResult, MultiGeekPlays } from "extstats-core";
+import {GameData, GeekGame, MultiGeekPlays} from "extstats-core";
 import { doRetrieveGames } from "./mysql-rds";
 import { asyncReturnWithConnection, getGeekIds } from "./library";
 import { Expression, parse } from "./parser";
-import { evaluateSimple } from "./selector";
+import {evaluateSimple, GeekGameSelectResult} from "./selector";
 
 const ListOfString = new graphql.GraphQLList(graphql.GraphQLString!);
 const ListOfInt = new graphql.GraphQLList(graphql.GraphQLInt!);
@@ -45,7 +45,10 @@ const GeekGameType = new GraphQLObjectType({
       years: { type: graphql.GraphQLInt! },
       months: { type: graphql.GraphQLInt! },
       lyMonths: { type: graphql.GraphQLInt! },
-      expansion: { type: graphql.GraphQLBoolean! }
+      expansion: { type: graphql.GraphQLBoolean! },
+      forTrade: { type: graphql.GraphQLBoolean! },
+      wantInTrade: { type: graphql.GraphQLBoolean! },
+      wish: { type: graphql.GraphQLInt! }
     }
   }
 );
@@ -149,12 +152,13 @@ interface VarBinding {
   name: string;
   value: string;
 }
+type GeekGameSelectWithGames = GeekGameSelectResult & { games: GameData[] };
 
-async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBinding[]) {
+async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBinding[]): Promise<GeekGameSelectWithGames> {
   const expr: Expression = parse(selector);
   const vars: Record<string, string> = {};
   for (const vb of varBindings) vars[vb.name] = vb.value;
-  const evalResult: GeekGameQueryResult = await evaluateSimple(conn, expr, vars);
+  const evalResult: GeekGameSelectResult = await evaluateSimple(conn, expr, vars);
   await addLastPlayOfGamesForGeek(conn, evalResult.geekGames);
   const gids = evalResult.geekGames.map(gg => gg.bggid);
   const games = await doRetrieveGames(conn, gids);
@@ -229,7 +233,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
   const playsResult = await conn.query(playsSql, args);
   const expPlays: object[] = [];
   const basePlays: RetrievePlay[] = [];
-  const playsById: Record<number, RetrievePlay> = {};
+  const playsById: Record<string, RetrievePlay> = {};
   const firstKeys: string[] = [];
   for (const row of playsResult) {
     if (first) {
