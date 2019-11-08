@@ -1,11 +1,15 @@
-import {Request, Response} from "express";
-import {IncomingHttpHeaders} from "http";
-import {UserConfig, UserData} from "extstats-core";
+import { Request, Response } from "express";
+import { IncomingHttpHeaders } from "http";
+import { UserConfig, UserData } from "extstats-core";
 import mysql = require('promise-mysql');
-import {asyncReturnWithConnection} from "./library";
+import { asyncReturnWithConnection } from "./library";
 
 export async function login(req: Request, res: Response) {
     const cookies = getCookiesFromHeader(req.headers);
+    console.log(req.headers);
+    console.log(req.headers.cookie);
+    console.log(cookies);
+
     const body = {};
     const id = cookies['extstatsid'];
     if (id) {
@@ -17,7 +21,7 @@ export async function login(req: Request, res: Response) {
 }
 
 function makeCookieValue(id: string) {
-    return id + "; Domain=drfriendless.com; Secure; Path=/; Max-Age=36000; SameSite=Strict; HttpOnly";
+    return id + "; Domain=drfriendless.com; Secure; Path=/; Max-Age=36000; SameSite=Lax; HttpOnly";
 }
 
 /**
@@ -26,23 +30,18 @@ function makeCookieValue(id: string) {
  * @return {Object}
  */
 export function getCookiesFromHeader(headers: IncomingHttpHeaders): Record<string, string> {
-    if (headers === null || headers === undefined || headers.Cookie === undefined) {
-        return {};
-    }
+    if (!headers || !headers.cookie) return {};
 
     // Split a cookie string in an array (Originally found http://stackoverflow.com/a/3409200/1427439)
-    const list: Record<string, string> = {};
-    const rc: string = headers.cookie;
+    const result: Record<string, string> = {};
 
-    rc && rc.split(';').forEach(function(cookie) {
+    headers.cookie.split(';').forEach(function(cookie) {
         const parts = cookie.split('=');
-        const key = parts.shift().trim()
+        const key = parts.shift().trim();
         const value = decodeURI(parts.join('='));
-        if (key !== '') {
-            list[key] = value;
-        }
+        if (key !== '') result[key] = value;
     });
-    return list;
+    return result;
 }
 
 async function getUserDataForID(sub: string): Promise<UserData | undefined> {
