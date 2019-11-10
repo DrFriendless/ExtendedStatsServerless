@@ -119,7 +119,7 @@ export function extractUserDataFromPage(geek: string, url: string, pageContent: 
 
 export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string): Promise<ProcessGameResult> {
     const dom = await xml2js(pageContent, {trim: true});
-    if (!dom || !dom.boardgames || dom.boardgames.boardgame.length == 0) {
+    if (!dom || !dom.boardgames || dom.boardgames.boardgame.length === 0) {
         throw new NoSuchGameError(bggid);
     }
     const result = {} as ProcessGameResult;
@@ -162,6 +162,7 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         result.usersTrading = parseInt(ratings[0].trading);
         result.usersWanting = parseInt(ratings[0].wanting);
         result.usersWishing = parseInt(ratings[0].wishing);
+        result.averageWeight = parseFloat(ratings[0].averageweight);
         result.usersOwned = parseInt(ratings[0].owned);
         result.usersRated = parseInt(ratings[0].usersrated);
         result.name = name;
@@ -170,10 +171,9 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         result.mechanics = mechanics ? mechanics.map(c => c._) : [];
         result.designers = designers ? designers.map(c => parseInt(c.$.objectid)) : [];
         result.publishers = publishers ? publishers.map(c => parseInt(c.$.objectid)) : [];
-        result.rank = ranking; // TODO
+        result.rank = ranking;
         result.expansions = expIds;
     }
-    // console.log(result);
     return result;
 }
 
