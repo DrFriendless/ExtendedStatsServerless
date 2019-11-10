@@ -350,8 +350,7 @@ async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats>
 
 function patch(fileRows: TypeCount[], patchKey: string, row: any) {
     const key = row["processMethod"];
-    const count = row["count(url)"];
-    fileRows.filter(row => row.type == key)[0][patchKey] = count;
+    fileRows.filter(row => row.type == key)[0][patchKey] = row["count(url)"];
 }
 
 function gatherTypeCount(row: any): TypeCount {

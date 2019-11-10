@@ -224,7 +224,7 @@ export type GeekGameRow = {
     wantInTrade: boolean;
     wish: number;
     forTrade: boolean;
-}
+};
 
 function extractGeekGame(row: object): GeekGameRow {
     return {

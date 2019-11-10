@@ -2,11 +2,11 @@ import * as graphql from "graphql";
 import { APIGatewayProxyEvent, Callback, Context } from "aws-lambda";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
-import {GameData, GeekGame, MultiGeekPlays} from "extstats-core";
+import { GameData, GeekGame, MultiGeekPlays } from "extstats-core";
 import { doRetrieveGames } from "./mysql-rds";
 import { asyncReturnWithConnection, getGeekIds } from "./library";
 import { Expression, parse } from "./parser";
-import {evaluateSimple, GeekGameSelectResult} from "./selector";
+import { evaluateSimple, GeekGameSelectResult } from "./selector";
 
 const ListOfString = new graphql.GraphQLList(graphql.GraphQLString!);
 const ListOfInt = new graphql.GraphQLList(graphql.GraphQLInt!);
