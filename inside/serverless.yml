@@ -128,6 +128,7 @@ functions:
     handler: functions.processPlaysResult
     tags:
       component: inside
+    timeout: 60
     environment:
       mysqlHost: ${self:custom.database.mysqlHost}
       mysqlUsername: ${self:custom.database.mysqlUsername}
