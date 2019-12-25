@@ -210,8 +210,20 @@ export async function markUrlForUpdate(url: string): Promise<ToProcessElement> {
 }
 
 async function doGetGeekUpdates(conn: mysql.Connection, geek: string): Promise<ToProcessElement[]> {
+    const geekId = await getGeekId(conn, geek);
+    const playsSQL = "select sum(quantity) q, year*100+month ym from plays where geek = ? group by month, year";
     const updatesSQL = "select * from files where geek = ?";
-    return await conn.query(updatesSQL, [geek]) as ToProcessElement[];
+    const result = await conn.query(updatesSQL, [geek]) as ToProcessElement[];
+    const plays = await conn.query(playsSQL, [geekId]) as { q: number, ym: number }[];
+    const recorded: Record<string, number> = {};
+    for (const row of plays) recorded[row.ym] = row.q;
+    for (const tpe of result) {
+        if (tpe.processMethod === 'processPlays') {
+            const ym = tpe.year * 100 + tpe.month;
+            tpe['recorded'] = recorded[ym];
+        }
+    }
+    return result;
 }
 
 async function doMarkUrlForUpdate(conn: mysql.Connection, url: string): Promise<ToProcessElement> {
