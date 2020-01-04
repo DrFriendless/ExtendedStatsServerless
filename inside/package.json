@@ -24,7 +24,7 @@
     "gulp": "^3.9.1",
     "mocha": "^5.2.0",
     "mocha-typescript": "^1.1.17",
-    "npm": "^6.10.0",
+    "npm": "^6.13.4",
     "serverless": "^1.46.1",
     "serverless-domain-manager": "^2.6.13",
     "serverless-plugin-typescript": "^1.1.9",
