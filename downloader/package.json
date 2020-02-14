@@ -7,7 +7,7 @@
     "@types/aws-lambda": "0.0.17",
     "@types/lodash": "^4.14.110",
     "@types/node": "^8.0.34",
-    "aws-lambda": "^0.1.2",
+    "aws-lambda": "^1.0.5",
     "aws-lambda-typescript": "0.0.10",
     "aws-sdk": "^2.259.1",
     "extstats-core": "^0.10.1",
