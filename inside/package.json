@@ -4,10 +4,9 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@types/aws-lambda": "^8.10.27",
-    "aws-lambda": "^0.1.2",
-    "aws-sdk": "^2.488.0",
-    "extstats-core": "^1.7.1",
+    "aws-lambda": "^1.0.5",
+    "aws-sdk": "^2.619.0",
+    "extstats-core": "^1.8.0",
     "graphql": "^0.12.3",
     "graphql-tag": "^2.10.1",
     "hoek": "^4.2.1",
@@ -16,25 +15,15 @@
     "promise-mysql": "^3.3.2"
   },
   "devDependencies": {
-    "@types/chai": "^4.2.3",
-    "@types/mocha": "^5.2.7",
+    "@types/aws-lambda": "^8.10.27",
     "@types/node": "^8.10.55",
     "aws-lambda-typescript": "^3.0.0",
-    "chai": "^4.2.0",
-    "gulp": "^3.9.1",
-    "mocha": "^5.2.0",
-    "mocha-typescript": "^1.1.17",
-    "npm": "^6.13.4",
+    "gulp": "^4.0.2",
+    "npm": "^6.13.7",
     "serverless": "^1.46.1",
     "serverless-domain-manager": "^2.6.13",
     "serverless-plugin-typescript": "^1.1.9",
     "source-map-support": "^0.5.13",
     "typescript": "^3.6.4"
-  },
-  "scripts": {
-    "pretest": "tsc",
-    "test": "mocha",
-    "watch": "mocha-typescript-watch",
-    "prepare": "tsc"
   }
 }
