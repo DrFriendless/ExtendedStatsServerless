@@ -1,24 +1,28 @@
 {
   "name": "ExtendedStatsServerlessDownloader",
   "description": "The part of the downloader that lives outside the VPC.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@types/aws-lambda": "0.0.17",
-    "@types/lodash": "^4.14.110",
-    "@types/node": "^8.0.34",
-    "aws-lambda": "^0.1.2",
-    "aws-lambda-typescript": "0.0.10",
-    "aws-sdk": "^2.259.1",
-    "extstats-core": "^0.10.1",
+    "aws-lambda": "^1.0.5",
+    "aws-sdk": "^2.619.0",
+    "extstats-core": "^1.8.0",
     "hoek": "^4.2.1",
-    "lodash": "^4.17.10",
-    "npm": "^6.4.1",
+    "lodash": "^4.17.15",
+    "npm": "^6.13.7",
     "request": "^2.87.0",
     "request-promise-native": "^1.0.5",
-    "serverless": "^1.28.0",
-    "serverless-plugin-typescript": "^1.1.5",
     "xml2js": "^0.4.19",
     "xml2js-es6-promise": "^1.1.1"
+  },
+  "devDependencies": {
+    "aws-lambda-typescript": "^3.0.0",
+    "@types/aws-lambda": "^8.10.41",
+    "@types/lodash": "^4.14.149",
+    "@types/node": "^13.7.1",
+    "serverless": "^1.46.1",
+    "serverless-domain-manager": "^2.6.13",
+    "serverless-plugin-typescript": "^1.1.7",
+    "typescript": "^3.5.3"
   }
 }
