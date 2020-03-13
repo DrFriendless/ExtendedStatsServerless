@@ -112,10 +112,10 @@ const schema = new graphql.GraphQLSchema({
     fields: {
       plays: {
         args: {
-          geeks: { name: "geeks", type: ListOfString },
-          first: { name: "first", type: graphql.GraphQLBoolean },
-          startYMD: { name: "startYMD", type: graphql.GraphQLInt },
-          endYMD: { name: "endYMD", type: graphql.GraphQLInt }
+          geeks: { type: ListOfString },
+          first: { type: graphql.GraphQLBoolean },
+          startYMD: { type: graphql.GraphQLInt },
+          endYMD: { type: graphql.GraphQLInt }
         },
         type: MultiGeekPlaysType,
         resolve: async (parent, args) =>
@@ -125,8 +125,8 @@ const schema = new graphql.GraphQLSchema({
       },
       geekgames: {
         args: {
-          selector: { name: "selector", type: graphql.GraphQLString },
-          vars: { name: "vars", type: new graphql.GraphQLList(VarBindingInputType!) }
+          selector: { type: graphql.GraphQLString },
+          vars: { type: new graphql.GraphQLList(VarBindingInputType!) }
         },
         type: GeekGamesType,
         resolve: async (parent, args) =>
