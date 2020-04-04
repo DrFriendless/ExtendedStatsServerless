@@ -6,7 +6,7 @@ import { GameData, GeekGame, MultiGeekPlays } from "extstats-core";
 import { doRetrieveGames } from "./mysql-rds";
 import {asyncReturnWithConnection, getGeekId, getGeekIds} from "./library";
 import { Expression, parse } from "./parser";
-import { evaluateSimple, GeekGameSelectResult } from "./selector";
+import {evaluateSimple, GeekGameRow, GeekGameSelectResult, retrieveGeekGames} from "./selector";
 
 const ListOfString = new graphql.GraphQLList(graphql.GraphQLString!);
 const ListOfInt = new graphql.GraphQLList(graphql.GraphQLInt!);
@@ -29,6 +29,7 @@ const GameDataType = new graphql.GraphQLObjectType({
 const GeekGameType = new GraphQLObjectType({
         name: "GeekGame",
         fields: {
+            geek: { type: graphql.GraphQLString },
             bggid: { type: graphql.GraphQLInt! },
             rating: { type: graphql.GraphQLFloat! },
             owned: { type: graphql.GraphQLBoolean! },
@@ -77,7 +78,8 @@ const MultiGeekPlaysType = new GraphQLObjectType({
     fields: {
         geeks: { type: ListOfString },
         plays: { type: new graphql.GraphQLList(PlaysWithDateType!) },
-        games: { type: new graphql.GraphQLList(GameDataType!) }
+        games: { type: new graphql.GraphQLList(GameDataType!) },
+        geekgames: { type: new graphql.GraphQLList(GeekGameType!) }
     }
 });
 export interface SelectorMetadata {
@@ -289,7 +291,12 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
         }
     }
     const games = await doRetrieveGames(conn, gameIds);
-    return { geeks: Object.values(geekNameIds), plays: basePlays, games };
+    const geekgames: GeekGameRow[] = [];
+    for (const geek of Object.values<string>(geekNameIds)) {
+        const ggs: GeekGameRow[] = await retrieveGeekGames(conn, gameIds, geek);
+        geekgames.push(...ggs);
+    }
+    return { geeks: Object.values<string>(geekNameIds), plays: basePlays, games, geekgames };
 }
 
 export async function retrieve(event: APIGatewayProxyEvent, context: Context, callback: Callback) {

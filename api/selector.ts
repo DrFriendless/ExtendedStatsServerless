@@ -195,15 +195,15 @@ export async function evaluateSimple(conn: mysql.Connection, expr: Expression, v
     return { geekGames: await retrieveGeekGames(conn, ids, vars['ME']), metadata } as GeekGameSelectResult;
 }
 
-async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGameRow[]> {
+export async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGameRow[]> {
     const sqlOne = "select * from geekgames where geekid = ? and game = ?";
     const sqlMany = "select * from geekgames where geekid = ? and game in (?)";
     if (ids.length === 0) return [];
     const geekId = await getGeekId(conn, geek);
     if (ids.length === 1) {
-        return (await conn.query(sqlOne, [geekId, ids[0]])).map(extractGeekGame);
+        return (await conn.query(sqlOne, [geekId, ids[0]])).map(gg => extractGeekGame(geek, gg));
     } else {
-        return (await conn.query(sqlMany, [geekId, ids])).map(extractGeekGame);
+        return (await conn.query(sqlMany, [geekId, ids])).map(gg => extractGeekGame(geek, gg));
     }
 }
 
@@ -213,6 +213,7 @@ export interface GeekGameSelectResult {
 }
 
 export type GeekGameRow = {
+    geek: string;
     bggid: number;
     rating: number;
     owned: boolean;
@@ -226,8 +227,9 @@ export type GeekGameRow = {
     forTrade: boolean;
 };
 
-function extractGeekGame(row: object): GeekGameRow {
+function extractGeekGame(geek: string, row: object): GeekGameRow {
     return {
+        geek,
         geekid: row["geekid"],
         bggid: row["game"],
         rating: row["rating"],
