@@ -10,6 +10,15 @@ import {evaluateSimple, GeekGameRow, GeekGameSelectResult, retrieveGeekGames} fr
 
 const ListOfString = new graphql.GraphQLList(graphql.GraphQLString!);
 const ListOfInt = new graphql.GraphQLList(graphql.GraphQLInt!);
+const DesignerType = new graphql.GraphQLObjectType({
+    name: "Designer",
+    fields: {
+        bggid: { type: graphql.GraphQLInt! },
+        name: { type: graphql.GraphQLString! },
+        url: { type: graphql.GraphQLString! },
+        boring: { type: graphql.GraphQLBoolean! }
+    }
+});
 const GameDataType = new graphql.GraphQLObjectType({
     name: "GameData",
     fields: {
@@ -23,7 +32,14 @@ const GameDataType = new graphql.GraphQLObjectType({
         subdomain: { type: graphql.GraphQLString! },
         bggRating: { type: graphql.GraphQLFloat! },
         weight: { type: graphql.GraphQLFloat! },
-        isExpansion: { type: graphql.GraphQLBoolean! }
+        isExpansion: { type: graphql.GraphQLBoolean! },
+        designers: {
+            type: new graphql.GraphQLList(DesignerType!),
+            resolve:
+                async (parent, args) => await asyncReturnWithConnection(async conn =>
+                    await resolveDesignersForGame(conn, parent)
+                )
+        }
     }
 });
 const GeekGameType = new GraphQLObjectType({
@@ -165,6 +181,22 @@ interface VarBinding {
     value: string;
 }
 type GeekGameSelectWithGames = GeekGameSelectResult & { games: GameData[] };
+interface DesignerData {
+    bggid: number;
+    name: string;
+    url: string;
+    boring: boolean;
+}
+
+async function resolveDesignersForGame(conn: mysql.Connection, game: GameData): Promise<DesignerData[]> {
+    const sql = "select * from designers where bggid in (select designer from game_designers where game = ?)";
+    const rows = await conn.query(sql, [game.bggid]);
+    return rows.map(extractDesignerData);
+}
+
+function extractDesignerData(dbRow: any): DesignerData {
+    return { bggid: dbRow['bggid'] as number, name: dbRow['name'], url: dbRow['url'], boring: dbRow['boring'] };
+}
 
 async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBinding[]): Promise<GeekGameSelectWithGames> {
     const expr: Expression = parse(selector);
