@@ -172,7 +172,7 @@ type RetrievePlay = {
     ymd: number;
     year: number;
     month: number;
-    date: number;
+    day: number;
     geek: string;
     expansions: number[];
 };
@@ -301,8 +301,8 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
                 console.log("No user found for " + row.geek);
                 continue;
             }
-            const pwd: RetrievePlay = { game: row.game, quantity: row.quantity, ymd: row.ymd, year: row.year, month: row.month, date: row.date,
-                geek: username, expansions: [] };
+            const pwd: RetrievePlay = { game: row.game, quantity: row.quantity, ymd: row.ymd, year: row.year, month: row.month,
+                day: row.date, geek: username, expansions: [] };
             basePlays.push(pwd);
             playsById[row.id] = pwd;
         }
