@@ -59,13 +59,13 @@ function toWorkingPlay(expansionData: ExpansionData, play: NormalisedPlays): Wor
 // #         result.append(play)
 // #     return result, messages, False
 
-function sumQuantities(plays: WorkingNormalisedPlays[]): WorkingNormalisedPlays {
+export function sumQuantities(plays: WorkingNormalisedPlays[]): WorkingNormalisedPlays {
     if (plays.length === 1) return plays[0];
     plays[0].quantity = plays.map(p => p.quantity).reduce((a, b) => a + b);
     return plays[0];
 }
 
-function coalescePlays(initial: WorkingNormalisedPlays[]): WorkingNormalisedPlays[] {
+export function coalescePlays(initial: WorkingNormalisedPlays[]): WorkingNormalisedPlays[] {
     const byGame = _.groupBy(initial, wnp => wnp.game);
     return Object.values(byGame).map(sumQuantities);
 }
@@ -86,7 +86,7 @@ export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: 
     return current;
 }
 
-function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: ExpansionData): WorkingNormalisedPlays[] {
+function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: ExpansionData): WorkingNormalisedPlays[] | undefined {
     const expansionPlays = current.filter(play => play.isExpansion);
     for (const expansionPlay of expansionPlays) {
         for (const basegamePlay of current) {

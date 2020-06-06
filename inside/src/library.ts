@@ -18,8 +18,8 @@ export async function withConnectionAsync(func: (conn: mysql.Connection) => Prom
 }
 
 export function returnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
-    let connection;
-    let result;
+    let connection: mysql.Connection;
+    let result: PromiseLike<T>;
     return getConnection()
         .then(conn => {
             connection = conn;
@@ -69,7 +69,7 @@ export function extractNormalisedPlayFromPlayRow(row: PlaysRow, geek: number, mo
     return { month, year, geek, date, game: row.game, quantity: row.quantity } as NormalisedPlays;
 }
 
-export function eqSet(as, bs): boolean {
+export function eqSet(as: Set<number>, bs: Set<number>): boolean {
     if (as.size !== bs.size) return false;
     for (const a of as) if (!bs.has(a)) return false;
     return true;

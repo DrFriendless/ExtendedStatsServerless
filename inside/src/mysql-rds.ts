@@ -9,7 +9,7 @@ import {
     MonthPlayed, NormalisedPlays, PlayData,
     ProcessGameResult, ProcessPlaysResult,
     SeriesMetadata,
-    ToProcessElement, WorkingNormalisedPlays, ErrorMessage
+    ToProcessElement, WorkingNormalisedPlays, ErrorMessage, ProcessMethod
 } from "./interfaces";
 import { RankingTableRow, WarTableRow, ExpansionData } from "extstats-core";
 import {
@@ -74,7 +74,7 @@ export async function doRecordGameExpansions(conn: mysql.Connection, gameId: num
     const selectSql = "select expansion from expansions where basegame = ?";
     const deleteSql = "delete from expansions where basegame = ?";
     const insertSql = "insert into expansions (basegame, expansion) values (?, ?)";
-    const current = (await conn.query(selectSql, gameId)).map(row => row.expansion);
+    const current = (await conn.query(selectSql, gameId)).map((row: { expansion: number }) => row.expansion);
     if (!eqSet(new Set(expansions), new Set(current))) {
         await conn.query(deleteSql, gameId);
         for (const exp of expansions) {
@@ -119,8 +119,8 @@ async function doSetCategoriesForGame(conn: mysql.Connection, game: number, cate
         return;
     }
     for (const cat of categories) await doEnsureCategory(conn, cat);
-    const current = (await conn.query(selectSql, game)).map(row => row.category);
-    const required = (await conn.query(getCatsSql, getCatsParams)).map(row => row.id);
+    const current = (await conn.query(selectSql, game)).map((row: { category: string }) => row.category);
+    const required = (await conn.query(getCatsSql, getCatsParams)).map((row: { id: number }) => row.id);
     if (!eqSet(new Set(current), new Set(required))) {
         await conn.query(deleteAllGameCatsSql, [game]);
         for (const id of required) await conn.query(insertSql, [game, id]);
@@ -146,8 +146,8 @@ async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mecha
         return;
     }
     for (const mec of mechanics) await doEnsureMechanic(conn, mec);
-    const current = (await conn.query(selectSql, game)).map(row => row.mechanic);
-    const required = (await conn.query(getMecsSql, getMecsParams)).map(row => row.id);
+    const current = (await conn.query(selectSql, game)).map((row: { mechanic: number }) => row.mechanic);
+    const required = (await conn.query(getMecsSql, getMecsParams)).map((row: { id: number }) => row.id);
     if (!eqSet(new Set(current), new Set(required))) {
         await conn.query(deleteAllGameMecsSql, [game]);
         for (const id of required) await conn.query(insertSql, [game, id]);
@@ -156,9 +156,9 @@ async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mecha
 
 async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
     const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
-      "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update games set name = ?, average = ?, rank = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
-      "averageWeight = ?, bayesAverage = ?, numComments = ?, usersOwned = ?, subdomain = ? where bggid = ?";
+        "averageWeight = ?, bayesAverage = ?, numComments = ?, usersOwned = ?, subdomain = ? where bggid = ?";
     try {
         await conn.query(insertSql, [data.gameId, data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
             data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
@@ -181,7 +181,7 @@ async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: nu
     const ratings = await conn.query(ratingSql, [game]);
     const total = ratings[0]["sum(rating)"];
     const count = ratings[0]["count(rating)"];
-    const hindexData: number[] = (await conn.query(playsSql, [game])).map(row => row["q"]);
+    const hindexData: number[] = (await conn.query(playsSql, [game])).map((row: { q: number }) => row.q);
     let hindex = 0;
     while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
     let gindex = 0;
@@ -206,7 +206,7 @@ async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: nu
     };
     try {
         await conn.query(insertSql,
-          [row.game, row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.hindex, row.gindex]);
+            [row.game, row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.hindex, row.gindex]);
     } catch (e) {
         await conn.query(updateSql, [row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.hindex, row.gindex, row.game]);
     }
@@ -270,12 +270,12 @@ function about30Days() {
     return "" + Math.floor(minutes / 60) + ":" + (ms < 10 ? "0" : "") + ms + ":00";
 }
 
-function tillNextUpdate(processMethod: string) {
+function tillNextUpdate(processMethod: ProcessMethod) {
     const orig = TILL_NEXT_UPDATE[processMethod];
     return (orig === "72:00:00") ? about3Days() : (orig === "838:00:00") ? about30Days() : orig;
 }
 
-export async function doMarkUrlProcessed(conn: mysql.Connection, processMethod: string, url: string) {
+export async function doMarkUrlProcessed(conn: mysql.Connection, processMethod: ProcessMethod, url: string) {
     const delta = tillNextUpdate(processMethod);
     const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
     await conn.query(sqlSet, [delta, url, processMethod]);
@@ -312,7 +312,7 @@ export async function doMarkGameDoesNotExist(conn: mysql.Connection, bggid: numb
 
 export async function doEnsureUsers(conn: mysql.Connection, users: string[]) {
     const extraSql = "select username from geeks where username not in (?)";
-    const extraUsers = (await conn.query(extraSql, [users])).map(it => it.username);
+    const extraUsers = (await conn.query(extraSql, [users])).map((row: { username: string }) => row.username);
     for (const user of users) {
         await doEnsureUser(conn, user);
     }
@@ -404,13 +404,13 @@ export async function doEnsureProcessPlaysFiles(conn: mysql.Connection, geek: st
     const geekId = await getGeekId(conn, geek);
     for (const month of months) {
         let url = playsUrl
-          .replace("%d", month.year.toString())
-          .replace("%d", month.month.toString())
-          .replace("%d", month.year.toString())
-          .replace("%d", month.month.toString());
+            .replace("%d", month.year.toString())
+            .replace("%d", month.month.toString())
+            .replace("%d", month.year.toString())
+            .replace("%d", month.month.toString());
         if (month.month === 0 && month.year === 0) url = timelessPlaysUrl;
         await doRecordFile(conn, url, "processPlays", geek, "Plays for " + geek + " for " + month.month + "/" + month.year,
-          undefined, month.month, month.year, geekId);
+            undefined, month.month, month.year, geekId);
     }
 }
 
@@ -439,7 +439,7 @@ export async function doEnsureGames(conn: mysql.Connection, ids: number[]): Prom
         sql = sqlSome;
         params = [ids];
     }
-    const found = (await conn.query(sql, params)).map(row => row.bggid);
+    const found = (await conn.query(sql, params)).map((row: { bggid: number }) => row.bggid);
     const notExist = await getGamesThatDontExist(conn);
     const uniques = Array.from(new Set(listMinus(listMinus(ids, found), notExist)));
     for (const id of uniques) {
@@ -460,8 +460,9 @@ async function doRecordGame(conn: mysql.Connection, bggid: number) {
 }
 
 
-async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | null, description: string,
-                            bggid: number | null, month: number | null, year: number | null, geekid: number | null) {
+async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | undefined,
+                            description: string, bggid: number | undefined, month: number | undefined, year: number | undefined,
+                            geekid: number | undefined) {
     const countSql = "select count(*) from files where url = ? and processMethod = ?";
     const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
     const found = await count(conn, countSql, [url, processMethod]);
@@ -488,14 +489,14 @@ async function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: s
     } else {
         const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
         await doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", undefined,
-          undefined, undefined, geekid);
+            undefined, undefined, geekid);
     }
 }
 
 async function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string, geekid: number) {
     const url = `https://boardgamegeek.com/plays/bymonth/user/${geek}/subtype/boardgame`;
     await doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", undefined,
-      undefined, undefined, geekid);
+        undefined, undefined, geekid);
 }
 
 export async function doListToProcess(conn: mysql.Connection, count: number, processMethod: string, updateLastScheduled: boolean): Promise<ToProcessElement[]> {
@@ -514,12 +515,12 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
 
 async function doListToProcessAll(conn: mysql.Connection, count: number): Promise<ToProcessElement[]> {
     const sql = "select * from files where (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
-    return (await conn.query(sql, [count])).map(row => row as ToProcessElement);
+    return (await conn.query(sql, [count])).map((row: ToProcessElement) => row);
 }
 
 async function doListToProcessByMethod(conn: mysql.Connection, count: number, processMethod: string): Promise<ToProcessElement[]> {
     const sql = "select * from files where processMethod = ? and (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 15) limit ?";
-    return (await conn.query(sql, [processMethod, count])).map(row => row as ToProcessElement);
+    return (await conn.query(sql, [processMethod, count])).map((row: ToProcessElement) => row);
 }
 
 async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string[]) {
@@ -560,7 +561,7 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const totalPlays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"] || 0;
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
     const zeros = (await conn.query(zerosSql, [geekId, geekId]))[0]["z"];
-    const hindexData: number[] = (await conn.query(hindexSql, [geekId])).map(row => row["q"]);
+    const hindexData: number[] = (await conn.query(hindexSql, [geekId])).map((row: { q: number }) => row.q);
     let hindex = 0;
     while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
     let gindex = 0;
@@ -576,8 +577,9 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
     const ext100Id = await getIdForSeries(conn, "Extended Stats Top 100");
     const ext100 = (await conn.query(seriesPlaysSql, [ext100Id, geekId]))[0]["c"];
-    const owned = (await conn.query(ownedSql, [geekId])).map(row => row["game"]);
-    const uses = (owned.length === 0) ? [] : (await conn.query(usesSql, [geekId, owned])).map(row => row["c"]);
+    const owned = (await conn.query(ownedSql, [geekId])).map((row: { game: number }) => row.game);
+    const uses = (owned.length === 0) ? [] :
+        (await conn.query(usesSql, [geekId, owned])).map((row: { c: number }) => row.c);
     while (uses.length < owned.length) uses.push(0);
     return { totalPlays, distinctGames, tens, zeros, hindex, gindex, hrindex, sdj, ext100, uses };
 }
@@ -623,11 +625,11 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
         preordered: preordered
     };
     const insertSql = "insert into war_table (geek, geekName, totalPlays, distinctGames, top50, sdj, owned, want, wish, " +
-      "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, ext100, hindex, preordered, gindex, hrindex) values " +
-      "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, ext100, hindex, preordered, gindex, hrindex) values " +
+        "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update war_table set geekName = ?, totalPlays = ?, distinctGames = ?, top50 = ?, sdj = ?, owned = ?, "
-      + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, "
-      + "ext100 = ?, hindex = ?, preordered = ?, gindex = ?, hrindex = ? where geek = ?";
+        + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, "
+        + "ext100 = ?, hindex = ?, preordered = ?, gindex = ?, hrindex = ? where geek = ?";
     try {
         await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.totalPlays, fpg.distinctGames, fpg.top50, fpg.sdj, fpg.owned,
             fpg.want, fpg.wish, fpg.trade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros,
@@ -687,7 +689,8 @@ function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
     return { utilisation, cfm, friendless };
 }
 
-export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number, expansionData: ExpansionData) {
+export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number,
+                                               expansionData: ExpansionData) {
     const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
     const deleteSql = "delete from plays_normalised where geek = ? and month = ? and year = ?";
     const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values ?";
@@ -695,8 +698,10 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
     const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values ?";
     const rows: PlaysRow[] = await conn.query(selectSql, [geekId, month, year]);
     const rawData: NormalisedPlays[] = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
-    const byDate: Record<string, NormalisedPlays[]> = _.groupBy(rawData, playDate);
-    const allPlays: WorkingNormalisedPlays[] = _.flatMap(Object.values(byDate).map((plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData)));
+    const byDate: NormalisedPlays[][] = Object.values(_.groupBy(rawData, playDate));
+    const allPlays: WorkingNormalisedPlays[] = _.flatMap(
+        byDate.map(
+            (plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData)));
     await conn.query(deleteSql, [geekId, month, year]);
     // insert all of the base plays
     const basePlays: any[][] = [];
@@ -762,7 +767,7 @@ export async function doSetGeekPlaysForMonth(conn: mysql.Connection, geekId: num
 export async function doUpdateRankings(conn: mysql.Connection) {
     // calculate extended stats top 100
     const ext100Sql = "select game from ranking_table order by ranking_table.total_ratings desc limit 100";
-    const top100Games = (await conn.query(ext100Sql)).map(row => row["game"]);
+    const top100Games = (await conn.query(ext100Sql)).map((row: { game: number }) => row.game);
     await doUpdateSeries(conn, [ { name: "Extended Stats Top 100", games: top100Games } as SeriesMetadata ]);
 
     // calculate normalised rankings
@@ -800,7 +805,7 @@ async function countWhere(conn: mysql.Connection, where: string, params: any[]) 
 
 async function getGamesThatDontExist(conn: mysql.Connection): Promise<number[]> {
     const sql = "select bggid from not_games";
-    return (await conn.query(sql)).map(row => row.bggid);
+    return (await conn.query(sql)).map((row: { bggid: number }) => row.bggid);
 }
 
 async function getIdForSeries(conn: mysql.Connection, seriesName: string): Promise<number> {
@@ -810,7 +815,7 @@ async function getIdForSeries(conn: mysql.Connection, seriesName: string): Promi
 
 async function getGamesForSeries(conn: mysql.Connection, seriesId: number): Promise<number[]> {
     const sql = "select game from series where series_id = ?";
-    return (await conn.query(sql, [seriesId])).map(row => row["game"]);
+    return (await conn.query(sql, [seriesId])).map((row: { game: number }) => row.game);
 }
 
 async function loadExpansionData(conn: mysql.Connection): Promise<ExpansionData> {

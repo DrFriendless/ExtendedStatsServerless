@@ -4,6 +4,9 @@
     "module": "commonjs",
     "sourceMap": true,
     "experimentalDecorators": true,
-    "lib": [ "es2017", "dom" ]
+    "lib": [ "es2017", "dom" ],
+    "strict": true,
+    "esModuleInterop": true,
+    "sourceRoot": "./src"
   }
 }

@@ -1,5 +1,8 @@
+export type ProcessMethod = "processCollection" | "processMarket" | "processPlayed" | "processGame" | "processTop50" |
+    "processFrontPage" | "processUser";
+
 export interface FileToProcess {
-    processMethod: string;
+    processMethod: ProcessMethod;
     url: string;
     bggid: number;
     geek: string;

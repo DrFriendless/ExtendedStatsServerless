@@ -16,14 +16,21 @@
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.27",
+    "@types/jest": "^25.2.3",
     "@types/node": "^8.10.55",
     "aws-lambda-typescript": "^3.0.0",
-    "gulp": "^4.0.2",
-    "npm": "^6.13.7",
+    "gulp": "^3.9.1",
+    "jest": "^26.0.1",
+    "npm": "^6.14.5",
     "serverless": "^1.46.1",
     "serverless-domain-manager": "^2.6.13",
     "serverless-plugin-typescript": "^1.1.9",
     "source-map-support": "^0.5.13",
-    "typescript": "^3.6.4"
+    "ts-jest": "^26.1.0",
+    "typescript": "^3.9.5"
+  },
+  "scripts": {
+    "test": "tsc && jest",
+    "clear_jest": "jest --clearCache"
   }
 }

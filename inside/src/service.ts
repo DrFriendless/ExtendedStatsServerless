@@ -5,7 +5,7 @@ import {
     CollectionGame,
     MetadataRule,
     MonthPlayed,
-    ProcessGameResult,
+    ProcessGameResult, ProcessMethod,
     ProcessPlaysResult, SeriesMetadata,
     ToProcessElement
 } from "./interfaces";
@@ -61,7 +61,7 @@ export async function runProcessPlaysResult(data: ProcessPlaysResult) {
     await withConnectionAsync(conn => doProcessPlaysResult(conn, data));
 }
 
-export async function runMarkUrlProcessed(processMethod: string, url: string) {
+export async function runMarkUrlProcessed(processMethod: ProcessMethod, url: string) {
     await withConnectionAsync(async conn => await doMarkUrlProcessed(conn, processMethod, url));
 }
 
