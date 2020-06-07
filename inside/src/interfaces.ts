@@ -130,9 +130,10 @@ export interface NormalisedPlays {
     date: number;
     month: number;
     year: number;
-    baseplay: number;
+    baseplay?: number;
     expansionPlay: boolean;
-    id: number;
+    id?: number;
+    location: string;
 }
 
 export interface WorkingNormalisedPlays {
@@ -144,6 +145,7 @@ export interface WorkingNormalisedPlays {
     date: number;
     month: number;
     year: number;
+    location: string;
 }
 
 export interface ErrorMessage {

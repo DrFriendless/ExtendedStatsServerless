@@ -4,7 +4,7 @@ import { Lambda } from 'aws-sdk';
 
 const INSIDE_PREFIX = "inside-dev-";
 
-export type PlaysRow = { game: number, playDate: string, quantity: number };
+export type PlaysRow = { game: number, playDate: string, quantity: number, location: string };
 
 export async function withConnectionAsync(func: (conn: mysql.Connection) => Promise<any>) {
     const connection = await getConnection();
@@ -62,11 +62,9 @@ export function playDate(play: NormalisedPlays): number {
 
 export function extractNormalisedPlayFromPlayRow(row: PlaysRow, geek: number, month: number, year: number): NormalisedPlays {
     const playDate = row.playDate.toString();
-    let date = parseInt(playDate.split(" ")[2]);
-    if (isNaN(date)) {
-        date = 0;
-    }
-    return { month, year, geek, date, game: row.game, quantity: row.quantity } as NormalisedPlays;
+    let date = parseInt(playDate.replace(/-/g, " ").split(" ")[2]);
+    if (isNaN(date)) date = 0;
+    return { month, year, geek, date, game: row.game, quantity: row.quantity, expansionPlay: false, location: row.location };
 }
 
 export function eqSet(as: Set<number>, bs: Set<number>): boolean {

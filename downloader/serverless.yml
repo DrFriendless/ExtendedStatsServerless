@@ -108,6 +108,26 @@ functions:
     memorySize: 256
     role:
       "invokeLambdas"
+  processDesigner:
+    handler: functions.processDesigner
+    tags:
+      component: downloader
+    environment:
+      downloaderPassword: ${self:custom.secret.downloaderPassword}
+    timeout: 300
+    memorySize: 256
+    role:
+      "invokeLambdas"
+  processPublisher:
+    handler: functions.processPublisher
+    tags:
+      component: downloader
+    environment:
+      downloaderPassword: ${self:custom.secret.downloaderPassword}
+    timeout: 300
+    memorySize: 256
+    role:
+      "invokeLambdas"
   processBGGTop50:
     handler: functions.processBGGTop50
     tags:

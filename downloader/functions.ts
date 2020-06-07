@@ -33,6 +33,8 @@ const METHOD_PROCESS_COLLECTION = "processCollection";
 const METHOD_PROCESS_PLAYED = "processPlayed";
 const METHOD_PROCESS_GAME = "processGame";
 const METHOD_PROCESS_PLAYS = "processPlays";
+const METHOD_PROCESS_DESIGNER = "processDesigner";
+const METHOD_PROCESS_PUBLISHER = "processPublisher";
 
 // lambda names we expect to see
 const FUNCTION_RETRIEVE_FILES = "getToProcessList";
@@ -46,6 +48,8 @@ const FUNCTION_PROCESS_PLAYED_RESULT = "processPlayedMonthsResult";
 const FUNCTION_PROCESS_PLAYS_RESULT = "processPlaysResult";
 const FUNCTION_PROCESS_GAME = "processGame";
 const FUNCTION_PROCESS_PLAYS = "processPlays";
+const FUNCTION_PROCESS_DESIGNER = "processDesigner";
+const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
 const FUNCTION_PROCESS_GAME_RESULT = "processGameResult";
 const FUNCTION_NO_SUCH_GAME = "updateGameAsDoesNotExist";
 const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
@@ -74,8 +78,8 @@ export function processUserList(event, context, callback: Callback) {
 // Lambda to get the metadata from pastebin and send it to the database.
 export async function processMetadata(event, context, callback: Callback) {
     const metadataFile = process.env["METADATA_FILE"];
-    const series = [] as SeriesMetadata[];
-    const rules = [] as MetadataRule[];
+    const series: SeriesMetadata[] = [];
+    const rules: MetadataRule[] = [];
     try {
         const data = await request(encodeURI(metadataFile));
         const lines = data.split(/\r?\n/).map(s => s.trim());
@@ -144,7 +148,6 @@ export function fireFileProcessing(event, context, callback: Callback) {
         .then(data => {
             const files = data as ToProcessElement[];
             files.forEach(element => {
-                // if (event.hasOwnProperty("processMethod")) console.log(element);
                 console.log(element);
                 if (element.processMethod == METHOD_PROCESS_USER) {
                     return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
@@ -156,6 +159,10 @@ export function fireFileProcessing(event, context, callback: Callback) {
                     return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
                 } else if (element.processMethod == METHOD_PROCESS_PLAYS) {
                     return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
+                } else if (element.processMethod == METHOD_PROCESS_DESIGNER) {
+                    return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
+                } else if (element.processMethod == METHOD_PROCESS_PUBLISHER) {
+                    return invokeLambdaAsync("fireFileProcessing", OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
                 }
             });
             return { count: files.length };
@@ -276,41 +283,40 @@ async function markTryAgainTomorrow(context: string, fileDetails: FileToProcess)
 
 function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {
     return _.chunk(original.items, MAX_GAMES_PER_CALL)
-        .map(items => { return { geek: original.geek, items: items } as ProcessCollectionResult; });
+        .map(items => { return { geek: original.geek, items: items }; });
 }
 
 export async function processPlayed(event, context, callback: Callback) {
     const invocation = event as FileToProcess;
-    const data = await request(encodeURI(invocation.url)) as string;
-    const toAdd = [] as MonthPlayed[];
+    const data: string = await request(encodeURI(invocation.url));
+    const toAdd: MonthPlayed[] = [];
     data.split("\n")
         .filter(line => line.indexOf(">By date<") >= 0)
         .forEach(line => {
             const s = between(line, '/end/', '"');
             const fields = s.split('-');
-            const data = { month: parseInt(fields[1]), year: parseInt(fields[0]) } as MonthPlayed;
+            const data = { month: parseInt(fields[1]), year: parseInt(fields[0]) };
             toAdd.push(data);
         });
-    const monthsData = { geek: invocation.geek, monthsPlayed: toAdd, url: invocation.url } as ProcessMonthsPlayedResult;
+    const monthsData = { geek: invocation.geek, monthsPlayed: toAdd, url: invocation.url };
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYED_RESULT, monthsData);
 }
 
 export async function processPlays(event, context, callback: Callback) {
     const invocation = event as FileToProcess;
-    console.log(invocation.url);
-    let playsData = [];
+    let playsData: PlayData[] = [];
     let pagesSoFar = 0;
     let pagesNeeded = -1;
     while (pagesSoFar === 0 || pagesSoFar < pagesNeeded) {
         pagesSoFar++;
-        const data = await request(invocation.url + "&page=" + pagesSoFar) as string;
+        const data: string = await request(invocation.url + "&page=" + pagesSoFar);
         const processResult: { count: number, plays: PlayData[] } = await processPlaysFile(data, invocation);
         playsData = playsData.concat(processResult.plays);
         pagesNeeded = Math.ceil(processResult.count / 100);
     }
-    const playsResult = {
+    const playsResult: ProcessPlaysResult = {
         geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url
-    } as ProcessPlaysResult;
+    };
     if (playsData.length > 2000) {
         // synchronous invocations can take a much larger payload than async ones, and around 2000 plays we hit the limit.
         // https://www.stackery.io/blog/RequestEntityTooLargeException-aws-lambda-message-invocation-limits/
@@ -320,3 +326,14 @@ export async function processPlays(event, context, callback: Callback) {
     }
 }
 
+export async function processDesigner(event) {
+    const invocation = event as FileToProcess;
+    const data: string = await request(invocation.url);
+    console.log(data);
+}
+
+export async function processPublisher(event) {
+    const invocation = event as FileToProcess;
+    const data: string = await request(invocation.url);
+    console.log(data);
+}

@@ -5,18 +5,13 @@
 
 import mysql = require("promise-mysql");
 import {
-    CollectionGame, MetadataRule,
-    MonthPlayed, NormalisedPlays, PlayData,
-    ProcessGameResult, ProcessPlaysResult,
-    SeriesMetadata,
-    ToProcessElement, WorkingNormalisedPlays, ErrorMessage, ProcessMethod
+    CollectionGame, MetadataRule, MonthPlayed, PlayData,
+    ProcessGameResult, ProcessPlaysResult, SeriesMetadata,
+    ToProcessElement, ProcessMethod
 } from "./interfaces";
 import { RankingTableRow, WarTableRow, ExpansionData } from "extstats-core";
-import {
-    count, eqSet, extractNormalisedPlayFromPlayRow, listIntersect, listMinus, playDate, logError
-} from "./library";
-import * as _ from "lodash";
-import { inferExtraPlays } from "./plays";
+import { count, eqSet, listIntersect, listMinus, logError } from "./library";
+import { normalise } from "./plays";
 import { PlaysRow } from "./library";
 
 export async function doUpdateBGGTop50(conn: mysql.Connection, games: number[]) {
@@ -691,21 +686,17 @@ function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
 
 export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number,
                                                expansionData: ExpansionData) {
-    const selectSql = "select game, playDate, quantity from plays where geek = ? and month = ? and year = ?";
+    const selectSql = "select game, playDate, quantity, location from plays where geek = ? and month = ? and year = ?";
     const deleteSql = "delete from plays_normalised where geek = ? and month = ? and year = ?";
     const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values ?";
     const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
     const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values ?";
     const rows: PlaysRow[] = await conn.query(selectSql, [geekId, month, year]);
-    const rawData: NormalisedPlays[] = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
-    const byDate: NormalisedPlays[][] = Object.values(_.groupBy(rawData, playDate));
-    const allPlays: WorkingNormalisedPlays[] = _.flatMap(
-        byDate.map(
-            (plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData)));
+    const normalised = normalise(rows, geekId, month, year, expansionData);
     await conn.query(deleteSql, [geekId, month, year]);
     // insert all of the base plays
     const basePlays: any[][] = [];
-    for (const np of allPlays) {
+    for (const np of normalised) {
         basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, 0]);
     }
     if (basePlays.length > 0) {
@@ -719,7 +710,7 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
     }
     // construct the expansion plays with references to the base plays
     const expPlays = [];
-    for (const np of allPlays) {
+    for (const np of normalised) {
         if (np.expansions.length > 0) {
             const args = [np.game, geekId, np.quantity, np.year, np.month, np.date];
             const result = await conn.query(getIdSql, args);
@@ -768,23 +759,22 @@ export async function doUpdateRankings(conn: mysql.Connection) {
     // calculate extended stats top 100
     const ext100Sql = "select game from ranking_table order by ranking_table.total_ratings desc limit 100";
     const top100Games = (await conn.query(ext100Sql)).map((row: { game: number }) => row.game);
-    await doUpdateSeries(conn, [ { name: "Extended Stats Top 100", games: top100Games } as SeriesMetadata ]);
+    await doUpdateSeries(conn, [ { name: "Extended Stats Top 100", games: top100Games } ]);
 
     // calculate normalised rankings
     // TODO
 }
 
 export async function doRecordError(conn: mysql.Connection, message: string, source: string) {
-    const findSql = "select * from errors where message = ? and source = ?";
+    const findSql = "select count from errors where message = ? and source = ?";
     const createSql = "insert into errors (first, last, source, message, count) values (?, ?, ?, ?, ?)";
     const updateSql = "update errors set last = ?, count = ? where message = ? and source = ?";
-    const found: object[] = await conn.query(findSql, [message, source]);
+    const found: { count: number }[] = await conn.query(findSql, [message, source]);
     const now = new Date();
     if (found.length === 0) {
         await conn.query(createSql, [ now, now, source, message, 1]);
     } else {
-        const toUpdate: ErrorMessage = found[0] as ErrorMessage;
-        await conn.query(updateSql, [ now, toUpdate.count + 1, message, source ]);
+        await conn.query(updateSql, [ now, found[0].count + 1, message, source ]);
     }
 }
 
