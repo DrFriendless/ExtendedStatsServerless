@@ -15,6 +15,8 @@ const MTG = 463;
 const CARC = 822;
 const THE_RIVER = 2591;
 const RACE = 28143;
+const REBEL_VS = 40210;
+const BRINK = 66121;
 const GATHERING_STORM = 34499;
 const NEW_WORLDS = 242309;
 const AGRICOLA = 31260;
@@ -71,12 +73,17 @@ const ED = new ExpansionData([
     { basegame: CARC, expansion: THE_RIVER },
     { basegame: RACE, expansion: GATHERING_STORM },
     { basegame: RACE, expansion: NEW_WORLDS },
+    { basegame: RACE, expansion: BRINK },
+    { basegame: RACE, expansion: REBEL_VS },
+    { basegame: REBEL_VS, expansion: BRINK },
+    { basegame: GATHERING_STORM, expansion: BRINK },
+    { basegame: GATHERING_STORM, expansion: REBEL_VS },
     { basegame: AGRICOLA, expansion: FOTM },
     { basegame: AGRICOLA_REVISED, expansion: FOTM_REVISED },
     { basegame: AGRICOLA, expansion: NEWDALE },
     { basegame: AGRICOLA_REVISED, expansion: NEWDALE },
     { basegame: LOTR_LCG, expansion: KHAZAD_DUM },
-    { basegame: KHAZAD_DUM, expansion: SHADOW_AND_FLAME }
+    { basegame: KHAZAD_DUM, expansion: SHADOW_AND_FLAME },
 ]);
 
 // this test exists solely to show me what's exported from the code under test, because this testing framework
@@ -258,6 +265,17 @@ describe('normalise', () => {
         expect(basePlay.expansions).toStrictEqual([SHADOW_AND_FLAME, KHAZAD_DUM]);
         expect(basePlay.isExpansion).toBe(false);
         expect(basePlay.game).toBe(LOTR_LCG);
+    });
+
+    it('should infer base game with multiple middles', () => {
+        const playRows = [ playAt(BRINK) ];
+        const normalised: WorkingNormalisedPlays[] = normalise(playRows, 746,2,2020, ED);
+        expect(normalised.length).toBe(1);
+        const basePlay = find(RACE, normalised);
+        expect(basePlay.quantity).toBe(1);
+        expect(basePlay.expansions).toStrictEqual([BRINK]);
+        expect(basePlay.isExpansion).toBe(false);
+        expect(basePlay.game).toBe(RACE);
     });
 });
 

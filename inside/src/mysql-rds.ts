@@ -9,7 +9,7 @@ import {
     ProcessGameResult, ProcessPlaysResult, SeriesMetadata,
     ToProcessElement, ProcessMethod
 } from "./interfaces";
-import { RankingTableRow, WarTableRow, ExpansionData } from "extstats-core";
+import {ExpansionData, RankingTableRow, WarTableRow} from "extstats-core";
 import { count, eqSet, listIntersect, listMinus, logError } from "./library";
 import { normalise } from "./plays";
 import { PlaysRow } from "./library";

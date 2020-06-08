@@ -6,7 +6,7 @@
   "dependencies": {
     "aws-lambda": "^1.0.5",
     "aws-sdk": "^2.619.0",
-    "extstats-core": "^1.8.0",
+    "extstats-core": "^1.10.0",
     "graphql": "^0.12.3",
     "graphql-tag": "^2.10.1",
     "hoek": "^4.2.1",

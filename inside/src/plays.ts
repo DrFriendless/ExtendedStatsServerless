@@ -1,7 +1,8 @@
 import * as _ from "lodash";
 import { NormalisedPlays, WorkingNormalisedPlays } from "./interfaces";
-import { ExpansionData } from "extstats-core";
+// import { ExpansionData } from "extstats-core";
 import {extractNormalisedPlayFromPlayRow, playDate, PlaysRow} from "./library";
+import {ExpansionData} from "extstats-core";
 
 export function toWorkingPlay(expansionData: ExpansionData, play: NormalisedPlays): WorkingNormalisedPlays {
     return {
@@ -112,7 +113,42 @@ function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: Expansi
             const newPlays = current.filter(p => !Object.is(p, expansionPlay));
             newPlays.push(newPlay);
             return newPlays;
+        } else {
+            const provable = getProvableBasegames(expansionPlay.game, expansionData);
+            if (provable.length > 0) {
+                const basegame = provable[0];
+                const expansions = expansionPlay.expansions.slice();
+                expansions.push(expansionPlay.game);
+                expansions.push(...provable.slice(1));
+                const newPlay: WorkingNormalisedPlays = {
+                    quantity: expansionPlay.quantity,
+                    game: basegame,
+                    geek: expansionPlay.geek,
+                    date: expansionPlay.date,
+                    month: expansionPlay.month,
+                    year: expansionPlay.year,
+                    location: expansionPlay.location,
+                    isExpansion: expansionData.isExpansion(basegame),
+                    expansions
+                };
+                const newPlays = current.filter(p => !Object.is(p, expansionPlay));
+                newPlays.push(newPlay);
+                return newPlays;
+            }
         }
     }
     return undefined;
 }
+
+function getProvableBasegames(game: number, ed: ExpansionData): number[] {
+    const chains = ed.getPossibleBasegameChains(game);
+    if (chains.length === 0) return [];
+    if (chains.length === 1) return chains[0];
+    let result = chains[0];
+    for (const chain of chains.slice(1)) {
+        result = result.filter(g => chain.indexOf(g) >= 0);
+    }
+    return result;
+}
+
+
