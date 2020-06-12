@@ -1,4 +1,4 @@
-HOW TO CREATE THE EXPRESS SERVER
+# HOW TO CREATE THE EXPRESS SERVER
 
 Create an EC2 instance from the extstats-express AMI. Put it in a public subnet and give it a public IP address.
 
@@ -9,19 +9,25 @@ your known_hosts file. Run deploy.sh to install the extstats-express software on
 
 SSH into the server and run
 
-sudo /opt/express/unpackage.sh
+    sudo /opt/express/unpackage.sh
 
 
-HOW TO CREATE THE EXPRESS AMI
+# HOW TO CREATE THE EXPRESS AMI
 
 Launch an EC2 with the correct Ubuntu.
 
-sudo apt-get install nodejs
-npm
-express
+    sudo apt-get install nodejs
+    npm
+    express
 
-sudo apt-get install unzip
-
-sudo npm install -g pm2
+    sudo apt-get install unzip
+    sudo npm install -g pm2
 
 Stop the instance. Create an image from the stopped instance.
+
+# HOW TO RESTART THE SERVER
+
+Log in to the server.
+
+    cd /opt/express
+    sudo pm2 start dist/server.js -u root

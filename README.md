@@ -7,7 +7,7 @@ This is a rewrite of Extended Stats in the cloud, using:
  * UI components in Angular 6/7 etc
  * Lambdas written in Node.js.
 
-It's still early days, but what there is to be seen can be seen at https://extstats.drfriendless.com.
+The site is running at https://extstats.drfriendless.com.
 
 Extended Stats is a project to download data about the relationship between board games and board game geeks from boardgamegeek.com.
 The information available includes ratings for games and when those games are played.
