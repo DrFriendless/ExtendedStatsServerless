@@ -420,6 +420,32 @@ functions:
           private: true
     role:
       "doStuffFromInsideVPC"
+  updateOld:
+    handler: functions.updateOld
+    tags:
+      component: api
+    environment:
+      mysqlHost: ${self:custom.database.mysqlHost}
+      mysqlUsername: ${self:custom.database.mysqlUsername}
+      mysqlPassword: ${self:custom.database.mysqlPassword}
+      mysqlDatabase: ${self:custom.database.mysqlDatabase}
+    events:
+      - http:
+          path: updateOld
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - Accept-Encoding
+          integration: lambda
+          private: true
+    role:
+      "doStuffFromInsideVPC"
 
 resources:
   Resources:

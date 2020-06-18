@@ -209,6 +209,10 @@ export async function markUrlForUpdate(url: string): Promise<ToProcessElement> {
     return await asyncReturnWithConnection(async conn => await doMarkUrlForUpdate(conn, url));
 }
 
+export async function markGeekForUpdate(geek: string): Promise<string[]> {
+    return await asyncReturnWithConnection(async conn => await doMarkGeekForUpdate(conn, geek));
+}
+
 async function doGetGeekUpdates(conn: mysql.Connection, geek: string): Promise<ToProcessElement[]> {
     const geekId = await getGeekId(conn, geek);
     const playsSQL = "select sum(quantity) q, year*100+month ym from plays where geek = ? group by month, year";
@@ -233,6 +237,14 @@ async function doMarkUrlForUpdate(conn: mysql.Connection, url: string): Promise<
     const rows = await conn.query(updatesSQL, [url]) as ToProcessElement[];
     if (rows.length > 0) return rows[0];
     return undefined;
+}
+
+async function doMarkGeekForUpdate(conn: mysql.Connection, geek: string): Promise<string[]> {
+    const markSQL = "update files set lastUpdate = null where geek = ? and lastUpdate is not null and now()-lastUpdate > 604800000";
+    const selectSQL = "select url from files where geek = ? and lastUpdate is null";
+    await conn.query(markSQL, [geek]);
+    const rows = await conn.query(selectSQL, [geek]);
+    return rows.map(row => row["url"]);
 }
 
 async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary> {
