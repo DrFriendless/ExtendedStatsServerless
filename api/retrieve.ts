@@ -2,7 +2,7 @@ import * as graphql from "graphql";
 import { APIGatewayProxyEvent, Callback, Context } from "aws-lambda";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
-import { GameData, GeekGame, MultiGeekPlays } from "extstats-core";
+import { GameData, GeekGame } from "extstats-core";
 import { doRetrieveGames } from "./mysql-rds";
 import {asyncReturnWithConnection, getGeekId, getGeekIds} from "./library";
 import { Expression, parse } from "./parser";
@@ -243,7 +243,7 @@ async function addLastPlayOfGamesForGeek(conn: mysql.Connection, geekGames: Geek
     });
 
     const now = new Date();
-    const today = now.getFullYear() * 10000 + now.getMonth() * 100 + now.getDate();
+    const today = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
     const playsSql = "select game, sum(quantity) q, count(month) months from plays_normalised where geek = ? and ? - (year * 10000 + month * 100 + date) < 10000  and game in (?) group by game";
     const lyRows: object[] = await conn.query(playsSql, [geekid, today, bggids]);
     lyRows.forEach(lyRow => {

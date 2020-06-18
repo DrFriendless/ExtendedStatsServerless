@@ -1,0 +1,57 @@
+type MultiGeekPlaysType {
+
+}
+
+type DesignerType {
+    bggid: Int,
+    name: String,
+    url: String,
+    boring: Boolean
+}
+
+type GameDataType {
+    bggid: Int,
+    bggRanking: Int,
+    yearPublished: Int,
+    minPlayers: Int,
+    maxPlayers: Int,
+    playTime: Int,
+    name: String,
+    subdomain: String,
+    bggRating: Float,
+    weight: Float,
+    isExpansion: Boolean,
+    designers: [DesignerType]
+}
+
+type GeekGameType {
+
+}
+
+type SelectorMetadataType {
+
+}
+
+type GeekGamesType {
+    games: [GameDataType],
+    geekGames: [GeekGameType],
+    metadata: [SelectorMetadataType]
+}
+
+input VarBindingInputType {
+    name: String,
+    value: String
+}
+
+type Query {
+    # what years did this geek play games in?
+    years(geek: String!): [Int]
+
+    plays(geeks: [String], first: Boolean, startYMD: Int, endYMD: Int): MultiGeekPlaysType
+
+    geekgames(selector: [String], vars: [VarBindingInputType]): GeekGamesType
+}
+
+schema {
+    query: Query
+}

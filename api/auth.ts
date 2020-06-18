@@ -1,4 +1,4 @@
-import { Callback } from "aws-lambda";
+import {Callback, Context} from "aws-lambda";
 import jwt = require("jsonwebtoken");
 import { findOrCreateUser, findUser, retrieveAllData, updateUser } from "./users";
 import { Decoded, UserData, PersonalData, UserConfig } from "extstats-core";
@@ -58,7 +58,13 @@ function makeCookie(id: string) {
     return "extstatsid=" + id + "; Domain=drfriendless.com; Secure; Path=/; Max-Age=36000; SameSite=Lax; HttpOnly";
 }
 
-export async function login(event, context, callback: Callback) {
+/**
+ * If they have the extstatsid cookie, return their user data.
+ * @param event
+ * @param context
+ * @param callback
+ */
+export async function login(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const cookies = getCookiesFromHeader(event.headers);
     const headers = {
@@ -79,7 +85,12 @@ export async function login(event, context, callback: Callback) {
     callback(undefined, result);
 }
 
-export async function authenticate(event, context, callback: Callback) {
+/**
+ * Receive the encoded JWT as the Authorization header and set the extstatsid cookie.
+ * @param event
+ * @param callback
+ */
+export async function authenticate(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     await withAuthentication(event, async (error, decoded: Decoded) => {
         if (error) {
@@ -113,7 +124,7 @@ export async function authenticate(event, context, callback: Callback) {
     });
 }
 
-export async function updatePersonal(event, context, callback: Callback) {
+export async function updatePersonal(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     console.log(event);
     const cookies = getCookiesFromHeader(event.headers);
@@ -151,7 +162,7 @@ async function getPersonalDataForID(sub: string): Promise<PersonalData> {
     return { userData, allData, error: undefined };
 }
 
-export async function personal(event, context, callback: Callback) {
+export async function personal(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     const cookies = getCookiesFromHeader(event.headers);
     if (cookies['extstatsid']) {

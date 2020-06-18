@@ -1,4 +1,4 @@
-import { Callback } from "aws-lambda";
+import {Callback, Context} from "aws-lambda";
 import {
     doGetNews, doQuery, gatherGeekSummary, doPlaysQuery, gatherGeekUpdates,
     gatherSystemStats, listUsers, listWarTable, rankGames, updateFAQCount, markUrlForUpdate
@@ -6,7 +6,7 @@ import {
 import { asyncReturnWithConnection } from "./library";
 import { GeekGameQuery, PlaysQuery } from "extstats-core";
 
-export async function getUpdates(event, context, callback: Callback) {
+export async function getUpdates(event, context: Context, callback: Callback) {
     try {
         callback(undefined, await gatherGeekUpdates(event["query"]["geek"]));
     } catch (err) {
@@ -15,7 +15,7 @@ export async function getUpdates(event, context, callback: Callback) {
     }
 }
 
-export async function markForUpdate(event, context, callback: Callback) {
+export async function markForUpdate(event, context: Context, callback: Callback) {
     try {
         callback(undefined, await markUrlForUpdate(event.body.url));
     } catch (err) {
@@ -24,7 +24,7 @@ export async function markForUpdate(event, context, callback: Callback) {
     }
 }
 
-export async function getGeekSummary(event, context, callback: Callback) {
+export async function getGeekSummary(event, context: Context, callback: Callback) {
     try {
         callback(undefined, await gatherGeekSummary(event["query"]["geek"]));
     } catch (err) {
@@ -33,7 +33,7 @@ export async function getGeekSummary(event, context, callback: Callback) {
     }
 }
 
-export async function incFAQCount(event, context, callback: Callback) {
+export async function incFAQCount(event, context: Context, callback: Callback) {
     try {
         callback(undefined, await updateFAQCount(event.body as number[]));
     } catch (err) {
@@ -42,7 +42,7 @@ export async function incFAQCount(event, context, callback: Callback) {
     }
 }
 
-export async function adminGatherSystemStats(event, context, callback: Callback) {
+export async function adminGatherSystemStats(event, context: Context, callback: Callback) {
     try {
         callback(undefined, await gatherSystemStats());
     } catch (err) {
@@ -52,7 +52,7 @@ export async function adminGatherSystemStats(event, context, callback: Callback)
 }
 
 // Lambda to retrieve the list of users
-export async function getUserList(event, context, callback: Callback) {
+export async function getUserList(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     try {
         callback(undefined, await listUsers());
@@ -63,7 +63,7 @@ export async function getUserList(event, context, callback: Callback) {
 }
 
 // Lambda to retrieve the data for the war table.
-export async function getWarTable(event, context, callback: Callback) {
+export async function getWarTable(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     try {
         callback(undefined, await listWarTable());
@@ -73,7 +73,7 @@ export async function getWarTable(event, context, callback: Callback) {
     }
 }
 
-export async function query(event, context, callback: Callback) {
+export async function query(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     if (event && event.body) {
         const query = event.body as GeekGameQuery;
@@ -89,7 +89,7 @@ export async function query(event, context, callback: Callback) {
     }
 }
 
-export async function plays(event, context, callback: Callback) {
+export async function plays(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     if (event && event.body) {
         const query = event.body as PlaysQuery;
@@ -105,7 +105,7 @@ export async function plays(event, context, callback: Callback) {
     }
 }
 
-export async function getNews(event, context, callback: Callback) {
+export async function getNews(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     try {
         const result = await asyncReturnWithConnection(async conn => await doGetNews(conn));
@@ -116,7 +116,7 @@ export async function getNews(event, context, callback: Callback) {
     }
 }
 
-export async function getRankings(event, context, callback: Callback) {
+export async function getRankings(event, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
     if (event && event.body) {
         const query = {}; // TODO
