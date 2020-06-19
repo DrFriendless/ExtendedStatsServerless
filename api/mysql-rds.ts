@@ -67,10 +67,7 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
         case "CollectionWithMonthlyPlays": {
             const plays = (await getMonthlyPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
             const counts = (await getMonthlyCounts(conn, query.geek));
-            const result: CollectionWithMonthlyPlays = {
-                collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata, extra, counts
-            };
-            return result;
+            return { collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata, extra, counts };
         }
         default: {
             return { collection: queryResult.geekGames, games, metadata: queryResult.metadata, extra } as Collection;
@@ -166,7 +163,7 @@ async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePl
     });
 }
 
-async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<MonthlyPlays[]> {
+export async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<MonthlyPlays[]> {
     const playsSql = "select game, sum(quantity) q, year, month, max(expansion_play) x from plays_normalised where geek = ? group by game, year, month";
     const geekId = await getGeekId(conn, geek);
     const rows = await conn.query(playsSql, [geekId]);
@@ -176,7 +173,7 @@ async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<Mo
     });
 }
 
-async function getMonthlyCounts(conn: mysql.Connection, geek: string): Promise<MonthlyPlayCount[]> {
+export async function getMonthlyCounts(conn: mysql.Connection, geek: string): Promise<MonthlyPlayCount[]> {
     const countSql = "select year, month, count(distinct date) dates from plays_normalised where geek = ? group by year, month";
     const geekId = await getGeekId(conn, geek);
     return (await conn.query(countSql, [geekId])).map(row => { return { year: row["year"], month: row["month"], count: row["dates"] }; });

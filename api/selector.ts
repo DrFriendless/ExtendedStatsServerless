@@ -2,13 +2,14 @@ import mysql = require('promise-mysql');
 import { Arg, Argument, Expression, Integer, Keyword, parse, StringValue } from "./parser";
 import { getGeekId } from "./library";
 import { GeekGameQuery, GeekGameQueryResult, SelectorMetadataSet } from "extstats-core";
+import {VarBinding, VarBindings} from "./varbindings";
 
 export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameQueryResult> {
     const expr = parse(q);
     return await evaluate(conn, expr, query);
 }
 
-async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars: Record<string, string>, metadata: SelectorMetadataSet):
+async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars: VarBindings, metadata: SelectorMetadataSet):
     Promise<number[]> {
     switch (expr.func) {
         case "all": {
@@ -157,7 +158,7 @@ async function selectMechanic(conn: mysql.Connection, cat: string): Promise<numb
     return (await conn.query(sql, [cat])).map(row => row["id"]);
 }
 
-function evaluateSimpleArg(arg: Arg, vars: Record<string, string>): string | number {
+function evaluateSimpleArg(arg: Arg, vars: VarBindings): string | number {
     switch (arg.kind) {
         case Argument.Integer: return (arg as Integer).value;
         case Argument.StringValue: {
@@ -166,7 +167,8 @@ function evaluateSimpleArg(arg: Arg, vars: Record<string, string>): string | num
         }
         case Argument.Keyword: {
             const kw = arg as Keyword;
-            if (vars[kw.keyword]) return vars[kw.keyword];
+            const v = vars.lookup(kw.keyword);
+            if (v) return v;
             throw new Error("No value for keyword " + kw.keyword);
         }
         default: {
@@ -176,10 +178,12 @@ function evaluateSimpleArg(arg: Arg, vars: Record<string, string>): string | num
 }
 
 async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGameQuery): Promise<GeekGameSelectResult> {
-    const vars: Record<string, string> = {};
-    Object.assign(vars, query.vars);
-    vars['ME'] = query.geek;
-    return evaluateSimple(conn, expr, vars);
+    const vars: VarBinding[] = [ { name: 'ME', value: query.geek }];
+    if (query.vars.MONTH) vars.push({ name: "MONTH", value: query.vars.MONTH.toString() });
+    if (query.vars.RATING) vars.push({ name: "RATING", value: query.vars.RATING.toString() });
+    if (query.vars.THEM) vars.push({ name: "THEM", value: query.vars.THEM.toString() });
+    if (query.vars.YEAR) vars.push({ name: "YEAR", value: query.vars.YEAR.toString() });
+    return evaluateSimple(conn, expr, new VarBindings(vars));
 }
 
 /**
@@ -188,11 +192,11 @@ async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGam
  * @param expr
  * @param vars
  */
-export async function evaluateSimple(conn: mysql.Connection, expr: Expression, vars: Record<string, string>): Promise<GeekGameSelectResult> {
+export async function evaluateSimple(conn: mysql.Connection, expr: Expression, vars: VarBindings): Promise<GeekGameSelectResult> {
     const metadata = new SelectorMetadataSet();
     const ids = await evaluateExpression(conn, expr, vars, metadata);
     metadata.restrictTo(ids);
-    return { geekGames: await retrieveGeekGames(conn, ids, vars['ME']), metadata } as GeekGameSelectResult;
+    return { geekGames: await retrieveGeekGames(conn, ids, vars.lookup("ME")), metadata } as GeekGameSelectResult;
 }
 
 export async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGameRow[]> {

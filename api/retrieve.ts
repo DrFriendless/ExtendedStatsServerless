@@ -2,11 +2,16 @@ import * as graphql from "graphql";
 import { APIGatewayProxyEvent, Callback, Context } from "aws-lambda";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
-import { GameData, GeekGame } from "extstats-core";
-import { doRetrieveGames } from "./mysql-rds";
+import {GameData, GeekGame, MonthlyPlayCount, MonthlyPlays} from "extstats-core";
+import {doRetrieveGames, getMonthlyCounts, getMonthlyPlays} from "./mysql-rds";
 import {asyncReturnWithConnection, getGeekId, getGeekIds} from "./library";
-import { Expression, parse } from "./parser";
+import { parse } from "./parser";
 import {evaluateSimple, GeekGameRow, GeekGameSelectResult, retrieveGeekGames} from "./selector";
+import {VarBindings} from "./varbindings";
+const DataLoader = require('dataloader');
+
+// dataloader objects
+const gameLoader = new DataLoader(ids => batchGetGames(ids));
 
 const ListOfString = new graphql.GraphQLList(graphql.GraphQLString!);
 const ListOfInt = new graphql.GraphQLList(graphql.GraphQLInt!);
@@ -36,9 +41,7 @@ const GameDataType = new graphql.GraphQLObjectType({
         designers: {
             type: new graphql.GraphQLList(DesignerType!),
             resolve:
-                async (parent, args) => await asyncReturnWithConnection(async conn =>
-                    await resolveDesignersForGame(conn, parent)
-                )
+                async (parent: GameData) => await asyncReturnWithConnection(async conn => resolveDesignersForGame(conn, parent))
         }
     }
 });
@@ -65,7 +68,11 @@ const GeekGameType = new GraphQLObjectType({
             expansion: { type: graphql.GraphQLBoolean! },
             forTrade: { type: graphql.GraphQLBoolean! },
             wantInTrade: { type: graphql.GraphQLBoolean! },
-            wish: { type: graphql.GraphQLInt! }
+            wish: { type: graphql.GraphQLInt! },
+            game: {
+                type: GameDataType,
+                resolve: (parent: { bggid: number }) => gameLoader.load(parent.bggid)
+            }
         }
     }
 );
@@ -123,6 +130,38 @@ const GeekGamesType = new GraphQLObjectType({
         metadata: { type: new graphql.GraphQLList(SelectorMetadataType!) }
     }
 });
+// total plays for a geek for a month
+const MonthlyPlayCountType = new GraphQLObjectType({
+    name: "MonthlyPlaysCount",
+    fields: {
+        year: { type: graphql.GraphQLInt! },
+        month: { type: graphql.GraphQLInt! },
+        count: { type: graphql.GraphQLInt! }
+    }
+});
+// plays of a geek for a game for a month
+const MonthlyPlaysType = new GraphQLObjectType({
+    name: "MonthlyPlays",
+    fields: {
+        year: { type: graphql.GraphQLInt! },
+        month: { type: graphql.GraphQLInt! },
+        expansion: { type: graphql.GraphQLBoolean! },
+        quantity: { type: graphql.GraphQLInt! },
+        bggid: { type: graphql.GraphQLInt! },
+        game: {
+            type: GameDataType,
+            resolve: (parent: { bggid: number }) => gameLoader.load(parent.bggid)
+        }
+    }
+});
+const MonthlyPlaysAndCountsType = new GraphQLObjectType({
+    name: "MonthlyPlaysAndCounts",
+    fields: {
+        plays: { type: new graphql.GraphQLList(MonthlyPlaysType!) },
+        counts: { type: new graphql.GraphQLList(MonthlyPlayCountType!) },
+        geekGames: { type: new graphql.GraphQLList(GeekGameType!) }
+    }
+});
 
 const schema = new graphql.GraphQLSchema({
     query: new graphql.GraphQLObjectType({
@@ -136,9 +175,9 @@ const schema = new graphql.GraphQLSchema({
                     endYMD: { type: graphql.GraphQLInt }
                 },
                 type: MultiGeekPlaysType,
-                resolve: async (parent, args) =>
-                    await asyncReturnWithConnection(async conn =>
-                        await playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
+                resolve: async (parent: unknown, args) =>
+                    await asyncReturnWithConnection(
+                        async conn => playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
                     )
             },
             geekgames: {
@@ -147,26 +186,42 @@ const schema = new graphql.GraphQLSchema({
                     vars: { type: new graphql.GraphQLList(VarBindingInputType!) }
                 },
                 type: GeekGamesType,
-                resolve: async (parent, args) =>
-                    await asyncReturnWithConnection(async conn =>
-                        await geekGamesQueryForRetrieve(conn, args.selector, args.vars)
-                    )
+                resolve: async (parent: unknown, args) =>
+                    await asyncReturnWithConnection(
+                        async conn => geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars)))
             },
             years: {
                 args: {
                     geek: { type: graphql.GraphQLString! }
                 },
                 type: ListOfInt,
-                resolve: async(parent, args) =>
-                    await asyncReturnWithConnection(async conn =>
-                        await geekYearsQueryForRetrieve(conn, args.geek)
-                    )
+                resolve: async(parent: unknown, args) =>
+                    await asyncReturnWithConnection(
+                        async conn => geekYearsQueryForRetrieve(conn, args.geek))
+            },
+            monthly: {
+                args: {
+                    selector: { type: graphql.GraphQLString },
+                    vars: { type: new graphql.GraphQLList(VarBindingInputType!) }
+                },
+                type: MonthlyPlaysAndCountsType,
+                resolve: async (parent: unknown, args) =>
+                    await asyncReturnWithConnection(
+                        async conn => monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars)))
             }
         }
     })
 });
 
-type RetrievePlay = {
+interface CoreMonthlyPlays {
+    year: number;
+    month: number;
+    expansion: boolean;
+    quantity: number;
+    bggid: number;
+}
+
+interface RetrievePlay {
     game: number;
     quantity: number;
     ymd: number;
@@ -175,17 +230,31 @@ type RetrievePlay = {
     day: number;
     geek: string;
     expansions: number[];
-};
-interface VarBinding {
-    name: string;
-    value: string;
 }
+
 type GeekGameSelectWithGames = GeekGameSelectResult & { games: GameData[] };
 interface DesignerData {
     bggid: number;
     name: string;
     url: string;
     boring: boolean;
+}
+interface MonthlyPlaysAndCounts {
+    plays: CoreMonthlyPlays[],
+    counts: MonthlyPlayCount[]
+}
+
+async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBindings): Promise<MonthlyPlaysAndCounts> {
+    const evalResult = await selectGames(conn, selector, varBindings);
+    const geekGames = evalResult.geekGames.map(gg => gg.bggid);
+    const geek = varBindings.lookup("ME");
+    const plays: CoreMonthlyPlays[] = (await getMonthlyPlays(conn, geek))
+        .filter(gp => geekGames.indexOf(gp.game) >= 0)
+        .map((mp: MonthlyPlays) => {
+            return { year: mp.year, month: mp.month, expansion: mp.expansion, quantity: mp.quantity, bggid: mp.game }
+        });
+    const counts = (await getMonthlyCounts(conn, geek));
+    return { ...evalResult, counts, plays,  };
 }
 
 async function resolveDesignersForGame(conn: mysql.Connection, game: GameData): Promise<DesignerData[]> {
@@ -198,11 +267,12 @@ function extractDesignerData(dbRow: any): DesignerData {
     return { bggid: dbRow['bggid'] as number, name: dbRow['name'], url: dbRow['url'], boring: dbRow['boring'] };
 }
 
-async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBinding[]): Promise<GeekGameSelectWithGames> {
-    const expr: Expression = parse(selector);
-    const vars: Record<string, string> = {};
-    for (const vb of varBindings) vars[vb.name] = vb.value;
-    const evalResult: GeekGameSelectResult = await evaluateSimple(conn, expr, vars);
+async function selectGames(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<GeekGameSelectResult> {
+    return evaluateSimple(conn, parse(selector), vars);
+}
+
+async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<GeekGameSelectWithGames> {
+    const evalResult = await selectGames(conn, selector, vars);
     await addLastPlayOfGamesForGeek(conn, evalResult.geekGames);
     const gids = evalResult.geekGames.map(gg => gg.bggid);
     const games = await doRetrieveGames(conn, gids);
@@ -344,4 +414,8 @@ export async function retrieve(event: APIGatewayProxyEvent, context: Context, ca
         console.log(err);
         callback(err);
     }
+}
+
+async function batchGetGames(gameIds: number[]): Promise<GameData[]> {
+    return asyncReturnWithConnection(async conn => doRetrieveGames(conn, gameIds));
 }

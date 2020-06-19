@@ -8,6 +8,7 @@
     "aws-lambda": "^1.0.6",
     "aws-sdk": "^2.699.0",
     "extstats-core": "^1.10.0",
+    "dataloader": "^2.0.0",
     "graphql": "^15.1.0",
     "jsonwebtoken": "^8.5.1",
     "jwks-rsa": "^1.8.0",
