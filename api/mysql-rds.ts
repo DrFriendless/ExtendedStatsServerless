@@ -38,7 +38,7 @@ export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Pr
 function extractGameData(row: object, expansionData: ExpansionData): GameData {
     return { bggid: row["bggid"], bggRanking: row["rank"], bggRating: row["average"], minPlayers: row["minPlayers"],
         maxPlayers: row["maxPlayers"], name: row["name"], playTime: row["playTime"], subdomain: row["subdomain"],
-        weight: row["averageWeight"], yearPublished: row["yearPublished"], isExpansion: expansionData.isExpansion(row["bggid"]) } as GameData;
+        weight: row["averageWeight"], yearPublished: row["yearPublished"], isExpansion: expansionData.isExpansion(row["bggid"]) };
 }
 
 export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {

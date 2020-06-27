@@ -41,7 +41,7 @@ const GameDataType = new graphql.GraphQLObjectType({
         designers: {
             type: new graphql.GraphQLList(DesignerType!),
             resolve:
-                async (parent: GameData) => await asyncReturnWithConnection(async conn => resolveDesignersForGame(conn, parent))
+                async (parent: GameData) => await asyncReturnWithConnection(async conn => resolveDesignersForGame(conn, parent.bggid))
         }
     }
 });
@@ -241,11 +241,12 @@ interface DesignerData {
 }
 interface MonthlyPlaysAndCounts {
     plays: CoreMonthlyPlays[],
-    counts: MonthlyPlayCount[]
+    counts: MonthlyPlayCount[],
+    geekGames: GeekGame[]
 }
 
 async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBindings): Promise<MonthlyPlaysAndCounts> {
-    const evalResult = await selectGames(conn, selector, varBindings);
+    const evalResult: GeekGameSelectResult = await selectGames(conn, selector, varBindings);
     const geekGames = evalResult.geekGames.map(gg => gg.bggid);
     const geek = varBindings.lookup("ME");
     const plays: CoreMonthlyPlays[] = (await getMonthlyPlays(conn, geek))
@@ -253,13 +254,13 @@ async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: st
         .map((mp: MonthlyPlays) => {
             return { year: mp.year, month: mp.month, expansion: mp.expansion, quantity: mp.quantity, bggid: mp.game }
         });
-    const counts = (await getMonthlyCounts(conn, geek));
-    return { ...evalResult, counts, plays,  };
+    const counts = await getMonthlyCounts(conn, geek);
+    return { counts, plays, geekGames: evalResult.geekGames };
 }
 
-async function resolveDesignersForGame(conn: mysql.Connection, game: GameData): Promise<DesignerData[]> {
+async function resolveDesignersForGame(conn: mysql.Connection, gameId: number): Promise<DesignerData[]> {
     const sql = "select * from designers where bggid in (select designer from game_designers where game = ?)";
-    const rows = await conn.query(sql, [game.bggid]);
+    const rows = await conn.query(sql, [gameId]);
     return rows.map(extractDesignerData);
 }
 

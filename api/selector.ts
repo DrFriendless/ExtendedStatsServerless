@@ -194,9 +194,21 @@ async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGam
  */
 export async function evaluateSimple(conn: mysql.Connection, expr: Expression, vars: VarBindings): Promise<GeekGameSelectResult> {
     const metadata = new SelectorMetadataSet();
-    const ids = await evaluateExpression(conn, expr, vars, metadata);
+    const ids1 = await evaluateExpression(conn, expr, vars, metadata);
+    const ids = await getValidIds(conn, ids1);
     metadata.restrictTo(ids);
     return { geekGames: await retrieveGeekGames(conn, ids, vars.lookup("ME")), metadata } as GeekGameSelectResult;
+}
+
+async function getValidIds(conn: mysql.Connection, ids: number[]): Promise<number[]> {
+    const sqlOne = "select bggid from games where bggid = ?";
+    const sqlMany = "select bggid from games where bggid in (?)";
+    if (ids.length === 0) return [];
+    if (ids.length === 1) {
+        return (await conn.query(sqlOne, [ids[0]])).map(row => row["bggid"]);
+    } else {
+        return (await conn.query(sqlMany, [ids])).map(row => row["bggid"]);
+    }
 }
 
 export async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGameRow[]> {
