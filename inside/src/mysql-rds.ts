@@ -282,7 +282,6 @@ export async function doMarkUrlProcessedWithUpdate(conn: mysql.Connection, proce
 }
 
 export async function doMarkUrlUnprocessed(conn: mysql.Connection, processMethod: string, url: string) {
-    console.log(url);
     const sqlSet = "update files set last_scheduled = null where url = ? and processMethod = ?";
     await conn.query(sqlSet, [url, processMethod]);
 }
@@ -830,17 +829,11 @@ export async function doProcessPlaysResult(conn: mysql.Connection, data: Process
     for (const play of data.plays) {
         if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
     }
-    console.log("a");
     const geekId = await getGeekId(conn, data.geek);
-    console.log("b");
     const expansionData = await loadExpansionData(conn); // 2.1 sec
-    console.log("c");
     const notGames = await doEnsureGames(conn, gameIds);
-    console.log("d");
     await doSetGeekPlaysForMonth(conn, geekId, data.month, data.year, data.plays, notGames);
-    console.log("e");
     await doNormalisePlaysForMonth(conn, geekId, data.month, data.year, expansionData);
-    console.log("f");
     const now = new Date();
     const nowMonth = now.getFullYear() * 12 + now.getMonth();
     const thenMonth = data.year * 12 + data.month;
@@ -852,9 +845,6 @@ export async function doProcessPlaysResult(conn: mysql.Connection, data: Process
     } else {
         delta = "72:00:00";
     }
-    console.log("g");
     await doMarkUrlProcessedWithUpdate(conn, "processPlays", data.url, delta);
-    console.log("h");
-    await doUpdateFrontPageGeek(conn, data.geek); // 1.4 sec
-    console.log("i");
+    await doUpdateFrontPageGeek(conn, data.geek);
 }

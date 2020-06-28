@@ -6,7 +6,7 @@
   "dependencies": {
     "aws-lambda": "^1.0.6",
     "aws-sdk": "^2.706.0",
-    "extstats-core": "^1.10.0",
+    "extstats-core": "^1.10.3",
     "hoek": "^6.1.3",
     "lodash": "^4.17.15",
     "mysql": "^2.18.1",
