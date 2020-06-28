@@ -79,12 +79,6 @@ export interface MonthPlayed {
     year: number;
 }
 
-export interface ProcessMonthsPlayedResult {
-    geek: string;
-    monthsPlayed: MonthPlayed[];
-    url: string;
-}
-
 export interface PlayData {
     quantity: number;
     location: string;

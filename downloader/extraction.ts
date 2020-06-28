@@ -108,13 +108,7 @@ export function extractUserDataFromPage(geek: string, url: string, pageContent: 
     if (pageContent.indexOf(BEFORE_COUNTRY) >= 0) {
         country = between(pageContent, BEFORE_COUNTRY, AFTER_COUNTRY).replace("%20", " ");
     }
-    const result: ProcessUserResult = {
-        geek: geek,
-        url: url,
-        country: country,
-        bggid: bggid
-    };
-    return result;
+    return { geek, url, country, bggid };
 }
 
 export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string): Promise<ProcessGameResult> {

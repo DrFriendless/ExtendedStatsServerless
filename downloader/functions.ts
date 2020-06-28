@@ -1,11 +1,10 @@
-import { Callback } from "aws-lambda";
+import { Callback, Context } from "aws-lambda";
 import {
     ProcessCollectionResult,
     FileToProcess,
     ToProcessElement,
     CleanUpCollectionResult,
     MonthPlayed,
-    ProcessMonthsPlayedResult,
     ProcessPlaysResult,
     SeriesMetadata,
     MetadataRule,
@@ -62,7 +61,7 @@ const FUNCTION_MARK_TOMORROW = "updateUrlAsTryTomorrow";
 const MAX_GAMES_PER_CALL = 500;
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
-export function processUserList(event, context, callback: Callback) {
+export function processUserList(event, context: Context, callback: Callback) {
     const usersFile = process.env["USERS_FILE"];
     let count;
     promiseToCallback(request(encodeURI(usersFile))
@@ -76,7 +75,7 @@ export function processUserList(event, context, callback: Callback) {
 }
 
 // Lambda to get the metadata from pastebin and send it to the database.
-export async function processMetadata(event, context, callback: Callback) {
+export async function processMetadata(event, context: Context, callback: Callback) {
     const metadataFile = process.env["METADATA_FILE"];
     const series: SeriesMetadata[] = [];
     const rules: MetadataRule[] = [];
@@ -115,7 +114,7 @@ export async function processMetadata(event, context, callback: Callback) {
     }
 }
 
-export async function processBGGTop50(event, context, callback: Callback) {
+export async function processBGGTop50(event, context: Context, callback: Callback) {
     const TOP50_URL = "https://www.boardgamegeek.com/browse/boardgame";
     try {
         const data = await request(TOP50_URL);
@@ -135,7 +134,7 @@ export async function processBGGTop50(event, context, callback: Callback) {
 }
 
 // Lambda to get files to be processed and invoke the lambdas to do that
-export function fireFileProcessing(event, context, callback: Callback) {
+export function fireFileProcessing(event, context: Context, callback: Callback) {
     let count = PROCESS_COUNT;
     const envCount = process.env["COUNT"];
     if (parseInt(envCount)) count = parseInt(envCount);
@@ -171,7 +170,7 @@ export function fireFileProcessing(event, context, callback: Callback) {
 }
 
 // Lambda to harvest data about a game
-export async function processGame(event, context, callback: Callback) {
+export async function processGame(event, context: Context, callback: Callback) {
     const invocation = event as FileToProcess;
     console.log(invocation.url);
     const data = await request(encodeURI(invocation.url));
@@ -192,7 +191,7 @@ export async function processGame(event, context, callback: Callback) {
 }
 
 // Lambda to harvest data about a user
-export function processUser(event, context, callback: Callback) {
+export function processUser(event, context: Context, callback: Callback) {
     console.log(event);
     const invocation = event as FileToProcess;
 
@@ -204,8 +203,7 @@ export function processUser(event, context, callback: Callback) {
 }
 
 // Lambda to harvest a user's collection
-export async function processCollection(event, context, callback: Callback) {
-    const invocation = event as FileToProcess;
+export async function processCollection(invocation: FileToProcess, context: Context, callback: Callback) {
     try {
         const code = await tryToProcessCollection(invocation);
         if (code === 202) {
@@ -215,7 +213,7 @@ export async function processCollection(event, context, callback: Callback) {
         }
         callback();
     } catch (e) {
-        console.log(event);
+        console.log(invocation);
         if (e.toString().includes("Collection exceeds maximum export size")) {
             console.log("try again tomorrow");
             await markTryAgainTomorrow("processCollection", invocation);
@@ -257,7 +255,7 @@ async function ensureGames(ids: number[]): Promise<number[]> {
         uri: "http://eb.drfriendless.com/downloader/ensuregames",
         json: ids
     };
-    return await request.post(options).auth("downloader", process.env["downloaderPassword"]);
+    return request.post(options).auth("downloader", process.env["downloaderPassword"]);
 }
 
 async function cleanupCollection(collection: ProcessCollectionResult, url: string) {
@@ -286,8 +284,7 @@ function splitCollection(original: ProcessCollectionResult): ProcessCollectionRe
         .map(items => { return { geek: original.geek, items: items }; });
 }
 
-export async function processPlayed(event, context, callback: Callback) {
-    const invocation = event as FileToProcess;
+export async function processPlayed(invocation: FileToProcess, context: Context, callback: Callback) {
     const data: string = await request(encodeURI(invocation.url));
     const toAdd: MonthPlayed[] = [];
     data.split("\n")
@@ -302,8 +299,7 @@ export async function processPlayed(event, context, callback: Callback) {
     await invokeLambdaAsync("processPlayed", INSIDE_PREFIX + FUNCTION_PROCESS_PLAYED_RESULT, monthsData);
 }
 
-export async function processPlays(event, context, callback: Callback) {
-    const invocation = event as FileToProcess;
+export async function processPlays(invocation: FileToProcess, context: Context, callback: Callback) {
     let playsData: PlayData[] = [];
     let pagesSoFar = 0;
     let pagesNeeded = -1;

@@ -4,25 +4,25 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "aws-lambda": "^1.0.5",
-    "aws-sdk": "^2.639.0",
-    "extstats-core": "^1.8.0",
+    "aws-lambda": "^1.0.6",
+    "aws-sdk": "^2.706.0",
+    "extstats-core": "^1.10.3",
     "hoek": "^4.2.1",
     "lodash": "^4.17.15",
-    "npm": "^6.14.2",
+    "npm": "^6.14.5",
     "request": "^2.88.2",
     "request-promise-native": "^1.0.8",
     "xml2js": "^0.4.23",
     "xml2js-es6-promise": "^1.1.1"
   },
   "devDependencies": {
-    "@types/aws-lambda": "^8.10.46",
-    "@types/lodash": "^4.14.149",
-    "@types/node": "^13.9.1",
+    "@types/aws-lambda": "^8.10.57",
+    "@types/lodash": "^4.14.157",
+    "@types/node": "^13.13.12",
     "aws-lambda-typescript": "^3.0.0",
-    "serverless": "^1.66.0",
+    "serverless": "^1.74.0",
     "serverless-domain-manager": "^2.6.13",
     "serverless-plugin-typescript": "^1.1.7",
-    "typescript": "^3.8.3"
+    "typescript": "^3.9.5"
   }
 }
