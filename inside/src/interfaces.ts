@@ -148,10 +148,3 @@ export interface WorkingNormalisedPlays {
     location: string;
 }
 
-export interface ErrorMessage {
-    first: Date;
-    last: Date;
-    source: string;
-    message: string;
-    count: number;
-}

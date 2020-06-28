@@ -49,6 +49,7 @@ export async function runEnsureUsers(users: string[]) {
     console.log("runEnsureUsers complete");
 }
 
+// currently implemented in the Express server
 export async function runEnsureGames(games: CollectionGame[]) {
     await withConnectionAsync(async conn => await doEnsureGames(conn, games.map(cg => cg.gameId)));
 }

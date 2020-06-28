@@ -1,6 +1,5 @@
 import * as _ from "lodash";
 import { NormalisedPlays, WorkingNormalisedPlays } from "./interfaces";
-// import { ExpansionData } from "extstats-core";
 import {extractNormalisedPlayFromPlayRow, playDate, PlaysRow} from "./library";
 import {ExpansionData} from "extstats-core";
 

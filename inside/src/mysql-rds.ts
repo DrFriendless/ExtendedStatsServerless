@@ -543,6 +543,21 @@ type PlaysDataForWarTable = {
     uses: number[]
 };
 
+function calcIndexes(hindexData: number[]) {
+    let hindex = 0;
+    while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
+    let gindex = 0;
+    let gindexTotal = 0;
+    while (hindexData.length > gindex && (gindexTotal + hindexData[gindex] >= (gindex + 1) * (gindex + 1))) {
+        gindexTotal += hindexData[gindex];
+        gindex++;
+    }
+    let n = hindexData.filter(x => x > hindex).length;
+    if (hindexData.length > hindex) n += hindexData[hindex];
+    const hrindex = hindex + n / (2 * hindex + 1);
+    return {hindex, gindex, hrindex};
+}
+
 export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<PlaysDataForWarTable> {
     const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
     const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
@@ -557,17 +572,7 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
     const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
     const zeros = (await conn.query(zerosSql, [geekId, geekId]))[0]["z"];
     const hindexData: number[] = (await conn.query(hindexSql, [geekId])).map((row: { q: number }) => row.q);
-    let hindex = 0;
-    while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
-    let gindex = 0;
-    let gindexTotal = 0;
-    while (hindexData.length > gindex && (gindexTotal + hindexData[gindex] >= (gindex + 1) * (gindex + 1))) {
-        gindexTotal += hindexData[gindex];
-        gindex++;
-    }
-    let n = hindexData.filter(x => x > hindex).length;
-    if (hindexData.length > hindex) n += hindexData[hindex];
-    const hrindex = hindex + n / (2 * hindex + 1);
+    let {hindex, gindex, hrindex} = calcIndexes(hindexData);
     const sdjId = await getIdForSeries(conn, "Spiel des Jahre");
     const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
     const ext100Id = await getIdForSeries(conn, "Extended Stats Top 100");
@@ -583,12 +588,14 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
     const geekId = await getGeekId(conn, geekName);
     const top50Id = await getIdForSeries(conn, "BGG Top 50");
     const top50 = await getGamesForSeries(conn, top50Id);
-    const owned = await countWhere(conn, "geekgames where geekId = ? and owned > 0", [geekId]);
-    const want = await countWhere(conn, "geekgames where geekId = ? and want > 0", [geekId]);
-    const wish = await countWhere(conn, "geekgames where geekId = ? and wish > 0", [geekId]);
-    const trade = await countWhere(conn, "geekgames where geekId = ? and trade > 0", [geekId]);
-    const prevOwned = await countWhere(conn, "geekgames where geekId = ? and prevowned > 0", [geekId]);
-    const preordered = await countWhere(conn, "geekgames where geekId = ? and preordered > 0", [geekId]);
+    const geekRows: { owned: number, want: number, wish: number, trade: number, prevowned: number, preordered: number }[] =
+        await conn.query("select owned, want, wish, trade, prevowned, preordered from geekgames where geekId = ?", [geekId]);
+    const owned = geekRows.filter(row => row.owned > 0).length
+    const want = geekRows.filter(row => row.want > 0).length
+    const wish = geekRows.filter(row => row.wish > 0).length
+    const trade = geekRows.filter(row => row.trade > 0).length
+    const prevOwned = geekRows.filter(row => row.prevowned > 0).length
+    const preordered = geekRows.filter(row => row.preordered > 0).length
     let top50Count = 0;
     if (top50.length > 0) {
         const sql = "select distinct game from plays_normalised where geek = ? and game in (?);";
@@ -823,11 +830,17 @@ export async function doProcessPlaysResult(conn: mysql.Connection, data: Process
     for (const play of data.plays) {
         if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
     }
+    console.log("a");
     const geekId = await getGeekId(conn, data.geek);
-    const expansionData = await loadExpansionData(conn);
+    console.log("b");
+    const expansionData = await loadExpansionData(conn); // 2.1 sec
+    console.log("c");
     const notGames = await doEnsureGames(conn, gameIds);
+    console.log("d");
     await doSetGeekPlaysForMonth(conn, geekId, data.month, data.year, data.plays, notGames);
+    console.log("e");
     await doNormalisePlaysForMonth(conn, geekId, data.month, data.year, expansionData);
+    console.log("f");
     const now = new Date();
     const nowMonth = now.getFullYear() * 12 + now.getMonth();
     const thenMonth = data.year * 12 + data.month;
@@ -839,6 +852,9 @@ export async function doProcessPlaysResult(conn: mysql.Connection, data: Process
     } else {
         delta = "72:00:00";
     }
+    console.log("g");
     await doMarkUrlProcessedWithUpdate(conn, "processPlays", data.url, delta);
-    await doUpdateFrontPageGeek(conn, data.geek);
+    console.log("h");
+    await doUpdateFrontPageGeek(conn, data.geek); // 1.4 sec
+    console.log("i");
 }

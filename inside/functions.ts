@@ -10,7 +10,6 @@ import {
     ProcessGameResult, ProcessMonthsPlayedResult, ProcessPlaysResult,
     ProcessUserResult
 } from './src/interfaces';
-import { getConnection } from './src/library';
 import {
     runEnsureUsers, recordError,
     runListToProcess,
@@ -149,15 +148,12 @@ export async function processPlayedMonths(event: ProcessMonthsPlayedResult, cont
 
 export async function processPlaysResult(event: ProcessPlaysResult, context: Context, callback: Callback) {
     context.callbackWaitsForEmptyEventLoop = false;
-    const conn = await getConnection();
     try {
         await runProcessPlaysResult(event);
         callback();
     } catch (e) {
         console.log(e);
         callback(e);
-    } finally {
-        if (conn) conn.destroy();
     }
 }
 
