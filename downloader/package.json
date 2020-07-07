@@ -9,7 +9,7 @@
     "extstats-core": "^1.10.3",
     "hoek": "^4.2.1",
     "lodash": "^4.17.15",
-    "npm": "^6.14.5",
+    "npm": "^6.14.6",
     "request": "^2.88.2",
     "request-promise-native": "^1.0.8",
     "xml2js": "^0.4.23",
