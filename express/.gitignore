@@ -11,3 +11,4 @@ node_modules/
 /.env.example
 /extstats-express.zip
 /.env.production
+/.env.mysql

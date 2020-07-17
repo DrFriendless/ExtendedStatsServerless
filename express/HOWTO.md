@@ -1,3 +1,13 @@
+# HOW TO BUILD
+
+./package.sh
+
+# HOW TO DEPLOY
+
+scp -i ~/.ssh/extstats-express.pem extstats-express.zip ubuntu@eb2.drfriendless.com:/opt/express
+
+Then run unpackage.sh on the server as described below.
+
 # HOW TO CREATE THE EXPRESS SERVER
 
 Create an EC2 instance from the extstats-express AMI. Put it in a public subnet and give it a public IP address.
