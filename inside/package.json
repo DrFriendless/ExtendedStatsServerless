@@ -19,7 +19,7 @@
     "aws-lambda-typescript": "^3.0.0",
     "gulp": "^3.9.1",
     "jest": "^26.1.0",
-    "npm": "^6.14.5",
+    "npm": "^6.14.6",
     "serverless": "^1.74.0",
     "serverless-domain-manager": "^2.6.13",
     "serverless-plugin-typescript": "^1.1.9",
