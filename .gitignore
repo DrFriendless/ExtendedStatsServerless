@@ -60,6 +60,7 @@ typings/
 .idea
 /secrets.json
 /database.json
+/database-mysql.json
 .serverless
 static
 /jwks.json
