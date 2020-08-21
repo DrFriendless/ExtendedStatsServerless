@@ -30,7 +30,7 @@ export interface ProcessGameResult {
     gameId: number;
     name: string;
     average: number;
-    rank: number;
+    rank: number | null;
     yearPublished: number;
     minPlayers: number;
     maxPlayers: number;

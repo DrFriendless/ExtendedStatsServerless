@@ -150,10 +150,12 @@ async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mecha
 }
 
 async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
-    const insertSql = "insert into games (bggid, name, average, rank, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
+    const insertSql = "insert into games (bggid, name, average, `rank`, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
         "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-    const updateSql = "update games set name = ?, average = ?, rank = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
+    const updateSql = "update games set name = ?, average = ?, `rank` = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
         "averageWeight = ?, bayesAverage = ?, numComments = ?, usersOwned = ?, subdomain = ? where bggid = ?";
+    data.rank = data.rank || 0;
+    data.numComments = data.numComments || 0;
     try {
         await conn.query(insertSql, [data.gameId, data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
             data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
