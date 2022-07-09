@@ -6,7 +6,7 @@
   "dependencies": {
     "@types/aws-lambda": "0.0.17",
     "@types/node": "^8.0.34",
-    "aws-sdk": "^2.259.1",
+    "aws-sdk": "^2.814.0",
     "npm": "^6.13.4",
     "serverless": "^1.28.0"
   },
