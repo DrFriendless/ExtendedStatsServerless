@@ -5,7 +5,7 @@
   "private": true,
   "dependencies": {
     "aws-lambda": "^1.0.6",
-    "aws-sdk": "^2.738.0",
+    "aws-sdk": "^2.814.0",
     "extstats-core": "^1.10.4",
     "hoek": "^4.2.1",
     "lodash": "^4.17.20",
