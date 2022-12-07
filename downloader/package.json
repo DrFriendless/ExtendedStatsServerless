@@ -21,7 +21,7 @@
     "@types/node": "^13.13.15",
     "aws-lambda-typescript": "^3.0.0",
     "gulp": "^3.9.1",
-    "serverless": "^1.79.0",
+    "serverless": "^3.25.1",
     "serverless-domain-manager": "^2.6.13",
     "serverless-plugin-typescript": "^1.1.7",
     "typescript": "^3.9.7"
