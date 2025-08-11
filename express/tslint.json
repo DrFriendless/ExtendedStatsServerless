@@ -52,6 +52,6 @@
     "prefer-const": true,
     "jsdoc-format": true,
     "no-floating-promises": true,
-    "await-promise": true
+    "await-promise": [true, "Bluebird", "PromiseLike"]
   }
 }

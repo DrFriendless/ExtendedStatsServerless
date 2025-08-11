@@ -5,6 +5,7 @@
 # HOW TO DEPLOY
 
 scp -i ~/.ssh/extstats-express.pem extstats-express.zip ubuntu@eb2.drfriendless.com:/opt/express
+./deploy.sh
 
 Then run unpackage.sh on the server as described below.
 

@@ -25,7 +25,7 @@ app.set("port", process.env.PORT || 3000);
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "pug");
 
-const accessLogStream = fs.createWriteStream(path.join("/var/log", 'express.log'), { flags: 'a' });
+const accessLogStream = fs.createWriteStream(path.join("/tmp", 'express.log'), { flags: 'a' });
 app.use(logger("combined", { stream: accessLogStream }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

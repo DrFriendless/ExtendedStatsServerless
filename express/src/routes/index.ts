@@ -5,5 +5,5 @@ import { Request, Response } from "express";
  * Home page.
  */
 export let index = (req: Request, res: Response) => {
-    res.render("index", { title: "Express" });
+    res.render("index", { title: "Express", name: "the Extended Stats API" });
 };

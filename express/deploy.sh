@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-scp -i ~/.ssh/extstats-express.pem extstats-express.zip ubuntu@eb2.drfriendless.com:/opt/express
-scp -i ~/.ssh/extstats-express.pem unpackage.sh ubuntu@eb2.drfriendless.com:/opt/express
-scp -i ~/.ssh/extstats-express.pem .env.production ubuntu@eb2.drfriendless.com:/opt/express/.env
+cp extstats-express.zip ../eb2/staging
+cp unpackage.sh ../eb2/staging/unpackage-express.sh
+cp .env.production ../eb2/staging/.env
