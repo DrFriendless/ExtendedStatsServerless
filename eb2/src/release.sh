@@ -1,2 +1,23 @@
+#!/usr/bin/env bash
 cd /opt/express
-. ./unpackage-express.sh
+pm2 stop express insideq
+
+# express
+pm2 stop express
+rm -rf express
+mkdir express
+cp extstats-express.zip express
+cd express
+unzip -n extstats-express.zip
+cd ..
+
+# insideq
+pm2 stop insideq
+rm -rf insideq
+mkdir insideq
+cp inside-queue.zip insideq
+cd insideq
+unzip -n inside-queue.zip
+cd ..
+
+pm2 start pm2.config.js -u root
