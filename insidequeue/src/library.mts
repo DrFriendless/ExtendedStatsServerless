@@ -1,5 +1,6 @@
 import mysql = require('promise-mysql');
-import { Lambda } from 'aws-sdk';
+import aws_sdk from 'aws-sdk';
+const { Lambda } = aws_sdk;
 import {NormalisedPlays} from "./interfaces.mjs";
 
 const INSIDE_PREFIX = "inside-dev-";

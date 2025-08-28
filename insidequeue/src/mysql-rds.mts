@@ -265,7 +265,7 @@ async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: numbe
 // longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
 const TILL_NEXT_UPDATE = { "processCollection" : "72:00:00", "processMarket" : "72:00:00", "processPlayed" : "72:00:00",
     "processGame" : "838:00:00", "processTop50" : "72:00:00", "processFrontPage" : "24:00:00", "processUser": "838:00:00",
-    "processPlays": undefined, "processDesigner": undefined, "processPublisher": undefined };
+    "processPlays": undefined as string, "processDesigner": undefined as string, "processPublisher": undefined as string };
 
 function about3Days(): string {
     const minutes = 3600 + Math.floor(Math.random() * 1440);

@@ -4,11 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npx ts-node src/main.ts",
-    "build": "npm run build-ts && npm run tslint",
-    "build-ts": "tsc",
-    "tslint": "tslint -c tslint.json -p tsconfig.json"
+    "start": "npx ts-node src/main.mts",
+    "build": "npm run build-ts && npm run eslint",
+    "build-ts": "npx tsc",
+    "eslint": "eslint"
   },
+  "type": "module",
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -16,6 +17,7 @@
     "@aws-sdk/client-sqs": "^3.864.0",
     "async": "^3.2.6",
     "aws-sdk": "^2.1692.0",
+    "disposablestack": "^1.1.7",
     "dotenv": "^17.2.1",
     "extstats-core": "^1.12.1",
     "lodash": "^4.17.21",
@@ -25,11 +27,12 @@
   },
   "devDependencies": {
     "@aws-sdk/types": "^3.862.0",
+    "@tsconfig/node-ts": "^23.6.1",
     "@types/async": "^3.2.25",
     "@types/lodash": "^4.17.20",
-    "@types/node": "^24.2.1",
+    "@types/node": "^24.3.0",
     "ts-node": "^10.9.2",
-    "tslint": "^5.20.1",
+    "eslint": "^9.34.0",
     "typescript": "^5.9.2"
   }
 }

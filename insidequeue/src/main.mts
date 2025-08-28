@@ -1,5 +1,5 @@
 
-import mysql = require('promise-mysql');
+import mysql from 'promise-mysql';
 import {
     GetQueueUrlCommand,
     Message,
@@ -8,8 +8,8 @@ import {
     SQSClient
 } from "@aws-sdk/client-sqs";
 import dotenv from "dotenv";
-import * as process from "process";
-import {QueueMessage} from "extstats-core";
+import process from "process";
+import { QueueMessage } from "extstats-core";
 import {
     doEnsureUsers,
     doMarkGameDoesNotExist,
@@ -19,7 +19,7 @@ import {
     doProcessGameResult, doProcessPlayedMonths, doProcessPlaysResult,
     doUpdateBGGTop50, doUpdateGamesForGeek, doUpdateMetadata, doUpdateProcessUserResult
 } from "./mysql-rds.mjs";
-const S3StreamLogger = require('s3-streamlogger').S3StreamLogger;
+import { S3StreamLogger } from "s3-streamlogger";
 
 dotenv.config({ path: ".env" });
 
