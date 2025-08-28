@@ -4,16 +4,11 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@types/aws-lambda": "0.0.17",
-    "@types/node": "^8.0.34",
-    "aws-sdk": "^2.259.1",
-    "npm": "^6.13.4",
-    "serverless": "^1.28.0"
+    "@types/aws-lambda": "^8.10.152",
+    "@types/node": "^24.3.0",
+    "aws-sdk": "^2.1692.0"
   },
   "devDependencies": {
-    "@angular/cli": "^6.0.8",
-    "@types/node": "^8.5.2",
-    "serverless-plugin-typescript": "^1.1.5",
-    "serverless-s3-deploy": "^0.7.0"
+    "@types/node": "^24.3.0"
   }
 }
