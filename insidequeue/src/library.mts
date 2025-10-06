@@ -1,8 +1,6 @@
 import mysql = require('promise-mysql');
 import {NormalisedPlays} from "./interfaces.mjs";
 
-const INSIDE_PREFIX = "inside-dev-";
-
 export type PlaysRow = { game: number, playDate: string, quantity: number, location: string };
 
 export async function withConnectionAsync(func: (conn: mysql.Connection) => Promise<any>) {
@@ -40,6 +38,7 @@ export async function getConnection(): Promise<mysql.Connection> {
         password: process.env.mysqlPassword,
         database: process.env.mysqlDatabase
     };
+    console.log(params);
     return mysql.createConnection(params);
 }
 

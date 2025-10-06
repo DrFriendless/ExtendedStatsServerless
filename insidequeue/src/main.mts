@@ -1,6 +1,7 @@
 
 import mysql from 'promise-mysql';
 import {
+    DeleteMessageCommand,
     GetQueueUrlCommand,
     Message,
     ReceiveMessageCommand,
@@ -44,7 +45,7 @@ async function main() {
         const command = new ReceiveMessageCommand(input);
         const response = await sqsClient.send(command);
         if (response.Messages) {
-            await handleMessages(response.Messages);
+            await handleMessages(response.Messages, queueUrl);
         } else {
             logstream.write("Still no messages.\n");
             console.log("No messages");
@@ -53,13 +54,16 @@ async function main() {
     logstream.write("We terminated.\n");
 }
 
-async function handleMessages(messages: Message[]) {
+async function handleMessages(messages: Message[], queueUrl: string): Promise<void> {
     for (const message of messages) {
+        console.log(message);
+        const receiptHandle = message.ReceiptHandle;
         if (message.Body) {
             const payload = JSON.parse(message.Body);
             console.log(payload);
             await handleQueueMessage(payload as QueueMessage);
         }
+        await sqsClient.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: receiptHandle }));
     }
 }
 

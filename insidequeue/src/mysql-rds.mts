@@ -328,48 +328,49 @@ export async function doEnsureUsers(conn: mysql.Connection, users: string[]) {
 }
 
 async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) {
-    console.log("Deleting " + extraUsers.length + " unwanted users.");
-    console.log(extraUsers);
-    const idsToDelete = [];
-    for (const u of extraUsers) {
-        const geekId = await getGeekId(conn, u);
-        idsToDelete.push(geekId);
-    }
-    const deleteOneFile = "delete from files where geekid = ?";
-    const deleteOneFileByName = "delete from files where geek = ?";
-    const deleteOneGeek = "delete from geeks where username = ?";
-    const deleteSomeFiles = "delete from files where geekid in (?)";
-    const deleteSomeFilesByName = "delete from files where geek in (?)";
-    const deleteSomeGeeks = "delete from geeks where username in (?)";
-    const deleteOnePlays = "delete from plays where geek = ?";
-    const deleteSomePlays = "delete from plays where geek in (?)";
-    const deleteOneNormalisedPlays = "delete from plays_normalised where geek = ?";
-    const deleteSomeNormalisedPlays = "delete from plays_normalised where geek in (?)";
-    const deleteOneWarTable = "delete from war_table where geek = ?";
-    const deleteSomeWarTable = "delete from war_table where geek in (?)";
-    const deleteOneGeekGames = "delete from geekgames where geekid = ?";
-    const deleteSomeGeekGames = "delete from geekgames where geekid in (?)";
-    const deleteOneMonthPlayed = "delete from months_played where geek = ?";
-    const deleteSomeMonthsPlayed = "delete from months_played where geek in (?)";
-    if (extraUsers.length === 1) {
-        await conn.query(deleteOneWarTable, idsToDelete);
-        await conn.query(deleteOnePlays, idsToDelete);
-        await conn.query(deleteOneNormalisedPlays, idsToDelete);
-        await conn.query(deleteOneFile, idsToDelete);
-        await conn.query(deleteOneFileByName, extraUsers);
-        await conn.query(deleteOneGeekGames, idsToDelete);
-        await conn.query(deleteOneMonthPlayed, idsToDelete);
-        await conn.query(deleteOneGeek, extraUsers);
-    } else if (extraUsers.length > 0) {
-        await conn.query(deleteSomeWarTable, [idsToDelete]);
-        await conn.query(deleteSomePlays, [idsToDelete]);
-        await conn.query(deleteSomeNormalisedPlays, [idsToDelete]);
-        await conn.query(deleteSomeFiles, [idsToDelete]);
-        await conn.query(deleteSomeFilesByName, [extraUsers]);
-        await conn.query(deleteSomeGeekGames, [idsToDelete]);
-        await conn.query(deleteSomeMonthsPlayed, [idsToDelete]);
-        await conn.query(deleteSomeGeeks, [extraUsers]);
-    }
+    console.log("Not deleting extra users");
+    // console.log("Deleting " + extraUsers.length + " unwanted users.");
+    // console.log(extraUsers);
+    // const idsToDelete = [];
+    // for (const u of extraUsers) {
+    //     const geekId = await getGeekId(conn, u);
+    //     idsToDelete.push(geekId);
+    // }
+    // const deleteOneFile = "delete from files where geekid = ?";
+    // const deleteOneFileByName = "delete from files where geek = ?";
+    // const deleteOneGeek = "delete from geeks where username = ?";
+    // const deleteSomeFiles = "delete from files where geekid in (?)";
+    // const deleteSomeFilesByName = "delete from files where geek in (?)";
+    // const deleteSomeGeeks = "delete from geeks where username in (?)";
+    // const deleteOnePlays = "delete from plays where geek = ?";
+    // const deleteSomePlays = "delete from plays where geek in (?)";
+    // const deleteOneNormalisedPlays = "delete from plays_normalised where geek = ?";
+    // const deleteSomeNormalisedPlays = "delete from plays_normalised where geek in (?)";
+    // const deleteOneWarTable = "delete from war_table where geek = ?";
+    // const deleteSomeWarTable = "delete from war_table where geek in (?)";
+    // const deleteOneGeekGames = "delete from geekgames where geekid = ?";
+    // const deleteSomeGeekGames = "delete from geekgames where geekid in (?)";
+    // const deleteOneMonthPlayed = "delete from months_played where geek = ?";
+    // const deleteSomeMonthsPlayed = "delete from months_played where geek in (?)";
+    // if (extraUsers.length === 1) {
+    //     await conn.query(deleteOneWarTable, idsToDelete);
+    //     await conn.query(deleteOnePlays, idsToDelete);
+    //     await conn.query(deleteOneNormalisedPlays, idsToDelete);
+    //     await conn.query(deleteOneFile, idsToDelete);
+    //     await conn.query(deleteOneFileByName, extraUsers);
+    //     await conn.query(deleteOneGeekGames, idsToDelete);
+    //     await conn.query(deleteOneMonthPlayed, idsToDelete);
+    //     await conn.query(deleteOneGeek, extraUsers);
+    // } else if (extraUsers.length > 0) {
+    //     await conn.query(deleteSomeWarTable, [idsToDelete]);
+    //     await conn.query(deleteSomePlays, [idsToDelete]);
+    //     await conn.query(deleteSomeNormalisedPlays, [idsToDelete]);
+    //     await conn.query(deleteSomeFiles, [idsToDelete]);
+    //     await conn.query(deleteSomeFilesByName, [extraUsers]);
+    //     await conn.query(deleteSomeGeekGames, [idsToDelete]);
+    //     await conn.query(deleteSomeMonthsPlayed, [idsToDelete]);
+    //     await conn.query(deleteSomeGeeks, [extraUsers]);
+    // }
 }
 
 async function doEnsureUser(conn: mysql.Connection, user: string) {
