@@ -1,14 +1,14 @@
+import { between, logError } from "./library.mjs";
 import {
-    ProcessUserResult,
-    ProcessCollectionResult,
-    ProcessGameResult, CollectionGame,
-    FileToProcess, PlayData
-} from "./interfaces";
-import { between, logError } from "./library";
-const xml2js = require('xml2js-es6-promise');
+    CollectionGame,
+    PlayData,
+    ProcessCollectionResult, ProcessGameResult,
+    ProcessUserResult, FileToProcess
+} from "extstats-core";
+import { parseStringPromise } from 'xml2js';
 
 export async function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
-    const dom = await xml2js(pageContent, {trim: true});
+    const dom = await parseStringPromise(pageContent, {trim: true});
     if (dom && dom.message) {
         console.log("BGG says come back later");
         throw new Error("BGG says come back later to get collection for " + geek);
@@ -27,19 +27,19 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
         await logError("Found no games in collection for " + geek);
     }
     const items: CollectionGame[] = [];
-    const byId = {};
+    const byId: Record<string, Partial<CollectionGame>> = {};
     if (dom.items.item) {
-        dom.items.item.forEach(item => {
+        dom.items.item.forEach((item: any) => {
             if (item.$.subtype != 'boardgame') {
                 console.log(item.$.subtype + " not a board game");
             } else {
-                const gameId = item.$.objectid;
+                const gameId: string = item.$.objectid;
                 // const name = item.name[0]._;
                 const stats = item.stats[0];
                 const status = item.status[0];
                 const existingItem = byId[gameId];
                 const existing = !!existingItem;
-                const gameItem = existingItem || ({ gameId: gameId, rating: -1 } as CollectionGame);
+                const gameItem = existingItem || ({ gameId: gameId, rating: -1 } as unknown as CollectionGame);
                 if (stats) {
                     const rating = stats.rating;
                     if (rating && rating.length > 0) {
@@ -59,7 +59,7 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
                     gameItem.preordered = gameItem.preordered || (status.$.preordered === '1');
                 }
                 if (!existing) {
-                    items.push(gameItem);
+                    items.push(gameItem as CollectionGame);
                     byId[gameItem.gameId] = gameItem;
                 }
             }
@@ -112,7 +112,7 @@ export function extractUserDataFromPage(geek: string, url: string, pageContent: 
 }
 
 export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string): Promise<ProcessGameResult> {
-    const dom = await xml2js(pageContent, {trim: true});
+    const dom = await parseStringPromise(pageContent, {trim: true});
     if (!dom || !dom.boardgames || dom.boardgames.boardgame.length === 0) {
         throw new NoSuchGameError(bggid);
     }
@@ -123,7 +123,7 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         // console.log(boardgame);
         if (boardgame.error) throw new NoSuchGameError(bggid);
         const expansions = boardgame.boardgameexpansion || [];
-        const expIds = expansions.filter(row => row.$.inbound != "true").map(row => parseInt(row.$.objectid));
+        const expIds = expansions.filter((row: any) => row.$.inbound != "true").map((row: any) => parseInt(row.$.objectid));
         const categories = boardgame.boardgamecategory;
         const mechanics = boardgame.boardgamemechanic;
         const designers = boardgame.boardgamedesigner;
@@ -134,7 +134,7 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         const ranks = ratings[0].ranks[0].rank;
         let ranking = 0;
         if (ranks) {
-            const bgRank = ranks.filter(r => r.$.name = 'boardgame');
+            const bgRank = ranks.filter((r: any) => r.$.name = 'boardgame');
             if (bgRank.length > 0) {
                 const rankingValue = bgRank[0].$.value;
                 try {
@@ -143,7 +143,7 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
                 }
             }
         }
-        const name = names.filter(it => it.$.primary == 'true')[0]._;
+        const name = names.filter((it: any) => it.$.primary == 'true')[0]._;
         result.gameId = parseInt(boardgame.$.objectid);
         result.yearPublished = parseInt(boardgame.yearpublished[0]);
         result.minPlayers = parseInt(boardgame.minplayers[0]);
@@ -161,10 +161,10 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         result.usersRated = parseInt(ratings[0].usersrated);
         result.name = name;
         result.url = url;
-        result.categories = categories ? categories.map(c => c._) : [];
-        result.mechanics = mechanics ? mechanics.map(c => c._) : [];
-        result.designers = designers ? designers.map(c => parseInt(c.$.objectid)) : [];
-        result.publishers = publishers ? publishers.map(c => parseInt(c.$.objectid)) : [];
+        result.categories = categories ? categories.map((c: any) => c._) : [];
+        result.mechanics = mechanics ? mechanics.map((c: any) => c._) : [];
+        result.designers = designers ? designers.map((c: any) => parseInt(c.$.objectid)) : [];
+        result.publishers = publishers ? publishers.map((c: any) => parseInt(c.$.objectid)) : [];
         result.rank = ranking;
         result.expansions = expIds;
     }
@@ -180,7 +180,7 @@ export class NoSuchGameError {
 }
 
 export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<{ count: number, plays: PlayData[] }> {
-    const dom = await xml2js(fileContents, {trim: true});
+    const dom = await parseStringPromise(fileContents, {trim: true});
     const result: PlayData[] = [];
     if (!dom || !dom.plays || !dom.plays.play) {
         console.log("Plays not found");
@@ -189,7 +189,7 @@ export async function processPlaysFile(fileContents: string, invocation: FileToP
         return { count: -1, plays: result };
     }
     const playCount = parseInt(dom.plays.$.total);
-    dom.plays.play.forEach(play => {
+    dom.plays.play.forEach((play: any) => {
         const date = play.$.date;
         const items = play.item;
         const quantity = play.$.quantity;
