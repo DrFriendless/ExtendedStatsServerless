@@ -25,14 +25,12 @@ dotenv.config({ path: ".env" });
 
 // Set the AWS Region.
 const REGION = process.env.AWS_REGION;
-const credentials = { accessKeyId: process.env.AWS_ACCESS_KEY || "", secretAccessKey: process.env.AWS_SECRET_KEY || "" };
 // Create an Amazon S3 service client object.
-const sqsClient = new SQSClient({ region: REGION, credentials: credentials });
+// Credentials are granted to the EC2 hosting this so we don't need to add them here.
+const sqsClient = new SQSClient({ region: REGION });
 
 const logstream = new S3StreamLogger({
-    bucket: process.env.LOG_BUCKET,
-    access_key_id: credentials.accessKeyId,
-    secret_access_key: credentials.secretAccessKey
+    bucket: process.env.LOG_BUCKET
 });
 
 async function main() {

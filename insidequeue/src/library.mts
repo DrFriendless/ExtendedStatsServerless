@@ -1,6 +1,4 @@
 import mysql = require('promise-mysql');
-import aws_sdk from 'aws-sdk';
-const { Lambda } = aws_sdk;
 import {NormalisedPlays} from "./interfaces.mjs";
 
 const INSIDE_PREFIX = "inside-dev-";
@@ -72,28 +70,4 @@ export function eqSet(as: Set<number>, bs: Set<number>): boolean {
     if (as.size !== bs.size) return false;
     for (const a of as) if (!bs.has(a)) return false;
     return true;
-}
-
-export function logError(message: string): Promise<void> {
-    return invokeLambdaAsync("inside.logError", INSIDE_PREFIX + "logError", { source: "inside", message });
-}
-
-export function invokeLambdaAsync(context: string, func: string, payload: object): Promise<void> {
-    const params = {
-        ClientContext: context,
-        FunctionName: func,
-        InvocationType: "Event", // this is an async invocation
-        LogType: "None",
-        Payload: JSON.stringify(payload),
-    };
-    const lambda = new Lambda();
-    return new Promise(function (fulfill, reject) {
-        lambda.invoke(params, function (err, data) {
-            if (err) {
-                reject(err);
-            } else {
-                fulfill();
-            }
-        });
-    });
 }

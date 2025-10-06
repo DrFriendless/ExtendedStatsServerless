@@ -16,7 +16,6 @@
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.864.0",
     "async": "^3.2.6",
-    "aws-sdk": "^2.1692.0",
     "disposablestack": "^1.1.7",
     "dotenv": "^17.2.1",
     "extstats-core": "^1.12.1",

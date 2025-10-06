@@ -13,7 +13,7 @@ import {
     SeriesMetadata, ToProcessElement,
     WarTableRow
 } from "extstats-core";
-import { count, eqSet, listIntersect, listMinus, logError } from "./library.mjs";
+import { count, eqSet, listIntersect, listMinus } from "./library.mjs";
 import { PlaysRow } from "./library.mjs";
 import {normalise} from "./plays.mjs";
 
@@ -481,7 +481,6 @@ async function doRecordFile(conn: mysql.Connection, url: string, processMethod: 
             await conn.query(insertSql, insertParams);
         } catch (err) {
             console.log(err);
-            if (typeof err === 'string' || err instanceof Error) await logError(err.toString());
         }
     }
 }
@@ -724,7 +723,6 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
             await conn.query(insertBasePlaySql, [basePlays]);
         } catch (ex) {
             console.log(ex);
-            await logError("Unable to insert base plays " + geekId + " " + year + "-" + month);
             throw ex;
         }
     }
@@ -735,7 +733,6 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
             const args = [np.game, geekId, np.quantity, np.year, np.month, np.date];
             const result = await conn.query(getIdSql, args);
             if (!result || result.length === 0 || !result[0]) {
-                await logError("Bad result looking for play " + geekId + " " + year + "-" + month);
                 continue;
             }
             const id = result[0].id;
@@ -749,7 +746,6 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
             await conn.query(insertExpansionPlaySql, [expPlays]);
         } catch (ex) {
             console.log(ex);
-            await logError("Unable to insert expansion plays " + geekId + " " + year + "-" + month);
             throw ex;
         }
     }
@@ -802,7 +798,7 @@ async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> 
     const getIdSql = "select id from geeks where geeks.username = ?";
     const results = await conn.query(getIdSql, [geek]);
     if (!results || results.length === 0 || !results[0]) {
-        await logError("No geek ID for " + geek);
+        console.log("No geek ID for " + geek);
     }
     return results[0]["id"];
 }
