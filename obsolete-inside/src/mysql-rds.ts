@@ -469,7 +469,7 @@ async function doRecordFile(conn: mysql.Connection, url: string, processMethod: 
             await conn.query(insertSql, insertParams);
         } catch (err) {
             console.log(err);
-            await logError(err.toString());
+            if (typeof err === 'string' || err instanceof Error) await logError(err.toString());
         }
     }
 }

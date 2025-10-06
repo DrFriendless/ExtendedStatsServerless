@@ -1,3 +1,5 @@
+org: drfriendless
+app: inside
 service: inside
 
 plugins:
@@ -10,6 +12,8 @@ provider:
   timeout: 30
   memorySize: 128
   region: ap-southeast-2
+  lambdaHashingVersion: 20201221
+  profile: extstats
   vpc:
     securityGroupIds:
       - sg-4d4b742b

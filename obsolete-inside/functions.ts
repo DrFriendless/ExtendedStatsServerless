@@ -32,7 +32,7 @@ export async function processGameResult(event: ProcessGameResult, context: Conte
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -43,7 +43,7 @@ export async function processUserResult(event: ProcessUserResult, context: Conte
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -57,7 +57,7 @@ export async function updateUserList(event: string, context: Context, callback: 
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
     console.log("updateUserList complete");
 }
@@ -69,7 +69,7 @@ export async function updateMetadata(event: Metadata, context: Context, callback
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -80,7 +80,7 @@ export async function updateBGGTop50(event: number[], context: Context, callback
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -105,7 +105,7 @@ export async function getToProcessList(event: ToProcessQuery, context: Context, 
         callback(undefined, result);
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -116,7 +116,7 @@ export async function processCollectionCleanup(event: CleanUpCollectionResult, c
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -131,7 +131,7 @@ export async function processCollectionUpdateGames(event: ProcessCollectionResul
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -142,7 +142,7 @@ export async function processPlayedMonths(event: ProcessMonthsPlayedResult, cont
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -153,7 +153,7 @@ export async function processPlaysResult(event: ProcessPlaysResult, context: Con
         callback();
     } catch (e) {
         console.log(e);
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -163,7 +163,7 @@ export async function updateUrlAsProcessed(event: FileToProcess, context: Contex
         await runMarkUrlProcessed(event.processMethod, event.url);
         callback();
     } catch (e) {
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -173,7 +173,7 @@ export async function updateUrlAsUnprocessed(event: FileToProcess, context: Cont
         await runMarkUrlUnprocessed(event.processMethod, event.url);
         callback();
     } catch (e) {
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -183,7 +183,7 @@ export async function updateUrlAsTryTomorrow(event: FileToProcess, context: Cont
         await runMarkUrlTryTomorrow(event.processMethod, event.url);
         callback();
     } catch (e) {
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -193,7 +193,7 @@ export async function updateGameAsDoesNotExist(event: { bggid: number }, context
         await runMarkGameDoesNotExist(event.bggid);
         callback();
     } catch (e) {
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -203,7 +203,7 @@ export async function updateRankings(event: undefined, context: Context, callbac
         await runUpdateRankings();
         callback();
     } catch (e) {
-        callback(e);
+        errorCallback(callback, e);
     }
 }
 
@@ -213,6 +213,14 @@ export async function logError(event: { message: string, source: string }, conte
         await recordError(event.message, event.source);
         callback();
     } catch (e) {
+        errorCallback(callback, e);
+    }
+}
+
+function errorCallback(callback: Callback, e: any) {
+    if (typeof e === 'string' || e instanceof Error || e === null || e === undefined) {
         callback(e);
+    } else {
+        console.log(`safeCallback ${e}`)
     }
 }
