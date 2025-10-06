@@ -59,8 +59,11 @@ typings/
 
 .idea
 /secrets.json
-/database.json
-/database-mysql.json
+database.json
+database-mysql.json
 .serverless
-static
+static/
 /jwks.json
+/eb2/.env.production
+**/dist
+**/node_modules
