@@ -2,7 +2,6 @@
 import mysql from 'promise-mysql';
 import {
     DeleteMessageCommand,
-    GetQueueUrlCommand,
     Message,
     ReceiveMessageCommand,
     ReceiveMessageCommandInput,
@@ -10,9 +9,9 @@ import {
 } from "@aws-sdk/client-sqs";
 import dotenv from "dotenv";
 import process from "process";
-import { QueueMessage } from "extstats-core";
+import {QueueMessage, ToProcessElement} from "extstats-core";
 import {
-    doEnsureUsers,
+    doEnsureUsers, doListToProcess,
     doMarkGameDoesNotExist,
     doMarkUrlProcessed,
     doMarkUrlTryTomorrow, doMarkUrlUnprocessed,
@@ -20,7 +19,32 @@ import {
     doProcessGameResult, doProcessPlayedMonths, doProcessPlaysResult,
     doUpdateBGGTop50, doUpdateGamesForGeek, doUpdateMetadata, doUpdateProcessUserResult
 } from "./mysql-rds.mjs";
-import { S3StreamLogger } from "s3-streamlogger";
+import {invokeLambdaAsync} from "./library.mjs";
+import {loadSystem} from "./system.mjs";
+import {flushLogging, initLogging, log} from "./logging.mjs";
+
+const OUTSIDE_PREFIX = "downloader-";
+
+// method names from the database - this is the type of thing we have to do.
+const METHOD_PROCESS_USER = "processUser";
+const METHOD_PROCESS_COLLECTION = "processCollection";
+const METHOD_PROCESS_PLAYED = "processPlayed";
+const METHOD_PROCESS_GAME = "processGame";
+const METHOD_PROCESS_PLAYS = "processPlays";
+const METHOD_PROCESS_DESIGNER = "processDesigner";
+const METHOD_PROCESS_PUBLISHER = "processPublisher";
+
+// lambda names we expect to see
+const FUNCTION_RETRIEVE_FILES = "getToProcessList";
+const FUNCTION_UPDATE_USER_LIST = "updateUserList";
+const FUNCTION_PROCESS_USER = "processUser";
+const FUNCTION_PROCESS_COLLECTION = "processCollection";
+const FUNCTION_PROCESS_GAME = "processGame";
+const FUNCTION_PROCESS_PLAYS = "processPlays";
+const FUNCTION_PROCESS_DESIGNER = "processDesigner";
+const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
+const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
+const FUNCTION_PROCESS_PLAYED = "processPlayed";
 
 dotenv.config({ path: ".env" });
 
@@ -30,44 +54,70 @@ const REGION = process.env.AWS_REGION;
 // Credentials are granted to the EC2 hosting this so we don't need to add them here.
 const sqsClient = new SQSClient({ region: REGION });
 
-const logstream = new S3StreamLogger({
-    bucket: process.env.LOG_BUCKET
-});
-
 async function main() {
-    const command = new GetQueueUrlCommand({ QueueName: process.env.INSIDE_QUEUE, QueueOwnerAWSAccountId: process.env.AWS_ACCOUNT });
-    const response = await sqsClient.send(command);
-    const queueUrl = response.QueueUrl;
-    console.log("Logging to bucket " + process.env.LOG_BUCKET);
+    const system = await loadSystem();
+    await initLogging(system, "InsideQueue");
+    // TODO - do I need to send the account ID?
     while (true) {
-        console.log(`Waiting for queue ${queueUrl}`);
-        const input: ReceiveMessageCommandInput = { QueueUrl: queueUrl, WaitTimeSeconds: 20, MaxNumberOfMessages: 1 };
+        console.log(`Waiting for queue ${system.downloaderQueue}`);
+        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 20, MaxNumberOfMessages: 1 };
         const command = new ReceiveMessageCommand(input);
         const response = await sqsClient.send(command);
         if (response.Messages) {
-            await handleMessages(response.Messages, queueUrl);
+            await handleMessages(response.Messages, system.downloaderQueue);
         } else {
-            logstream.write("Still no messages.\n");
             console.log("No messages");
+            await noMessages();
         }
     }
-    logstream.write("We terminated.\n");
+    log("We terminated.");
+    await flushLogging();
+}
+
+async function noMessages() {
+    // TODO - allow more than one
+    // TODO - allow a variety of types
+    const todo: ToProcessElement[] = await returnWithConnection(conn => doListToProcess(conn, 1, "processUser", false))
+    for (const element of todo) {
+        // TODO - invoke appropriate lambda
+        if (element.processMethod === METHOD_PROCESS_USER) {
+            console.log(`scheduling processUser ${element.geek}`);
+            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
+        } else if (element.processMethod === METHOD_PROCESS_COLLECTION) {
+            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
+        } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
+            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
+        } else if (element.processMethod === METHOD_PROCESS_GAME) {
+            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
+        } else if (element.processMethod === METHOD_PROCESS_PLAYS) {
+            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
+        } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
+            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
+        } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {
+            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
+        }
+    }
 }
 
 async function handleMessages(messages: Message[], queueUrl: string): Promise<void> {
+    log(`Retrieved ${messages.length} messages from downloader queue`);
     for (const message of messages) {
-        console.log(message);
         const receiptHandle = message.ReceiptHandle;
         if (message.Body) {
             const payload = JSON.parse(message.Body);
             console.log(payload);
             await handleQueueMessage(payload as QueueMessage);
+        } else {
+            console.log("What is this?");
+            console.log(JSON.stringify(message));
         }
         await sqsClient.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: receiptHandle }));
     }
+    await flushLogging();
 }
 
 async function handleQueueMessage(message: QueueMessage) {
+    log(message.discriminator);
     switch (message.discriminator) {
         case "CleanUpCollectionMessage":
             await withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
@@ -112,6 +162,7 @@ async function handleQueueMessage(message: QueueMessage) {
         default:
             // this should not happen
             console.log(`${message} not handled.`);
+            log(`${message} not handled.`);
             break;
     }
 }

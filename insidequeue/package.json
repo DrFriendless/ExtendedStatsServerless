@@ -14,15 +14,16 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.864.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.901.0",
+    "@aws-sdk/client-lambda": "^3.901.0",
+    "@aws-sdk/client-sqs": "^3.901.0",
+    "@aws-sdk/client-ssm": "^3.901.0",
     "async": "^3.2.6",
-    "disposablestack": "^1.1.7",
     "dotenv": "^17.2.1",
     "extstats-core": "^1.12.1",
     "lodash": "^4.17.21",
     "mysql": "^2.18.1",
-    "promise-mysql": "^5.2.0",
-    "s3-streamlogger": "^1.11.1"
+    "promise-mysql": "^5.2.0"
   },
   "devDependencies": {
     "@aws-sdk/types": "^3.862.0",

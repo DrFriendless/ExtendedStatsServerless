@@ -1,5 +1,6 @@
 import mysql = require('promise-mysql');
 import {NormalisedPlays} from "./interfaces.mjs";
+import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
 export type PlaysRow = { game: number, playDate: string, quantity: number, location: string };
 
@@ -69,4 +70,18 @@ export function eqSet(as: Set<number>, bs: Set<number>): boolean {
     if (as.size !== bs.size) return false;
     for (const a of as) if (!bs.has(a)) return false;
     return true;
+}
+
+export async function invokeLambdaAsync(func: string, payload: object): Promise<void> {
+    const lambda = new LambdaClient({ region: process.env.REGION });
+    const command = new InvokeCommand({
+        FunctionName: func,
+        Payload: JSON.stringify(payload),
+        InvocationType: "Event"
+    });
+    try {
+        const resp = await lambda.send(command);
+    } catch (error) {
+        console.log(error);
+    }
 }
