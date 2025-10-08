@@ -35,8 +35,6 @@ const METHOD_PROCESS_DESIGNER = "processDesigner";
 const METHOD_PROCESS_PUBLISHER = "processPublisher";
 
 // lambda names we expect to see
-const FUNCTION_RETRIEVE_FILES = "getToProcessList";
-const FUNCTION_UPDATE_USER_LIST = "updateUserList";
 const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
 const FUNCTION_PROCESS_GAME = "processGame";
@@ -75,37 +73,35 @@ async function main() {
 }
 
 async function noMessages() {
-    // TODO - allow more than one
     // TODO - allow a variety of types
-    const todo: ToProcessElement[] = await returnWithConnection(conn => doListToProcess(conn, 1, "processUser", false))
+    const todo: ToProcessElement[] = await returnWithConnection(conn => doListToProcess(conn, 10, "processUser", false))
     for (const element of todo) {
         // TODO - invoke appropriate lambda
         if (element.processMethod === METHOD_PROCESS_USER) {
             console.log(`scheduling processUser ${element.geek}`);
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
+            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
         } else if (element.processMethod === METHOD_PROCESS_COLLECTION) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
+            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
         } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
+            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
         } else if (element.processMethod === METHOD_PROCESS_GAME) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
+            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
         } else if (element.processMethod === METHOD_PROCESS_PLAYS) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
+            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
         } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
+            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
         } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
+            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
         }
     }
 }
 
 async function handleMessages(messages: Message[], queueUrl: string): Promise<void> {
-    log(`Retrieved ${messages.length} messages from downloader queue`);
+    console.log(`Retrieved ${messages.length} messages from downloader queue`);
     for (const message of messages) {
         const receiptHandle = message.ReceiptHandle;
         if (message.Body) {
             const payload = JSON.parse(message.Body);
-            console.log(payload);
             await handleQueueMessage(payload as QueueMessage);
         } else {
             console.log("What is this?");
@@ -117,42 +113,54 @@ async function handleMessages(messages: Message[], queueUrl: string): Promise<vo
 }
 
 async function handleQueueMessage(message: QueueMessage) {
-    log(message.discriminator);
+    console.log(message.discriminator);
     switch (message.discriminator) {
         case "CleanUpCollectionMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
             break;
         case "CollectionResultMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
             break;
         case "GameResultMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doProcessGameResult(conn, message.result));
             break;
         case "MarkAsProcessedMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doMarkUrlProcessed(conn, message.fileDetails.processMethod, message.fileDetails.url));
             break;
         case "MarkAsTryAgainMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doMarkUrlTryTomorrow(conn, message.fileDetails.processMethod, message.fileDetails.url));
             break;
         case "MarkAsUnprocessedMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doMarkUrlUnprocessed(conn, message.fileDetails.processMethod, message.fileDetails.url));
             break;
         case "NoSuchGameMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doMarkGameDoesNotExist(conn, message.gameId));
             break;
         case "PlayedResultMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doProcessPlayedMonths(conn, message.monthsData.geek, message.monthsData.monthsPlayed, message.monthsData.url));
             break;
         case "PlaysResultMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doProcessPlaysResult(conn, message.result));
             break;
         case "UpdateMetadataMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doUpdateMetadata(conn, message.metadata.series, message.metadata.rules));
             break;
         case "UpdateTop50Message":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doUpdateBGGTop50(conn, message.top50));
             break;
         case "UpdateUserListMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doEnsureUsers(conn, message.users));
             break;
         case "UserResultMessage":

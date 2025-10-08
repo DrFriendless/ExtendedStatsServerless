@@ -3,12 +3,11 @@ import {
     CloudWatchLogsClient,
     CloudWatchLogsClientConfig,
     InputLogEvent, CreateLogStreamCommand,
-    PutLogEventsCommand, PutLogEventsRequest
+    PutLogEventsCommand
 } from "@aws-sdk/client-cloudwatch-logs";
 import {System} from "./system.mjs";
 
-const config: CloudWatchLogsClientConfig = {};
-const client = new CloudWatchLogsClient(config);
+let client: CloudWatchLogsClient;
 
 const logParams = {
     "logGroupName": undefined as string,
@@ -17,6 +16,10 @@ const logParams = {
 };
 
 export async function initLogging(system: System, streamName: string) {
+    const config: CloudWatchLogsClientConfig = {
+        region: "ap-southeast-2",
+    };
+    client = new CloudWatchLogsClient(config);
     logParams.logGroupName = system.systemLogGroup;
     logParams.streamName = streamName;
 }
@@ -33,17 +36,14 @@ export async function flushLogging() {
     const d = new Date();
     const ts = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     const logStreamName = `${logParams.streamName}-${ts}`;
-    console.log(logParams.logGroupName, logStreamName);
-    const r = await client.send(new CreateLogStreamCommand({
+    await client.send(new CreateLogStreamCommand({
         logGroupName: logParams.logGroupName,
         logStreamName: logStreamName,
-    }));
-    const input: PutLogEventsRequest = { //
+    })).catch(_ => {});
+    await client.send(new PutLogEventsCommand({
         logGroupName: logParams.logGroupName,
         logStreamName: logStreamName,
         logEvents: [ ...logParams.buffer ]
-    };
-    const command = new PutLogEventsCommand(input);
-    const response = await client.send(command);
+    })).catch(err => console.log(err));
     logParams.buffer = [];
 }
