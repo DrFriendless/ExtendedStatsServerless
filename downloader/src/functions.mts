@@ -24,6 +24,7 @@ import {
     ToProcessElement, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
 } from "extstats-core";
 import {loadSystem} from "./system.mjs";
+import {flushLogging, initLogging, log} from "./logging.mjs";
 
 
 
@@ -58,6 +59,7 @@ const MAX_GAMES_PER_CALL = 500;
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export async function processUserList(_: UpdateUserListMessage) {
     const system = await loadSystem();
+    await initLogging(system, "processUserList");
     if (!system.ok) {
         console.log("Failed to load system for processUserList");
         return;
@@ -71,7 +73,7 @@ export async function processUserList(_: UpdateUserListMessage) {
         const lines = data.split(/\r?\n/).map(s => s.trim()).filter(s => !!s);
         console.log(lines);
         await dispatchUpdateUserList(system, lines);
-        system.logstream.write(`Sent ${lines.length} users to ${FUNCTION_UPDATE_USER_LIST}\n`);
+        log(`Sent ${lines.length} users to ${FUNCTION_UPDATE_USER_LIST}`);
     } else {
         console.log("Unable to read users file");
         console.log(await resp.text());
@@ -81,6 +83,12 @@ export async function processUserList(_: UpdateUserListMessage) {
 // Lambda to get the metadata from pastebin and send it to the database.
 export async function processMetadata(_: UpdateMetadataMessage) {
     const system = await loadSystem();
+    if (!system.ok) {
+        console.log("Failed to load system for processUserList");
+        return;
+    }
+    await initLogging(system, "processMetadata");
+
     const resp = await fetch(system.metadataFile);
     const data = await resp.text();
     const lines: string[] = data.split(/\r?\n/).map(s => s.trim()).filter(s => !!s);
@@ -109,9 +117,10 @@ export async function processMetadata(_: UpdateMetadataMessage) {
                 }
             }
         }
-        if (!handled) system.logstream.write(`Did not understand metadata: ${line}\n`);
+        if (!handled) log(`Did not understand metadata: ${line}`);
     }
     await dispatchUpdateMetadata({ series, rules });
+    await flushLogging();
 }
 
 export async function processBGGTop50(ignored: UpdateTop50Message) {
@@ -128,41 +137,41 @@ export async function processBGGTop50(ignored: UpdateTop50Message) {
     await dispatchUpdateTop50(top50);
 }
 
-// Lambda to get files to be processed and invoke the lambdas to do that
-export async function fireFileProcessing(event: FileToProcess) {
-    let count = PROCESS_COUNT;
-    const envCount = process.env["COUNT"];
-    if (parseInt(envCount)) count = parseInt(envCount);
-    // TODO - figure out what this means
-    if (event.hasOwnProperty("count")) { // @ts-ignore
-        count = event['count'];
-    }
-    const payload = { count: count, updateLastScheduled: true };
-    if (event.hasOwnProperty("processMethod")) {
-        Object.assign(payload, {processMethod: event.processMethod});
-    }
-    const data = await invokeLambdaSync(INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload);
-    const files = data as ToProcessElement[];
-    files.forEach(element => {
-        console.log(element);
-        if (element.processMethod == METHOD_PROCESS_USER) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
-        } else if (element.processMethod == METHOD_PROCESS_COLLECTION) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
-        } else if (element.processMethod == METHOD_PROCESS_PLAYED) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
-        } else if (element.processMethod == METHOD_PROCESS_GAME) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
-        } else if (element.processMethod == METHOD_PROCESS_PLAYS) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
-        } else if (element.processMethod == METHOD_PROCESS_DESIGNER) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
-        } else if (element.processMethod == METHOD_PROCESS_PUBLISHER) {
-            return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
-        }
-    });
-    return { count: files.length };
-}
+// // Lambda to get files to be processed and invoke the lambdas to do that
+// export async function fireFileProcessing(event: FileToProcess) {
+//     let count = PROCESS_COUNT;
+//     const envCount = process.env["COUNT"];
+//     if (parseInt(envCount)) count = parseInt(envCount);
+//     // TODO - figure out what this means
+//     if (event.hasOwnProperty("count")) { // @ts-ignore
+//         count = event['count'];
+//     }
+//     const payload = { count: count, updateLastScheduled: true };
+//     if (event.hasOwnProperty("processMethod")) {
+//         Object.assign(payload, {processMethod: event.processMethod});
+//     }
+//     const data = await invokeLambdaSync(INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload);
+//     const files = data as ToProcessElement[];
+//     files.forEach(element => {
+//         console.log(element);
+//         if (element.processMethod === METHOD_PROCESS_USER) {
+//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
+//         } else if (element.processMethod === METHOD_PROCESS_COLLECTION) {
+//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
+//         } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
+//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
+//         } else if (element.processMethod === METHOD_PROCESS_GAME) {
+//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
+//         } else if (element.processMethod === METHOD_PROCESS_PLAYS) {
+//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
+//         } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
+//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
+//         } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {
+//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
+//         }
+//     });
+//     return { count: files.length };
+// }
 
 // Lambda to harvest data about a game
 export async function processGame(event: FileToProcess) {
@@ -183,11 +192,29 @@ export async function processGame(event: FileToProcess) {
 
 // Lambda to harvest data about a user
 export async function processUser(event: FileToProcess) {
+    const system = await loadSystem();
+    if (!system.ok) {
+        console.log("Failed to load system for processUser");
+        return;
+    }
+    await initLogging(system, "processUser");
+
     const invocation = event as FileToProcess;
-    const resp = await fetch(invocation.url);
-    const data = await resp.text();
+    log(`processUser ${invocation.geek}`);
+    const url = `https://api.geekdo.com/api/users?username=${encodeURIComponent(invocation.geek)}`;
+    console.log(url);
+    const resp = await fetch(url);
+    console.log(resp);
+    const data = await resp.json();
+    console.log(data);
+    // we send the invocation URL here as it is identification for the task, not actually the URL.
     const puResult = extractUserDataFromPage(invocation.geek, invocation.url, data);
-    await dispatchProcessUserResult(puResult);
+    console.log(JSON.stringify(puResult));
+
+    await dispatchProcessUserResult(system, puResult);
+    log(`processUser done`);
+    console.log("processUser flushing")
+    await flushLogging();
 }
 
 // Lambda to harvest a user's collection
@@ -222,17 +249,16 @@ async function tryToProcessCollection(invocation: FileToProcess): Promise<number
     // make sure that all of these games are in the database
     // if there are a lot, this lambda might timeout, but next time more of them will be there.
     const added = await ensureGames(ids);
-    if (added.length > 0) system.logstream.write("Added " + added + " to the database for " + invocation.geek + "\n");
+    if (added.length > 0) log("Added " + added + " to the database for " + invocation.geek);
     for (const games of splitCollection(collection)) {
         await dispatchProcessCollectionUpdateGames(games);
-        system.logstream.write("invoked " + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES + " for " + games.items.length + " games.\n");
+        log("invoked " + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES + " for " + games.items.length + " games.");
     }
     await cleanupCollection(collection, invocation.url);
     return 200;
 }
 
 async function ensureGames(ids: number[]): Promise<number[]> {
-    const system = await loadSystem();
     const credentials = btoa(`downloader:${process.env.DOWNLOADER_PASSWORD}`);
     const resp = await fetch("http://eb.drfriendless.com/downloader/ensuregames", {
         body: JSON.stringify(ids),
@@ -247,8 +273,9 @@ async function ensureGames(ids: number[]): Promise<number[]> {
         return await resp.json() as unknown as number[];
     } else {
         console.log(resp.text());
-        system.logstream.write("Failed to ensure games");
+        log("Failed to ensure games");
     }
+    await flushLogging();
 }
 
 async function cleanupCollection(collection: ProcessCollectionResult, url: string) {

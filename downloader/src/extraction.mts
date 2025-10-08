@@ -1,4 +1,4 @@
-import { between, logError } from "./library.mjs";
+import { logError } from "./library.mjs";
 import {
     CollectionGame,
     PlayData,
@@ -6,6 +6,7 @@ import {
     ProcessUserResult, FileToProcess
 } from "extstats-core";
 import { parseStringPromise } from 'xml2js';
+import {log} from "./logging.mjs";
 
 export async function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
     const dom = await parseStringPromise(pageContent, {trim: true});
@@ -93,21 +94,17 @@ export async function extractUserCollectionFromPage(geek: string, url: string, p
 // pass
 
 
-export function extractUserDataFromPage(geek: string, url: string, pageContent: string): ProcessUserResult {
-    const BEFORE_USER_IMAGE = "/images/user/";
-    const BEFORE_COUNTRY = "/users?country=";
-    const AFTER_USER_IMAGE = "/";
-    const AFTER_COUNTRY = '"';
+export function extractUserDataFromPage(geek: string, url: string, json: any): ProcessUserResult {
+    const users = json.filter((item: any) => item.type === 'users' && item.username.toLowerCase() === geek.toLowerCase());
 
     let bggid = -1;
     let country = "";
-    if (pageContent.indexOf(BEFORE_USER_IMAGE) >= 0) {
-        const bggids = between(pageContent, BEFORE_USER_IMAGE, AFTER_USER_IMAGE);
-        if (bggids) bggid = parseInt(bggids);
+    if (users.length > 0) {
+        const user = users[0];
+        bggid = parseInt(user.id);
+        country = user.country;
     }
-    if (pageContent.indexOf(BEFORE_COUNTRY) >= 0) {
-        country = between(pageContent, BEFORE_COUNTRY, AFTER_COUNTRY).replace("%20", " ");
-    }
+    if (bggid < 0) log(`Geek ${geek} doesn't seem to exist any more.`);
     return { geek, url, country, bggid };
 }
 

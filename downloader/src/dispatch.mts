@@ -5,10 +5,8 @@ import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 const INSIDE_PREFIX = "inside-dev-";
 
 // lambda names we expect to see
-const FUNCTION_UPDATE_USER_LIST = "updateUserList";
 const FUNCTION_UPDATE_METADATA = "updateMetadata";
 const FUNCTION_UPDATE_TOP50 = "updateBGGTop50";
-const FUNCTION_PROCESS_USER_RESULT = "processUserResult";
 const FUNCTION_PROCESS_PLAYED_RESULT = "processPlayedMonthsResult";
 const FUNCTION_PROCESS_PLAYS_RESULT = "processPlaysResult";
 const FUNCTION_PROCESS_GAME_RESULT = "processGameResult";
@@ -22,7 +20,7 @@ const FUNCTION_MARK_TOMORROW = "updateUrlAsTryTomorrow";
 import {invokeLambdaAsync, invokeLambdaSync} from "./library.mjs";
 import {
     ProcessGameResult, FileToProcess, Metadata, ProcessCollectionResult,
-    MonthPlayedData, ProcessPlaysResult, ProcessUserResult, CleanUpCollectionResult
+    MonthPlayedData, ProcessPlaysResult, ProcessUserResult, CleanUpCollectionResult, QueueMessage
 } from 'extstats-core';
 import {System} from "./system.mjs";
 
@@ -33,13 +31,16 @@ const credentials = { accessKeyId: process.env.AWS_ACCESS_KEY || "", secretAcces
 // const sqsClient = new SQSClient({ region: process.env.REGION, credentials: credentials });
 const sqsClient = new SQSClient({ region: process.env.REGION });
 
-export async function dispatchUpdateUserList(system: System, users: string[]): Promise<void> {
+async function sendToDownloaderQueue(system: System, body: QueueMessage) {
     const command = new SendMessageCommand({
         QueueUrl: system.downloaderQueue,
-        MessageBody: JSON.stringify({ discriminator: "UpdateUserListMessage", users }),
-
+        MessageBody: JSON.stringify(body),
     });
     await sqsClient.send(command);
+}
+
+export async function dispatchUpdateUserList(system: System, users: string[]): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "UpdateUserListMessage", users });
 }
 
 export function dispatchUpdateMetadata(metadata: Metadata): Promise<void> {
@@ -62,9 +63,8 @@ export function dispatchProcessGameResult(result: ProcessGameResult): Promise<vo
     return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result);
 }
 
-export function dispatchProcessUserResult(result: ProcessUserResult): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_USER_RESULT, result);
+export function dispatchProcessUserResult(system: System, result: ProcessUserResult): Promise<void> {
+    return sendToDownloaderQueue(system, { discriminator: "UserResultMessage", result })
 }
 
 export function dispatchProcessCollectionUpdateGames(result: ProcessCollectionResult): Promise<void> {

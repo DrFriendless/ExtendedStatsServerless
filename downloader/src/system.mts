@@ -1,5 +1,4 @@
-import { GetParametersByPathCommand, SSMClient } from "@aws-sdk/client-ssm";
-import S3StreamLogger from "s3-streamlogger";
+import {GetParameterCommand, GetParametersByPathCommand, SSMClient} from "@aws-sdk/client-ssm";
 
 export async function loadSystem() {
     const s = new System();
@@ -12,8 +11,8 @@ export class System {
     metadataFile: string;
     downloaderQueue: string;
     usersFile: string;
+    systemLogGroup: string;
     ok: boolean;
-    logstream: S3StreamLogger.S3StreamLogger;
 
     constructor() {
         this.paramKey = `/extstats/downloader`;
@@ -49,11 +48,24 @@ export class System {
                         break;
                 }
             }
-            this.logstream = new S3StreamLogger.S3StreamLogger({ bucket: this.logBucket });
+            this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
             this.ok = true;
         } catch (error) {
             console.log(error);
         }
         return this;
+    }
+
+    async getParameter(key: string): Promise<string> {
+        const ssmClient = new SSMClient({
+            apiVersion: '2014-11-06',
+            region: process.env.AWS_REGION
+        });
+        const response = await ssmClient.send(
+            new GetParameterCommand({
+                Name: key
+            })
+        );
+        return response.Parameter.Value;
     }
 }
