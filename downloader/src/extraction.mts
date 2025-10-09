@@ -8,7 +8,7 @@ import {
 import { parseStringPromise } from 'xml2js';
 import {log} from "./logging.mjs";
 
-export async function extractUserCollectionFromPage(geek: string, url: string, pageContent: string): Promise<ProcessCollectionResult> {
+export async function extractUserCollectionFromPage(geek: string, pageContent: string): Promise<ProcessCollectionResult> {
     const dom = await parseStringPromise(pageContent, {trim: true});
     if (dom && dom.message) {
         console.log("BGG says come back later");

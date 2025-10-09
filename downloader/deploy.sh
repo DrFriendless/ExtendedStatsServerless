@@ -17,5 +17,6 @@ function define_lambda() {
 
 define_lambda "downloader-processUserList" "functions.processUserList"
 define_lambda "downloader-processUser" "functions.processUser"
+define_lambda "downloader-processCollection" "functions.processCollection"
 
 date

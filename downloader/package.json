@@ -13,7 +13,7 @@
     "@aws-sdk/client-ssm": "^3.901.0",
     "@aws-sdk/client-lambda": "^3.901.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.901.0",
-    "extstats-core": "^1.12.1",
+    "extstats-core": "^1.12.10",
     "lodash": "^4.17.21",
     "xml2js": "^0.6.2",
     "xml2js-es6-promise": "^1.1.1"

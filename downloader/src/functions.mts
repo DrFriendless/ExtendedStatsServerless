@@ -1,4 +1,4 @@
-import { between, invokeLambdaAsync, invokeLambdaSync } from "./library.mjs";
+import { between } from "./library.mjs";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
@@ -7,6 +7,7 @@ import {
 } from "./extraction.mjs";
 import _ from "lodash";
 import {
+    dispatchEnsureGames,
     dispatchMarkAsProcessed, dispatchMarkAsTryAgainTomorrow, dispatchMarkAsUnprocessed,
     dispatchNoSuchGame, dispatchProcessCleanUpCollection, dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult, dispatchProcessPlayedResult, dispatchProcessPlaysResult, dispatchProcessUserResult,
@@ -20,39 +21,13 @@ import {
     METADATA_RULE_BASEGAME,
     MetadataRule, MonthPlayed, MonthPlayedData, PlayData,
     ProcessCollectionResult, ProcessPlaysResult,
-    SeriesMetadata,
-    ToProcessElement, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
+    SeriesMetadata, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
 } from "extstats-core";
-import {loadSystem} from "./system.mjs";
+import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
-
-
-// the max files to start processing for at once
-const PROCESS_COUNT = 1;
-const INSIDE_PREFIX = "inside-dev-";
-const OUTSIDE_PREFIX = "downloader-dev-";
-
-// method names from the database - this is the type of thing we have to do.
-const METHOD_PROCESS_USER = "processUser";
-const METHOD_PROCESS_COLLECTION = "processCollection";
-const METHOD_PROCESS_PLAYED = "processPlayed";
-const METHOD_PROCESS_GAME = "processGame";
-const METHOD_PROCESS_PLAYS = "processPlays";
-const METHOD_PROCESS_DESIGNER = "processDesigner";
-const METHOD_PROCESS_PUBLISHER = "processPublisher";
-
 // lambda names we expect to see
-const FUNCTION_RETRIEVE_FILES = "getToProcessList";
 const FUNCTION_UPDATE_USER_LIST = "updateUserList";
-const FUNCTION_PROCESS_USER = "processUser";
-const FUNCTION_PROCESS_COLLECTION = "processCollection";
-const FUNCTION_PROCESS_GAME = "processGame";
-const FUNCTION_PROCESS_PLAYS = "processPlays";
-const FUNCTION_PROCESS_DESIGNER = "processDesigner";
-const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
-const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
-const FUNCTION_PROCESS_PLAYED = "processPlayed";
 
 const MAX_GAMES_PER_CALL = 500;
 
@@ -200,7 +175,7 @@ export async function processUser(event: FileToProcess) {
     await initLogging(system, "processUser");
 
     const invocation = event as FileToProcess;
-    log(`processUser ${invocation.geek}`);
+
     const url = `https://api.geekdo.com/api/users?username=${encodeURIComponent(invocation.geek)}`;
     console.log(url);
     const resp = await fetch(url);
@@ -209,94 +184,80 @@ export async function processUser(event: FileToProcess) {
     console.log(data);
     // we send the invocation URL here as it is identification for the task, not actually the URL.
     const puResult = extractUserDataFromPage(invocation.geek, invocation.url, data);
-    console.log(JSON.stringify(puResult));
-
     await dispatchProcessUserResult(system, puResult);
-    log(`processUser done`);
-    console.log("processUser flushing")
+
+    log(`processUser ${invocation.geek} done`);
     await flushLogging();
 }
 
 // Lambda to harvest a user's collection
 export async function processCollection(invocation: FileToProcess) {
+    const system = await loadSystem();
+    if (!system.ok) {
+        console.log("Failed to load system for processCollection");
+        return;
+    }
+    await initLogging(system, "processCollection");
+
     try {
-        const code = await tryToProcessCollection(invocation);
+        const code = await tryToProcessCollection(system, invocation);
         if (code === 202) {
-            await markAsUnprocessed(invocation);
+            await markAsUnprocessed(system, invocation);
         } else if (code > 500) {
-            await markTryAgainTomorrow(invocation);
+            await markTryAgainTomorrow(system, invocation);
         }
     } catch (e) {
         console.log(invocation);
         if (e.toString().includes("Collection exceeds maximum export size")) {
             console.log("try again tomorrow");
-            await markTryAgainTomorrow(invocation);
+            await markTryAgainTomorrow(system, invocation);
         } else {
-            await markAsUnprocessed(invocation);
+            await markAsUnprocessed(system, invocation);
         }
     }
+
+    console.log(`processCollection ${invocation.geek} done`);
+    await flushLogging();
 }
 
 // return success
-async function tryToProcessCollection(invocation: FileToProcess): Promise<number> {
-    const system = await loadSystem();
+async function tryToProcessCollection(system: System, invocation: FileToProcess): Promise<number> {
     const resp = await fetch(invocation.url);
     if (resp.status == 202 || resp.status == 504) return resp.status;
     const data = await resp.text();
 
-    const collection = await extractUserCollectionFromPage(invocation.geek, invocation.url, data);
+    const collection = await extractUserCollectionFromPage(invocation.geek, data);
     const ids = collection.items.map(item => item.gameId);
+    console.log(ids);
     // make sure that all of these games are in the database
     // if there are a lot, this lambda might timeout, but next time more of them will be there.
-    const added = await ensureGames(ids);
-    if (added.length > 0) log("Added " + added + " to the database for " + invocation.geek);
+    await dispatchEnsureGames(system, ids);
     for (const games of splitCollection(collection)) {
-        await dispatchProcessCollectionUpdateGames(games);
-        log("invoked " + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES + " for " + games.items.length + " games.");
+        await dispatchProcessCollectionUpdateGames(system, games);
     }
-    await cleanupCollection(collection, invocation.url);
+    await cleanupCollection(system, collection, invocation.url);
     return 200;
 }
 
-async function ensureGames(ids: number[]): Promise<number[]> {
-    const credentials = btoa(`downloader:${process.env.DOWNLOADER_PASSWORD}`);
-    const resp = await fetch("http://eb.drfriendless.com/downloader/ensuregames", {
-        body: JSON.stringify(ids),
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            'Authorization': `Basic ${credentials}`
-        },
-    });
-    if (resp.ok) {
-        return await resp.json() as unknown as number[];
-    } else {
-        console.log(resp.text());
-        log("Failed to ensure games");
-    }
-    await flushLogging();
-}
-
-async function cleanupCollection(collection: ProcessCollectionResult, url: string) {
+async function cleanupCollection(system: System, collection: ProcessCollectionResult, url: string) {
     const params: CleanUpCollectionResult = {
         geek: collection.geek,
         items: collection.items.map(item => item.gameId),
         url: url
     };
-    await dispatchProcessCleanUpCollection(params);
+    await dispatchProcessCleanUpCollection(system, params);
 }
 
-function markAsProcessed(fileDetails: FileToProcess): Promise<void> {
-    return dispatchMarkAsProcessed(fileDetails);
+async function markAsProcessed(system: System, fileDetails: FileToProcess): Promise<void> {
+    await dispatchMarkAsProcessed(system, fileDetails);
 }
 
-async function markAsUnprocessed(fileDetails: FileToProcess) {
-    return dispatchMarkAsUnprocessed(fileDetails);
+async function markAsUnprocessed(system: System, fileDetails: FileToProcess) {
+    await dispatchMarkAsUnprocessed(system, fileDetails);
 }
 
-async function markTryAgainTomorrow(fileDetails: FileToProcess) {
-    return dispatchMarkAsTryAgainTomorrow(fileDetails);
+async function markTryAgainTomorrow(system: System, fileDetails: FileToProcess) {
+    await dispatchMarkAsTryAgainTomorrow(system, fileDetails);
 }
 
 function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {
@@ -305,6 +266,13 @@ function splitCollection(original: ProcessCollectionResult): ProcessCollectionRe
 }
 
 export async function processPlayed(invocation: FileToProcess) {
+    const system = await loadSystem();
+    if (!system.ok) {
+        console.log("Failed to load system for processCollection");
+        return;
+    }
+    await initLogging(system, "processPlayed");
+
     const resp = await fetch(invocation.url);
     const data = await resp.text();
     const toAdd: MonthPlayed[] = [];
@@ -317,10 +285,18 @@ export async function processPlayed(invocation: FileToProcess) {
             toAdd.push(data);
         });
     const monthsData: MonthPlayedData = { geek: invocation.geek, monthsPlayed: toAdd, url: invocation.url };
-    await dispatchProcessPlayedResult(monthsData);
+    await dispatchProcessPlayedResult(system, monthsData);
+    await flushLogging();
 }
 
 export async function processPlays(invocation: FileToProcess) {
+    const system = await loadSystem();
+    if (!system.ok) {
+        console.log("Failed to load system for processPlays");
+        return;
+    }
+    await initLogging(system, "processPlays");
+
     let playsData: PlayData[] = [];
     let pagesSoFar = 0;
     let pagesNeeded = -1;
@@ -335,19 +311,36 @@ export async function processPlays(invocation: FileToProcess) {
     const playsResult: ProcessPlaysResult = {
         geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url
     };
-    await dispatchProcessPlaysResult(playsResult);
+    await dispatchProcessPlaysResult(system, playsResult);
+    await flushLogging();
 }
 
 export async function processDesigner(event: FileToProcess) {
+    const system = await loadSystem();
+    if (!system.ok) {
+        console.log("Failed to load system for processDesigner");
+        return;
+    }
+    await initLogging(system, "processDesigner");
+
     const resp = await fetch(event.url);
     const data = await resp.text();
     // TODO
     console.log(data);
+    await flushLogging();
 }
 
 export async function processPublisher(event: FileToProcess) {
+    const system = await loadSystem();
+    if (!system.ok) {
+        console.log("Failed to load system for processPublisher");
+        return;
+    }
+    await initLogging(system, "processPublisher");
+
     const resp = await fetch(event.url);
     const data = await resp.text();
     // TODO
     console.log(data);
+    await flushLogging();
 }

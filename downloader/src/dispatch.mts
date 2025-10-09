@@ -43,6 +43,10 @@ export async function dispatchUpdateUserList(system: System, users: string[]): P
     await sendToDownloaderQueue(system, { discriminator: "UpdateUserListMessage", users });
 }
 
+export async function dispatchEnsureGames(system: System, gameIds: number[]): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "EnsureGamesMessage", gameIds });
+}
+
 export function dispatchUpdateMetadata(metadata: Metadata): Promise<void> {
     // TODO
     return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_UPDATE_METADATA, metadata);
@@ -64,40 +68,35 @@ export function dispatchProcessGameResult(result: ProcessGameResult): Promise<vo
 }
 
 export function dispatchProcessUserResult(system: System, result: ProcessUserResult): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "UserResultMessage", result })
+    return sendToDownloaderQueue(system, { discriminator: "UserResultMessage", result });
 }
 
-export function dispatchProcessCollectionUpdateGames(result: ProcessCollectionResult): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES, result);
+export function dispatchProcessCollectionUpdateGames(system: System, result: ProcessCollectionResult): Promise<void> {
+    return sendToDownloaderQueue(system, { discriminator: "CollectionResultMessage", result });
 }
 
-export function dispatchMarkAsProcessed(fileDetails: FileToProcess): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_MARK_PROCESSED, fileDetails);
+export async function dispatchMarkAsProcessed(system: System, fileDetails: FileToProcess): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "MarkAsProcessedMessage", context: "", fileDetails });
 }
 
-export function dispatchMarkAsUnprocessed(fileDetails: FileToProcess): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_MARK_UNPROCESSED, fileDetails);
+export async function dispatchMarkAsUnprocessed(system: System, fileDetails: FileToProcess): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "MarkAsUnprocessedMessage", context: "", fileDetails });
 }
 
-export function dispatchMarkAsTryAgainTomorrow(fileDetails: FileToProcess): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_MARK_TOMORROW, fileDetails);
+export async function dispatchMarkAsTryAgainTomorrow(system: System, fileDetails: FileToProcess): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "MarkAsTryAgainMessage", context: "", fileDetails });
 }
 
-export function dispatchProcessCleanUpCollection(params: CleanUpCollectionResult): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION_CLEANUP, params);
+export async function dispatchProcessCleanUpCollection(system: System, params: CleanUpCollectionResult): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "CleanUpCollectionMessage", params });
 }
 
-export function dispatchProcessPlayedResult(monthsData: MonthPlayedData): Promise<void> {
+export function dispatchProcessPlayedResult(system: System, monthsData: MonthPlayedData): Promise<void> {
     // TODO
     return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_PLAYED_RESULT, monthsData);
 }
 
-export function dispatchProcessPlaysResult(result: ProcessPlaysResult): Promise<void> {
+export function dispatchProcessPlaysResult(system: System, result: ProcessPlaysResult): Promise<void> {
     // TODO
     if (result.plays.length > 2000) {
         // synchronous invocations can take a much larger payload than async ones, and around 2000 plays we hit the limit.
