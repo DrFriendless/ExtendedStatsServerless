@@ -9,9 +9,9 @@ import {
 } from "@aws-sdk/client-sqs";
 import dotenv from "dotenv";
 import process from "process";
-import {QueueMessage, ToProcessElement} from "extstats-core";
+import {FileToProcess, ProcessMethod, QueueMessage, ToProcessElement} from "extstats-core";
 import {
-    doEnsureUsers, doListToProcess,
+    doEnsureUsers, doListToProcess, doEnsureGames,
     doMarkGameDoesNotExist,
     doMarkUrlProcessed,
     doMarkUrlTryTomorrow, doMarkUrlUnprocessed,
@@ -44,7 +44,8 @@ const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
 const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
 const FUNCTION_PROCESS_PLAYED = "processPlayed";
 
-dotenv.config({ path: ".env" });
+dotenv.config({ path: ".env", quiet: true });
+
 
 // Set the AWS Region.
 const REGION = process.env.AWS_REGION;
@@ -58,7 +59,7 @@ async function main() {
     // TODO - do I need to send the account ID?
     while (true) {
         console.log(`Waiting for queue ${system.downloaderQueue}`);
-        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 20, MaxNumberOfMessages: 1 };
+        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 20, MaxNumberOfMessages: 10 };
         const command = new ReceiveMessageCommand(input);
         const response = await sqsClient.send(command);
         if (response.Messages) {
@@ -72,27 +73,32 @@ async function main() {
     await flushLogging();
 }
 
+async function scheduleProcessing(element: ToProcessElement) {
+    // TODO - invoke appropriate lambda
+    if (element.processMethod === METHOD_PROCESS_USER) {
+        console.log(`scheduling processUser ${element.geek}`);
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
+    } else if (element.processMethod === METHOD_PROCESS_COLLECTION) {
+        console.log(`scheduling processCollection ${element.geek}`);
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
+    } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
+    } else if (element.processMethod === METHOD_PROCESS_GAME) {
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
+    } else if (element.processMethod === METHOD_PROCESS_PLAYS) {
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
+    } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
+    } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
+    }
+}
+
 async function noMessages() {
     // TODO - allow a variety of types
-    const todo: ToProcessElement[] = await returnWithConnection(conn => doListToProcess(conn, 10, "processUser", false))
+    const todo: ToProcessElement[] = await returnWithConnection(conn => doListToProcess(conn, 10, ["processUser", "processCollection"], false))
     for (const element of todo) {
-        // TODO - invoke appropriate lambda
-        if (element.processMethod === METHOD_PROCESS_USER) {
-            console.log(`scheduling processUser ${element.geek}`);
-            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
-        } else if (element.processMethod === METHOD_PROCESS_COLLECTION) {
-            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
-        } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
-            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
-        } else if (element.processMethod === METHOD_PROCESS_GAME) {
-            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
-        } else if (element.processMethod === METHOD_PROCESS_PLAYS) {
-            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
-        } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
-            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
-        } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {
-            await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
-        }
+        await scheduleProcessing(element);
     }
 }
 
@@ -113,15 +119,18 @@ async function handleMessages(messages: Message[], queueUrl: string): Promise<vo
 }
 
 async function handleQueueMessage(message: QueueMessage) {
-    console.log(message.discriminator);
     switch (message.discriminator) {
         case "CleanUpCollectionMessage":
-            console.log(JSON.stringify(message));
+            console.log(`CleanUpCollectionMessage ${message.params.geek}`);
             await withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
             break;
         case "CollectionResultMessage":
-            console.log(JSON.stringify(message));
+            console.log(`CollectionResultMessage ${message.result.geek}`);
             await withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
+            break;
+        case "EnsureGamesMessage":
+            console.log(`EnsureGamesMessage ${message.gameIds.length}`);
+            await withConnectionAsync(conn => doEnsureGames(conn, message.gameIds));
             break;
         case "GameResultMessage":
             console.log(JSON.stringify(message));
@@ -129,15 +138,31 @@ async function handleQueueMessage(message: QueueMessage) {
             break;
         case "MarkAsProcessedMessage":
             console.log(JSON.stringify(message));
-            await withConnectionAsync(conn => doMarkUrlProcessed(conn, message.fileDetails.processMethod, message.fileDetails.url));
+            await withConnectionAsync(conn => doMarkUrlProcessed(conn, message.fileDetails.processMethod as ProcessMethod, message.fileDetails.url));
             break;
         case "MarkAsTryAgainMessage":
             console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doMarkUrlTryTomorrow(conn, message.fileDetails.processMethod, message.fileDetails.url));
             break;
         case "MarkAsUnprocessedMessage":
-            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doMarkUrlUnprocessed(conn, message.fileDetails.processMethod, message.fileDetails.url));
+            // reschedule while BGG has the data.
+            const fd: FileToProcess = message.fileDetails;
+            if (message.fileDetails.processMethod === "processCollection") {
+                console.log(`rescheduling processCollection for ${fd.geek}`);
+                const toProcess: ToProcessElement = {
+                    ...fd,
+                    lastUpdate: null,
+                    nextUpdate: null,
+                    description: "",
+                    lastattempt: null,
+                    last_scheduled: null,
+                    month: null,
+                    year: null,
+                    geekid: 0
+                };
+                setTimeout(() => scheduleProcessing(toProcess), 60);
+            }
             break;
         case "NoSuchGameMessage":
             console.log(JSON.stringify(message));
@@ -160,10 +185,11 @@ async function handleQueueMessage(message: QueueMessage) {
             await withConnectionAsync(conn => doUpdateBGGTop50(conn, message.top50));
             break;
         case "UpdateUserListMessage":
-            console.log(JSON.stringify(message));
+            console.log("UpdateUserListMessage");
             await withConnectionAsync(conn => doEnsureUsers(conn, message.users));
             break;
         case "UserResultMessage":
+            console.log(`UserResultMessage ${message.result.geek}`);
             await withConnectionAsync(conn =>
                 doUpdateProcessUserResult(conn, message.result.geek, message.result.bggid, message.result.country, message.result.url));
             break;

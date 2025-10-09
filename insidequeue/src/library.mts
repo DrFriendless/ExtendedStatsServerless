@@ -43,8 +43,9 @@ export async function getConnection(): Promise<mysql.Connection> {
     return mysql.createConnection(params);
 }
 
-export function count(conn: mysql.Connection, sql: string, params: any[]): PromiseLike<number> {
-    return conn.query(sql, params).then(result => result[0]["count(*)"]);
+export async function count(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
+    const result = await conn.query(sql, params);
+    return result[0]["count(*)"];
 }
 
 export function listMinus(ints: number[], takeaway: number[]): number[] {

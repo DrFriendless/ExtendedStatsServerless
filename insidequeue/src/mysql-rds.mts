@@ -263,7 +263,7 @@ async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: numbe
 }
 
 // longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
-const TILL_NEXT_UPDATE = { "processCollection" : "72:00:00", "processMarket" : "72:00:00", "processPlayed" : "72:00:00",
+const TILL_NEXT_UPDATE: Record<ProcessMethod, string> = { "processCollection" : "72:00:00", "processMarket" : "72:00:00", "processPlayed" : "72:00:00",
     "processGame" : "838:00:00", "processTop50" : "72:00:00", "processFrontPage" : "24:00:00", "processUser": "838:00:00",
     "processPlays": undefined as string, "processDesigner": undefined as string, "processPublisher": undefined as string };
 
@@ -435,8 +435,10 @@ export async function doEnsureMonthsPlayed(conn: mysql.Connection, geek: string,
     }
 }
 
-export async function doEnsureGames(conn: mysql.Connection, ids: number[]): Promise<number[]> {
-    if (ids.length === 0) return [];
+// can't trust that the IDs are actually numbers, TYVM TypeScript.
+export async function doEnsureGames(conn: mysql.Connection, anyIds: any[]): Promise<number[]> {
+    if (anyIds.length === 0) return [];
+    const ids = anyIds.map(x => parseInt(x.toString(), 10));
     const sqlSome = "select bggid from files where bggid in (?) and processMethod = 'processGame'";
     const sqlOne = "select bggid from files where bggid = ? and processMethod = 'processGame'";
     let params;
@@ -448,7 +450,7 @@ export async function doEnsureGames(conn: mysql.Connection, ids: number[]): Prom
         sql = sqlSome;
         params = [ids];
     }
-    const found = (await conn.query(sql, params)).map((row: { bggid: number }) => row.bggid);
+    const found = (await conn.query(sql, params)).map((row: { bggid: any }) => parseInt(row.bggid.toString()));
     const notExist = await getGamesThatDontExist(conn);
     const uniques = Array.from(new Set(listMinus(listMinus(ids, found), notExist)));
     for (const id of uniques) {
@@ -458,16 +460,14 @@ export async function doEnsureGames(conn: mysql.Connection, ids: number[]): Prom
 }
 
 async function doRecordGame(conn: mysql.Connection, bggid: number) {
-    const GAME_URL = "https://boardgamegeek.com/xmlapi/boardgame/%d&stats=1";
-    const url = GAME_URL.replace("%d", bggid.toString());
-    const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid) values (?, ?, ?, ?, ?, ?)";
+    const url = `https://boardgamegeek.com/xmlapi/boardgame/${bggid}&stats=1`;
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
     const tillNext = tillNextUpdate("processGame");
     const insertParams = [url, "processGame", undefined, undefined, tillNext, "Game #" + bggid, bggid];
     await conn.query(insertSql, insertParams).catch(err => {
         console.log(err);
     });
 }
-
 
 async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | undefined,
                             description: string, bggid: number | undefined, month: number | undefined, year: number | undefined,
@@ -507,10 +507,10 @@ async function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: strin
         undefined, undefined, geekid);
 }
 
-export async function doListToProcess(conn: mysql.Connection, count: number, processMethod: string, updateLastScheduled: boolean): Promise<ToProcessElement[]> {
+export async function doListToProcess(conn: mysql.Connection, count: number, processMethods: string[], updateLastScheduled: boolean): Promise<ToProcessElement[]> {
     let query: ToProcessElement[];
-    if (processMethod) {
-        query = await doListToProcessByMethod(conn, count, processMethod);
+    if (processMethods.length > 0) {
+        query = await doListToProcessByMethod(conn, count, processMethods);
     } else {
         query = await doListToProcessAll(conn, count);
     }
@@ -526,9 +526,9 @@ async function doListToProcessAll(conn: mysql.Connection, count: number): Promis
     return (await conn.query(sql, [count])).map((row: ToProcessElement) => row);
 }
 
-async function doListToProcessByMethod(conn: mysql.Connection, count: number, processMethod: string): Promise<ToProcessElement[]> {
-    const sql = "select * from files where processMethod = ? and (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 15) limit ?";
-    return (await conn.query(sql, [processMethod, count])).map((row: ToProcessElement) => row);
+async function doListToProcessByMethod(conn: mysql.Connection, count: number, processMethods: string[]): Promise<ToProcessElement[]> {
+    const sql = "select * from files where processMethod in (?) and (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 15) limit ?";
+    return (await conn.query(sql, [processMethods, count])).map((row: ToProcessElement) => row);
 }
 
 async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string[]) {
