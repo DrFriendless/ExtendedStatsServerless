@@ -62,6 +62,10 @@ export function dispatchNoSuchGame(gameId: number): Promise<void> {
     return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_NO_SUCH_GAME, {bggid: gameId});
 }
 
+export function dispatchNoSuchUser(system: System, geek: string): Promise<void> {
+    return sendToDownloaderQueue(system, { discriminator: "NoSuchGeekMessage", geek });
+}
+
 export function dispatchProcessGameResult(result: ProcessGameResult): Promise<void> {
     // TODO
     return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result);

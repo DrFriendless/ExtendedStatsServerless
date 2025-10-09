@@ -318,6 +318,19 @@ export async function doMarkGameDoesNotExist(conn: mysql.Connection, bggid: numb
     await conn.query(deleteSql2, [bggid]);
 }
 
+export async function doMarkGeekDoesNotExist(conn: mysql.Connection, geek: string) {
+    const insertSql = "insert into not_geeks (geek) values (?)";
+    const deleteSql1 = "delete from files where geek is not null and geek = ?";
+    const deleteSql2 = "delete from geekgames where geekid not in (select distinct geekid from files)";
+    try {
+        await conn.query(insertSql, [geek]);
+    } catch (e) {
+        // ignore error if it's already there
+    }
+    await conn.query(deleteSql1, [geek]);
+    await conn.query(deleteSql2);
+}
+
 export async function doEnsureUsers(conn: mysql.Connection, users: string[]) {
     const extraSql = "select username from geeks where username not in (?)";
     const extraUsers = (await conn.query(extraSql, [users])).map((row: { username: string }) => row.username);
@@ -813,6 +826,11 @@ async function countWhere(conn: mysql.Connection, where: string, params: any[]) 
 async function getGamesThatDontExist(conn: mysql.Connection): Promise<number[]> {
     const sql = "select bggid from not_games";
     return (await conn.query(sql)).map((row: { bggid: number }) => row.bggid);
+}
+
+export async function getGeeksThatDontExist(conn: mysql.Connection): Promise<string[]> {
+    const sql = "select geek from not_geeks";
+    return (await conn.query(sql)).map((row: { geek: string }) => row.geek);
 }
 
 async function getIdForSeries(conn: mysql.Connection, seriesName: string): Promise<number> {

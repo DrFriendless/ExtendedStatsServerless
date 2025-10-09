@@ -11,13 +11,23 @@ import dotenv from "dotenv";
 import process from "process";
 import {FileToProcess, ProcessMethod, QueueMessage, ToProcessElement} from "extstats-core";
 import {
-    doEnsureUsers, doListToProcess, doEnsureGames,
+    doEnsureUsers,
+    doListToProcess,
+    doEnsureGames,
     doMarkGameDoesNotExist,
     doMarkUrlProcessed,
-    doMarkUrlTryTomorrow, doMarkUrlUnprocessed,
+    doMarkUrlTryTomorrow,
+    doMarkUrlUnprocessed,
     doProcessCollectionCleanup,
-    doProcessGameResult, doProcessPlayedMonths, doProcessPlaysResult,
-    doUpdateBGGTop50, doUpdateGamesForGeek, doUpdateMetadata, doUpdateProcessUserResult
+    doProcessGameResult,
+    doProcessPlayedMonths,
+    doProcessPlaysResult,
+    doUpdateBGGTop50,
+    doUpdateGamesForGeek,
+    doUpdateMetadata,
+    doUpdateProcessUserResult,
+    doMarkGeekDoesNotExist,
+    getGeeksThatDontExist
 } from "./mysql-rds.mjs";
 import {invokeLambdaAsync} from "./library.mjs";
 import {loadSystem} from "./system.mjs";
@@ -41,7 +51,6 @@ const FUNCTION_PROCESS_GAME = "processGame";
 const FUNCTION_PROCESS_PLAYS = "processPlays";
 const FUNCTION_PROCESS_DESIGNER = "processDesigner";
 const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
-const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
 const FUNCTION_PROCESS_PLAYED = "processPlayed";
 
 dotenv.config({ path: ".env", quiet: true });
@@ -95,10 +104,17 @@ async function scheduleProcessing(element: ToProcessElement) {
 }
 
 async function noMessages() {
+    const geeksThatDontExist = await returnWithConnection(getGeeksThatDontExist);
     // TODO - allow a variety of types
     const todo: ToProcessElement[] = await returnWithConnection(conn => doListToProcess(conn, 10, ["processUser", "processCollection"], false))
     for (const element of todo) {
-        await scheduleProcessing(element);
+        if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
+            // this shouldn't happen.
+            log(`Geek ${element.geek} doesn't even exist.`);
+            await withConnectionAsync(conn => doMarkUrlProcessed(conn, element.processMethod as ProcessMethod, element.url));
+        } else {
+            await scheduleProcessing(element);
+        }
     }
 }
 
@@ -121,11 +137,11 @@ async function handleMessages(messages: Message[], queueUrl: string): Promise<vo
 async function handleQueueMessage(message: QueueMessage) {
     switch (message.discriminator) {
         case "CleanUpCollectionMessage":
-            console.log(`CleanUpCollectionMessage ${message.params.geek}`);
+            console.log(`CleanUpCollectionMessage ${message.params.geek} ${message.params.items.length}`);
             await withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
             break;
         case "CollectionResultMessage":
-            console.log(`CollectionResultMessage ${message.result.geek}`);
+            console.log(`CollectionResultMessage ${message.result.geek} ${message.result.items.length}`);
             await withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
             break;
         case "EnsureGamesMessage":
@@ -133,7 +149,7 @@ async function handleQueueMessage(message: QueueMessage) {
             await withConnectionAsync(conn => doEnsureGames(conn, message.gameIds));
             break;
         case "GameResultMessage":
-            console.log(JSON.stringify(message));
+            console.log(`GameResultMessage ${message.result.name}`);
             await withConnectionAsync(conn => doProcessGameResult(conn, message.result));
             break;
         case "MarkAsProcessedMessage":
@@ -145,6 +161,7 @@ async function handleQueueMessage(message: QueueMessage) {
             await withConnectionAsync(conn => doMarkUrlTryTomorrow(conn, message.fileDetails.processMethod, message.fileDetails.url));
             break;
         case "MarkAsUnprocessedMessage":
+            console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doMarkUrlUnprocessed(conn, message.fileDetails.processMethod, message.fileDetails.url));
             // reschedule while BGG has the data.
             const fd: FileToProcess = message.fileDetails;
@@ -167,6 +184,10 @@ async function handleQueueMessage(message: QueueMessage) {
         case "NoSuchGameMessage":
             console.log(JSON.stringify(message));
             await withConnectionAsync(conn => doMarkGameDoesNotExist(conn, message.gameId));
+            break;
+        case "NoSuchGeekMessage":
+            console.log(`NoSuchGeek ${message.geek}`);
+            await withConnectionAsync(conn => doMarkGeekDoesNotExist(conn, message.geek));
             break;
         case "PlayedResultMessage":
             console.log(JSON.stringify(message));

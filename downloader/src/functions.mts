@@ -9,7 +9,7 @@ import _ from "lodash";
 import {
     dispatchEnsureGames,
     dispatchMarkAsProcessed, dispatchMarkAsTryAgainTomorrow, dispatchMarkAsUnprocessed,
-    dispatchNoSuchGame, dispatchProcessCleanUpCollection, dispatchProcessCollectionUpdateGames,
+    dispatchNoSuchGame, dispatchNoSuchUser, dispatchProcessCleanUpCollection, dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult, dispatchProcessPlayedResult, dispatchProcessPlaysResult, dispatchProcessUserResult,
     dispatchUpdateMetadata,
     dispatchUpdateTop50,
@@ -205,6 +205,8 @@ export async function processCollection(invocation: FileToProcess) {
             await markAsUnprocessed(system, invocation);
         } else if (code > 500) {
             await markTryAgainTomorrow(system, invocation);
+        } else if (code === 400) {
+            log(`No such geek: ${invocation.geek}`)
         }
     } catch (e) {
         console.log(invocation);
@@ -223,20 +225,29 @@ export async function processCollection(invocation: FileToProcess) {
 // return success
 async function tryToProcessCollection(system: System, invocation: FileToProcess): Promise<number> {
     const resp = await fetch(invocation.url);
-    if (resp.status == 202 || resp.status == 504) return resp.status;
+    if (resp.status !== 200) console.log(resp.status);
+    if (resp.status === 202 || resp.status === 504) return resp.status;
     const data = await resp.text();
 
-    const collection = await extractUserCollectionFromPage(invocation.geek, data);
-    const ids = collection.items.map(item => item.gameId);
-    console.log(ids);
-    // make sure that all of these games are in the database
-    // if there are a lot, this lambda might timeout, but next time more of them will be there.
-    await dispatchEnsureGames(system, ids);
-    for (const games of splitCollection(collection)) {
-        await dispatchProcessCollectionUpdateGames(system, games);
+    try {
+        const collection = await extractUserCollectionFromPage(invocation.geek, data);
+        const ids = collection.items.map(item => item.gameId);
+        console.log(ids);
+        // make sure that all of these games are in the database
+        // if there are a lot, this lambda might timeout, but next time more of them will be there.
+        await dispatchEnsureGames(system, ids);
+        for (const games of splitCollection(collection)) {
+            await dispatchProcessCollectionUpdateGames(system, games);
+        }
+        await cleanupCollection(system, collection, invocation.url);
+        return 200;
+    } catch (e) {
+        if (data.includes("Invalid username specified")) {
+            await dispatchNoSuchUser(system, invocation.geek);
+            return 400;
+        }
+        return 401;
     }
-    await cleanupCollection(system, collection, invocation.url);
-    return 200;
 }
 
 async function cleanupCollection(system: System, collection: ProcessCollectionResult, url: string) {

@@ -1,4 +1,3 @@
-import { logError } from "./library.mjs";
 import {
     CollectionGame,
     PlayData,
@@ -16,16 +15,20 @@ export async function extractUserCollectionFromPage(geek: string, pageContent: s
     }
     if (!dom || !dom.items) {
         if (pageContent.includes("Collection exceeds maximum export size")) {
-            await logError("Collection exceeds maximum export size for " + geek);
+            log("Collection exceeds maximum export size for " + geek);
             throw new Error("Collection exceeds maximum export size for " + geek);
         }
+        if (pageContent.includes("Invalid username specified")) {
+            log(`It looks like ${geek} no longer exists.`);
+            throw new Error(`It looks like ${geek} no longer exists.`);
+        }
         console.log("Found incorrect DOM");
-        await logError("Found incorrect DOM for " + geek);
+        log("Found incorrect DOM for " + geek);
         throw new Error("Found incorrect DOM for " + geek);
     }
     if (!dom.items.item || dom.items.item.length === 0) {
         console.log("Found no games in collection");
-        await logError("Found no games in collection for " + geek);
+        log("Found no games in collection for " + geek);
     }
     const items: CollectionGame[] = [];
     const byId: Record<string, Partial<CollectionGame>> = {};
@@ -182,7 +185,7 @@ export async function processPlaysFile(fileContents: string, invocation: FileToP
     if (!dom || !dom.plays || !dom.plays.play) {
         console.log("Plays not found");
         console.log(dom);
-        await logError("Plays not found in " + invocation.url);
+        log("Plays not found in " + invocation.url);
         return { count: -1, plays: result };
     }
     const playCount = parseInt(dom.plays.$.total);

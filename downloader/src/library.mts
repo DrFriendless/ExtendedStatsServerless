@@ -1,9 +1,4 @@
 import {LambdaClient, InvokeCommand} from "@aws-sdk/client-lambda";
-const INSIDE_PREFIX = "inside-dev-";
-
-export function logError(message: string): Promise<void> {
-    return invokeLambdaAsync(INSIDE_PREFIX + "logError", { source: "downloader", message });
-}
 
 export async function invokeLambdaAsync(func: string, payload: object): Promise<void> {
     const lambda = new LambdaClient({ region: process.env.REGION });
@@ -43,8 +38,4 @@ export function between(s: string, before: string, after: string): string {
     const j = s.indexOf(after);
     if (j < 0) return "";
     return s.substring(0, j);
-}
-
-export function btoa(s: string) {
-    return Buffer.from(s, 'binary').toString('base64');
 }
