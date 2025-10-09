@@ -161,7 +161,7 @@ async function handleQueueMessage(message: QueueMessage) {
             await withConnectionAsync(conn => doMarkUrlTryTomorrow(conn, message.fileDetails.processMethod, message.fileDetails.url));
             break;
         case "MarkAsUnprocessedMessage":
-            console.log(JSON.stringify(message));
+            console.log(`MarkAsUnprocessedMessage ${message.fileDetails.processMethod} ${message.fileDetails.geek}`)
             await withConnectionAsync(conn => doMarkUrlUnprocessed(conn, message.fileDetails.processMethod, message.fileDetails.url));
             // reschedule while BGG has the data.
             const fd: FileToProcess = message.fileDetails;

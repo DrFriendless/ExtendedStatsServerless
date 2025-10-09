@@ -26,9 +26,6 @@ import {
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
-// lambda names we expect to see
-const FUNCTION_UPDATE_USER_LIST = "updateUserList";
-
 const MAX_GAMES_PER_CALL = 500;
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
@@ -48,7 +45,6 @@ export async function processUserList(_: UpdateUserListMessage) {
         const lines = data.split(/\r?\n/).map(s => s.trim()).filter(s => !!s);
         console.log(lines);
         await dispatchUpdateUserList(system, lines);
-        log(`Sent ${lines.length} users to ${FUNCTION_UPDATE_USER_LIST}`);
     } else {
         console.log("Unable to read users file");
         console.log(await resp.text());
