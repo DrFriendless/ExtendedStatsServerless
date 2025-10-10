@@ -73,9 +73,10 @@ async function main() {
         const response = await sqsClient.send(command);
         if (response.Messages) {
             await handleMessages(response.Messages, system.downloaderQueue);
+            await noMessages(1);
         } else {
             console.log("No messages");
-            await noMessages();
+            await noMessages(20);
         }
     }
     log("We terminated.");
@@ -104,12 +105,12 @@ async function scheduleProcessing(element: ToProcessElement) {
     }
 }
 
-async function noMessages() {
+async function noMessages(howManyToDo: number) {
     const geeksThatDontExist = await returnWithConnection(getGeeksThatDontExist);
     // TODO - allow a variety of types
     const todo: ToProcessElement[] =
         await returnWithConnection(conn =>
-            doListToProcess(conn, 10, ["processUser", "processCollection", "processGame"], false))
+            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame"], false))
     for (const element of todo) {
         if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
             // this shouldn't happen.
