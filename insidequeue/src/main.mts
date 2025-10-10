@@ -93,6 +93,7 @@ async function scheduleProcessing(element: ToProcessElement) {
     } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
     } else if (element.processMethod === METHOD_PROCESS_GAME) {
+        console.log(`scheduling processGame ${element.bggid}`);
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
     } else if (element.processMethod === METHOD_PROCESS_PLAYS) {
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
@@ -106,7 +107,9 @@ async function scheduleProcessing(element: ToProcessElement) {
 async function noMessages() {
     const geeksThatDontExist = await returnWithConnection(getGeeksThatDontExist);
     // TODO - allow a variety of types
-    const todo: ToProcessElement[] = await returnWithConnection(conn => doListToProcess(conn, 10, ["processUser", "processCollection"], false))
+    const todo: ToProcessElement[] =
+        await returnWithConnection(conn =>
+            doListToProcess(conn, 10, ["processUser", "processCollection", "processGame"], false))
     for (const element of todo) {
         if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
             // this shouldn't happen.

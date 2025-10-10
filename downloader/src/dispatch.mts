@@ -22,7 +22,7 @@ import {
     ProcessGameResult, FileToProcess, Metadata, ProcessCollectionResult,
     MonthPlayedData, ProcessPlaysResult, ProcessUserResult, CleanUpCollectionResult, QueueMessage
 } from 'extstats-core';
-import {System} from "./system.mjs";
+import {loadSystem, System} from "./system.mjs";
 
 
 // Set the AWS Region.
@@ -57,18 +57,16 @@ export function dispatchUpdateTop50(top50: number[]): Promise<void> {
     return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_UPDATE_TOP50, top50);
 }
 
-export function dispatchNoSuchGame(gameId: number): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_NO_SUCH_GAME, {bggid: gameId});
+export function dispatchNoSuchGame(system: System, gameId: number): Promise<void> {
+    return sendToDownloaderQueue(system, { discriminator: "NoSuchGameMessage", gameId });
 }
 
 export function dispatchNoSuchUser(system: System, geek: string): Promise<void> {
     return sendToDownloaderQueue(system, { discriminator: "NoSuchGeekMessage", geek });
 }
 
-export function dispatchProcessGameResult(result: ProcessGameResult): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_GAME_RESULT, result);
+export function dispatchProcessGameResult(system: System, result: ProcessGameResult): Promise<void> {
+    return sendToDownloaderQueue(system, { discriminator: "GameResultMessage", result });
 }
 
 export function dispatchProcessUserResult(system: System, result: ProcessUserResult): Promise<void> {

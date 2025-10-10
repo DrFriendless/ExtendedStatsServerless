@@ -146,19 +146,27 @@ export async function processBGGTop50(ignored: UpdateTop50Message) {
 
 // Lambda to harvest data about a game
 export async function processGame(event: FileToProcess) {
+    const system = await loadSystem();
+    if (!system.ok) {
+        console.log("Failed to load system for processUser");
+        return;
+    }
+    await initLogging(system, "processUser");
+
     const invocation = event as FileToProcess;
     const resp = await fetch(invocation.url);
     const data = await resp.text();
     try {
         const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data.toString());
-        await dispatchProcessGameResult(result);
+        await dispatchProcessGameResult(system, result);
     } catch (err) {
         if (err instanceof NoSuchGameError) {
-            await dispatchNoSuchGame(err.getId());
+            await dispatchNoSuchGame(system, err.getId());
         } else {
             console.log(err);
         }
     }
+    await flushLogging();
 }
 
 // Lambda to harvest data about a user
@@ -182,7 +190,6 @@ export async function processUser(event: FileToProcess) {
     const puResult = extractUserDataFromPage(invocation.geek, invocation.url, data);
     await dispatchProcessUserResult(system, puResult);
 
-    log(`processUser ${invocation.geek} done`);
     await flushLogging();
 }
 
