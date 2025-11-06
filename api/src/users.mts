@@ -1,6 +1,6 @@
-import mysql = require('promise-mysql');
-import { asyncReturnWithConnection } from "./library";
-import { UserConfig } from "extstats-core";
+import * as mysql from 'promise-mysql';
+import {UsersTableRow} from "./interfaces.mjs";
+import {UserConfig} from "extstats-core";
 
 export class User {
     private readonly identity: string;
@@ -53,32 +53,32 @@ export class User {
 
 // for GDPR requirements we need to provide the user with all data stored about them. However we do not need to
 // present it in any particular fashion.
-export async function retrieveAllData(identity: string): Promise<object> {
-    const findSql = "select * from users where identity = ?";
-    return asyncReturnWithConnection(async conn => {
-        return await conn.query(findSql, [identity]);
-    });
-}
-
-export async function findOrCreateUser(identity: string, suggestedUsername: string): Promise<User> {
-    return asyncReturnWithConnection(conn => doFindOrCreateUser(conn, identity, suggestedUsername));
-}
-
-export async function findUser(identity: string): Promise<User | undefined> {
-    return asyncReturnWithConnection(conn => doFindUser(conn, identity));
-}
-
-export async function updateUser(identity: string, userConfig: UserConfig) {
-    return asyncReturnWithConnection(conn => doUpdateUserConfig(conn, identity, userConfig));
-}
+// export async function retrieveAllData(identity: string): Promise<object> {
+//     const findSql = "select * from users where identity = ?";
+//     return asyncReturnWithConnection(async conn => {
+//         return await conn.query(findSql, [identity]);
+//     });
+// }
+//
+// export async function findOrCreateUser(identity: string, suggestedUsername: string): Promise<User> {
+//     return asyncReturnWithConnection(conn => doFindOrCreateUser(conn, identity, suggestedUsername));
+// }
+//
+// export async function findUser(identity: string): Promise<User | undefined> {
+//     return asyncReturnWithConnection(conn => doFindUser(conn, identity));
+// }
+//
+// export async function updateUser(identity: string, userConfig: UserConfig) {
+//     return asyncReturnWithConnection(conn => doUpdateUserConfig(conn, identity, userConfig));
+// }
 
 export async function doFindOrCreateUser(conn: mysql.Connection, identity: string, suggestedUsername: string): Promise<User> {
     const findSql = "select * from users where identity = ?";
     const createSql = "insert into users (identity, username, created) values (?,?,?)";
-    const findResult = (await conn.query(findSql, [identity])).map(row => extractUser(row, false));
+    const findResult = (await conn.query(findSql, [identity]) as UsersTableRow[]).map(row => extractUser(row, false));
     if (findResult.length === 0) {
         await conn.query(createSql, [identity, suggestedUsername, new Date()]);
-        return (await conn.query(findSql, [identity])).map(row => extractUser(row, true))[0];
+        return (await conn.query(findSql, [identity]) as UsersTableRow[]).map(row => extractUser(row, true))[0];
     } else {
         const user = findResult[0];
         user.incrementLoginCount();
@@ -89,7 +89,7 @@ export async function doFindOrCreateUser(conn: mysql.Connection, identity: strin
 
 export async function doFindUser(conn: mysql.Connection, identity: string): Promise<User | undefined> {
     const findSql = "select * from users where identity = ?";
-    const findResult = (await conn.query(findSql, [identity])).map(row => extractUser(row, false));
+    const findResult = (await conn.query(findSql, [identity]) as UsersTableRow[]).map(row => extractUser(row, false));
     if (findResult.length === 0) {
         return undefined;
     } else {
@@ -110,7 +110,7 @@ async function recordLoginForUser(conn: mysql.Connection, user: User) {
     await conn.query(updateSql, [new Date(), user.getLoginCount(), user.getIdentity()]);
 }
 
-function extractUser(row: object, first: boolean): User {
+function extractUser(row: UsersTableRow, first: boolean): User {
     return new User(row["identity"], row["username"], row["loginCount"], first, row["created"], row["lastLogin"],
         row["configuration"], row["icon"], row["colour"]);
 }

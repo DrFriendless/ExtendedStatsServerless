@@ -1,7 +1,8 @@
 // probably something like an LL(1) recursive descent parser
 // I couldn't get nearleyc to produce code that didn't crash node so I wrote this rather than muck with it.
 
-import * as moo from 'moo';
+// don't fix this, moo is a bit slow to catch up.
+import moo from 'moo';
 
 const tokens = {
     whitespace: /[ \t]+/,

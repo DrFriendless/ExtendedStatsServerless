@@ -1,8 +1,13 @@
 import mysql = require('promise-mysql');
-import { Arg, Argument, Expression, Integer, Keyword, parse, StringValue } from "./parser";
-import { getGeekId } from "./library";
+import { Arg, Argument, Expression, Integer, Keyword, parse, StringValue } from "./parser.mjs";
+import { getGeekId } from "./library.mjs";
 import { GeekGameQuery, GeekGameQueryResult, SelectorMetadataSet } from "extstats-core";
-import {VarBinding, VarBindings} from "./varbindings";
+import {VarBinding, VarBindings} from "./varbindings.mjs";
+import {
+    GameDesignersTableRow, GamePublishersTableRow,
+    GeekGameRow,
+    GeekGamesTableRow
+} from "./interfaces.mjs";
 
 export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameQueryResult> {
     const expr = parse(q);
@@ -68,36 +73,36 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
                 geek = await getGeekId(conn, geek as string);
             }
             const sql = "select game from geekgames where geekid = ? and rating > 0";
-            const ids = (await conn.query(sql, [geek])).map(row => row["game"]);
+            const ids = (await conn.query(sql, [geek]) as GeekGamesTableRow[]).map(row => row["game"]);
             ids.forEach(id => metadata.add(id, "rater", geek.toString()));
             return ids;
         }
         case "played": {
             let geek = evaluateSimpleArg(expr.args[0] as Arg, vars);
-            let strgeek;
+            let strgeek: string | undefined;
             if (typeof geek === 'string') {
                 strgeek = geek;
                 geek = await getGeekId(conn, geek as string);
             }
             const sql = "select distinct game from plays_normalised where geek = ?";
-            const ids = (await conn.query(sql, [geek])).map(row => row["game"]) as number[];
+            const ids = (await conn.query(sql, [geek]) as GeekGamesTableRow[]).map(row => row["game"]) as number[];
             if (strgeek) ids.forEach(id => metadata.add(id, "player", strgeek));
             return ids;
         }
         case "owned": {
             let geek = evaluateSimpleArg(expr.args[0] as Arg, vars);
-            let strgeek;
+            let strgeek: string | undefined;
             if (typeof geek === 'string') {
                 strgeek = geek;
                 geek = await getGeekId(conn, geek as string);
             }
             const sql = "select game from geekgames where geekid = ? and owned > 0";
-            const ids = (await conn.query(sql, [geek])).map(row => row["game"]);
+            const ids = (await conn.query(sql, [geek]) as GeekGamesTableRow[]).map(row => row["game"]);
             if (strgeek) ids.forEach(id => metadata.add(id, "owner", strgeek));
             return ids;
         }
         case "expansions": {
-            return (await conn.query("select distinct expansion from expansions")).map(row => row["expansion"]);
+            return (await conn.query("select distinct expansion from expansions") as { expansion: number }[]).map(row => row["expansion"]);
         }
         case "designer": {
             const designer = evaluateSimpleArg(expr.args[0] as Arg, vars);
@@ -140,22 +145,22 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
 
 async function selectDesigner(conn: mysql.Connection, designer: number): Promise<number[]> {
     const sql = "select game from game_designers where designer = ?";
-    return (await conn.query(sql, [designer])).map(row => row["game"]);
+    return (await conn.query(sql, [designer]) as GameDesignersTableRow[]).map(row => row["game"]);
 }
 
 async function selectPublisher(conn: mysql.Connection, publisher: number): Promise<number[]> {
     const sql = "select game from game_publishers where publisher = ?";
-    return (await conn.query(sql, [publisher])).map(row => row["game"]);
+    return (await conn.query(sql, [publisher]) as GamePublishersTableRow[]).map(row => row["game"]);
 }
 
 async function selectCategory(conn: mysql.Connection, cat: string): Promise<number[]> {
     const sql = "select games.bggid id from games,categories,game_categories where games.bggid = game_categories.game and categories.name = ? and categories.id = game_categories.category";
-    return (await conn.query(sql, [cat])).map(row => row["id"]);
+    return (await conn.query(sql, [cat]) as { id: number }[]).map(row => row["id"]);
 }
 
 async function selectMechanic(conn: mysql.Connection, cat: string): Promise<number[]> {
     const sql = "select games.bggid id from games,mechanics,game_mechanics where games.bggid = game_mechanics.game and mechanics.name = ? and mechanics.id = game_mechanics.mechanic";
-    return (await conn.query(sql, [cat])).map(row => row["id"]);
+    return (await conn.query(sql, [cat]) as { id: number }[]).map(row => row["id"]);
 }
 
 function evaluateSimpleArg(arg: Arg, vars: VarBindings): string | number {
@@ -205,9 +210,9 @@ async function getValidIds(conn: mysql.Connection, ids: number[]): Promise<numbe
     const sqlMany = "select bggid from games where bggid in (?)";
     if (ids.length === 0) return [];
     if (ids.length === 1) {
-        return (await conn.query(sqlOne, [ids[0]])).map(row => row["bggid"]);
+        return (await conn.query(sqlOne, [ids[0]]) as { bggid: number }[]).map(row => row["bggid"]);
     } else {
-        return (await conn.query(sqlMany, [ids])).map(row => row["bggid"]);
+        return (await conn.query(sqlMany, [ids]) as { bggid: number }[]).map(row => row["bggid"]);
     }
 }
 
@@ -217,9 +222,9 @@ export async function retrieveGeekGames(conn: mysql.Connection, ids: number[], g
     if (ids.length === 0) return [];
     const geekId = await getGeekId(conn, geek);
     if (ids.length === 1) {
-        return (await conn.query(sqlOne, [geekId, ids[0]])).map(gg => extractGeekGame(geek, gg));
+        return (await conn.query(sqlOne, [geekId, ids[0]]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg));
     } else {
-        return (await conn.query(sqlMany, [geekId, ids])).map(gg => extractGeekGame(geek, gg));
+        return (await conn.query(sqlMany, [geekId, ids]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg));
     }
 }
 
@@ -228,22 +233,7 @@ export interface GeekGameSelectResult {
     geekGames: GeekGameRow[];
 }
 
-export type GeekGameRow = {
-    geek: string;
-    bggid: number;
-    rating: number;
-    owned: boolean;
-    wantToBuy: boolean;
-    wantToPlay: boolean;
-    preordered: boolean;
-    prevOwned: boolean;
-    geekid: number;
-    wantInTrade: boolean;
-    wish: number;
-    forTrade: boolean;
-};
-
-function extractGeekGame(geek: string, row: object): GeekGameRow {
+function extractGeekGame(geek: string, row: GeekGamesTableRow): GeekGameRow {
     return {
         geek,
         geekid: row["geekid"],

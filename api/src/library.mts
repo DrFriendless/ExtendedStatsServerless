@@ -1,24 +1,5 @@
 import * as mysql from 'promise-mysql';
 
-export async function asyncReturnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
-    const connection = await getConnection();
-    try {
-        return await func(connection);
-    } finally {
-        if (connection) connection.destroy();
-    }
-}
-
-export function getConnection(): PromiseLike<mysql.Connection> {
-    const params = {
-        host: process.env.mysqlHost,
-        user: process.env.mysqlUsername,
-        password: process.env.mysqlPassword,
-        database: process.env.mysqlDatabase
-    };
-    return mysql.createConnection(params);
-}
-
 export async function count(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
     return (await conn.query(sql, params))[0]["count(*)"];
 }
@@ -35,20 +16,19 @@ export async function getGeekId(conn: mysql.Connection, geek: string): Promise<n
     return results[0]['id'];
 }
 
-export async function getGeekIds(conn: mysql.Connection, geeks: string[]): Promise<{ [id: number]: string }> {
+export async function getGeekIds(conn: mysql.Connection, geeks: string[]): Promise<Record<number, string>> {
     if (!geeks) return undefined;
+    const result: Record<number, string> = {};
     if (geeks.length === 1) {
         const geek: string = geeks[0];
         const id: number = await getGeekId(conn, geek);
-        const result = {};
         result[id] = geek;
-        return result;
-    }
-    const getIdSql = "select id, username from geeks where geeks.username in (?)";
-    const results = await conn.query(getIdSql, [geeks]);
-    const result = {};
-    for (const row of results) {
-        result[parseInt(row.id)] = row.username;
+    } else {
+        const getIdSql = "select id, username from geeks where geeks.username in (?)";
+        const results = await conn.query(getIdSql, [geeks]);
+        for (const row of results) {
+            result[parseInt(row.id)] = row.username;
+        }
     }
     return result;
 }
@@ -57,15 +37,13 @@ export async function getGeekIds(conn: mysql.Connection, geeks: string[]): Promi
 /**
  * Receives an array of headers and extract the value from the cookie header
  */
-export function getCookiesFromHeader(headers) {
-    if (headers === null || headers === undefined || headers.Cookie === undefined) {
+export function getCookiesFromHeader(headers: { [name: string]: string }): Record<string, string> {
+    if (!headers || !headers.Cookie) {
         return {};
     }
-
     // Split a cookie string in an array (Originally found http://stackoverflow.com/a/3409200/1427439)
-    const list = {};
+    const list: Record<string, string> = {};
     const rc = headers.Cookie;
-
     rc && rc.split(';').forEach(function( cookie ) {
         const parts = cookie.split('=');
         const key = parts.shift().trim();

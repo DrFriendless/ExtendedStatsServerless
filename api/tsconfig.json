@@ -1,9 +1,23 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "docs": [
+    "https://devblogs.microsoft.com/typescript/announcing-typescript-5-7/#path-rewriting-for-relative-paths",
+    "https://devblogs.microsoft.com/typescript/announcing-typescript-5-8-beta/#the---erasablesyntaxonly-option"
+  ],
   "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
+    "module": "nodenext",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
     "sourceMap": true,
-    "experimentalDecorators": true,
-    "lib": [ "es2017", "dom" ]
-  }
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    //    "types": ["node"],
+    "lib": ["esnext"],
+    "target": "es2022"
+  },
+  "include": [
+    "src/*.mts"
+  ]
 }
