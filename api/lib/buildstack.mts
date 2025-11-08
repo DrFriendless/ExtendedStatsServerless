@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib/core';
-import { ApiStack } from './cdk-api-stack.ts';
-import {FunctionVersionUpgrade} from "aws-cdk-lib/aws-lambda";
-import {LAMBDA_RECOGNIZE_VERSION_PROPS} from "aws-cdk-lib/cx-api";
-import {Aspects} from "aws-cdk-lib/core";
+import {ApiStack} from './cdk-api-stack.mts';
 
 const app = new cdk.App();
 new ApiStack(app, 'ApiStack', {
@@ -21,5 +18,5 @@ new ApiStack(app, 'ApiStack', {
 
     /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 });
-// Aspects.of(app).add(new FunctionVersionUpgrade(LAMBDA_RECOGNIZE_VERSION_PROPS));
 app.synth();
+

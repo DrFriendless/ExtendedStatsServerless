@@ -17,6 +17,8 @@ function update_lambda() {
 #define_lambda "downloader-processGame" "functions.processGame"
 
 cdk deploy --profile drfriendless --require-approval never
-update_lambda "api_wartable"
+# tell the Lambdas to refresh from their code source, because CloudFront is too special to do that.
+cd lib
+npx ts-node --prefer-ts-exts ./post-stack.mts
 
 date
