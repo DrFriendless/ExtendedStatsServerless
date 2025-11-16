@@ -1,5 +1,3 @@
 # HOW TO DEPLOY
 
-sls package
-
-sls deploy
+./build.sh && ./deploy.sh

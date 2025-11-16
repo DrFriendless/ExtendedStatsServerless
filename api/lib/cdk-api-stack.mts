@@ -18,6 +18,9 @@ let DATABASE_VPC: ec2.IVpc = undefined;
 let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
+let PUBLIC_SUBNET_A: ec2.ISubnet = undefined;
+let PUBLIC_SUBNET_B: ec2.ISubnet = undefined;
+let PUBLIC_SUBNET_C: ec2.ISubnet = undefined;
 let API_GATEWAY: aws_apigatewayv2.IHttpApi = undefined;
 let CLOUDFRONT: cf.IDistribution = undefined;
 
@@ -34,7 +37,7 @@ export class ApiStack extends cdk.Stack {
       allowPublicSubnet: true,
       vpc: DATABASE_VPC,
       vpcSubnets: {
-        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
+        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_A ]
       }
     });
     Tags.of(f).add("component", COMPONENT);
@@ -54,6 +57,9 @@ export class ApiStack extends cdk.Stack {
     PRIVATE_SUBNET_A = ec2.Subnet.fromSubnetId(this, "private a", "subnet-f565d0bc");
     PRIVATE_SUBNET_B = ec2.Subnet.fromSubnetId(this, "private b", "subnet-a865decf");
     PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", "subnet-44646e1d");
+    PUBLIC_SUBNET_A = ec2.Subnet.fromSubnetId(this, "public a", "subnet-0822a1312816de200");
+    PUBLIC_SUBNET_B = ec2.Subnet.fromSubnetId(this, "public b", "subnet-039233503b6e31d8e");
+    PUBLIC_SUBNET_C = ec2.Subnet.fromSubnetId(this, "public c", "subnet-013589611630ac1d0");
     API_ROLE = iam.Role.fromRoleName(this, "role", "APILambdas");
     ZIP_BUCKET = s3.Bucket.fromBucketName(this, "bucket", DEPLOYMENT_BUCKET);
     API_GATEWAY = aws_apigatewayv2.HttpApi.fromHttpApiAttributes(this, "gateway", { httpApiId: "niiwhl9tva" });
@@ -63,19 +69,7 @@ export class ApiStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
     this.lookupExternalResources();
-    // this.defineLambda(this, `${COMPONENT}_wartable`, "functions.getWarTable", "warTable");
-    // this.defineLambda(this, `${COMPONENT}_updates`, "functions.getUpdates", "updates");
-    // this.defineLambda(this, `${COMPONENT}_geek`, "functions.getGeekSummary", "geek");
-    // this.defineLambda(this, `${COMPONENT}_systemStats`, "functions.adminGatherSystemStats", "systemStats");
-    // this.defineLambda(this, `${COMPONENT}_userList`, "functions.getUserList", "userList");
-    // this.defineLambda(this, `${COMPONENT}_news`, "functions.getNews", "news");
-    // this.defineLambda(this, `${COMPONENT}_rankings`, "functions.getRankings", "rankings");
-    //
-    // this.defineLambdaPost(this, `${COMPONENT}_markForUpdate`, "functions.markForUpdate", "markForUpdate");
-    // this.defineLambdaPost(this, `${COMPONENT}_updateOld`, "functions.updateOld", "updateOld");
-    // this.defineLambdaPost(this, `${COMPONENT}_incFAQCount`, "functions.incFAQCount", "incFAQCount");
-    // this.defineLambdaPost(this, `${COMPONENT}_query`, "functions.query", "query");
-    // this.defineLambdaPost(this, `${COMPONENT}_plays`, "functions.plays", "plays");
+
     for (const spec of LAMBDA_SPECS) {
       if (spec.method === "GET") {
         this.defineLambda(this, spec.name, spec.handler, spec.route, HttpMethod.GET);

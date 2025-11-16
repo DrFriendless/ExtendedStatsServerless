@@ -6,19 +6,13 @@ export AWS="aws --region $AWS_REGION --profile drfriendless --output text --no-c
 
 # upload code to S3
 $AWS s3 cp $COMPONENT.zip s3://$DEPLOYMENT_BUCKET/
-
-function update_lambda() {
-    $AWS lambda update-function-code --function-name $1 --s3-bucket=$DEPLOYMENT_BUCKET --s3-key=$COMPONENT.zip --publish
-}
-
-#define_lambda "downloader-processUserList" "functions.processUserList"
-#define_lambda "downloader-processUser" "functions.processUser"
-#define_lambda "downloader-processCollection" "functions.processCollection"
-#define_lambda "downloader-processGame" "functions.processGame"
-
+# deploy the stack
 cdk deploy --profile drfriendless --require-approval never
 # tell the Lambdas to refresh from their code source, because CloudFront is too special to do that.
 cd lib
 npx ts-node --prefer-ts-exts ./post-stack.mts
+# export the current version of the API library
+cd ../export
+./build.sh
 
 date
