@@ -112,4 +112,18 @@ export class ExtstatsApi {
             method: "POST"
         })).json()) as MultiGeekPlays;
     }
+
+    async retrieve(query: string): Promise<object> {
+        return (await (await fetch(`${this.baseUrl}/retrieve?query=${query}`, {
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            method: "POST"
+        })).json()) as MultiGeekPlays;
+    }
+
+    async findGeeks(fragment: string): Promise<string[]> {
+        return (await (await fetch(`${this.baseUrl}/findGeeks?fragment=${fragment}`)).json()) as string[];
+    }
 }

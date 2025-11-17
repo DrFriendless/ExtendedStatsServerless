@@ -25,4 +25,5 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_incFAQCount`, handler: "functions.incFAQCount", route: "incFAQCount", method: "POST" },
     { name: `${COMPONENT}_query`, handler: "functions.query", route: "query", method: "POST" },
     { name: `${COMPONENT}_plays`, handler: "functions.plays", route: "plays", method: "POST" },
+    { name: `${COMPONENT}_retrieve`, handler: "retrieve.retrieve", route: "retrieve", method: "GET" },
 ];

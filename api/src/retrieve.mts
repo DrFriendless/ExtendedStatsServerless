@@ -16,7 +16,7 @@ import {
     PlaysRetrieveResult, RawPlaysQueryResult, RetrievePlay,
     ShouldPlayAdditionalData
 } from "./interfaces.mjs";
-import {findSystem, isHttpResponse, System} from "./system.mjs";
+import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 
 interface Loaders {
     system: System;
@@ -422,19 +422,16 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
     return { geeks: Object.values<string>(geekNameIds), plays: basePlays, games, geekgames };
 }
 
-export async function retrieve(event: APIGatewayProxyEvent) {
+export async function retrieve(event: APIGatewayProxyEvent): Promise<HttpResponse | object> {
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
     const loaders = createLoaders(system);
-    const headers = {
-        "Access-Control-Allow-Origin": "*"
-    };
     // handle empty query for CORS
     const result = event.queryStringParameters.query ? await graphql.graphql({
         schema: buildSchema(loaders),
         source: event.queryStringParameters['query'] }
     ) : {};
-    return {statusCode: 200, headers, body: JSON.stringify(result)};
+    return {statusCode: 200, body: JSON.stringify(result)};
 }
 
 async function batchGetGames(system: System, gameIds: number[]): Promise<GameData[]> {
