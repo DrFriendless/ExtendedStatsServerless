@@ -433,7 +433,13 @@ export async function retrieve(event: APIGatewayProxyEvent): Promise<HttpRespons
         schema: buildSchema(loaders),
         source: event.queryStringParameters['query'] }
     ) : {};
-    return {statusCode: 200, body: JSON.stringify(result)};
+    if (result.errors) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify(result.errors)
+        }
+    }
+    return {statusCode: 200, body: JSON.stringify(result.data)};
 }
 
 async function batchGetGames(system: System, gameIds: number[]): Promise<GameData[]> {
