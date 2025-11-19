@@ -7,11 +7,12 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as cf from "aws-cdk-lib/aws-cloudfront";
 import {HttpMethod, HttpRouteKey} from "aws-cdk-lib/aws-apigatewayv2";
-import {HttpLambdaIntegration} from "aws-cdk-lib/aws-apigatewayv2-integrations";
-import {COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS} from "./metadata.mts";
+import {HttpLambdaIntegration, HttpUrlIntegration} from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import {COMPONENT, DEPLOYMENT_BUCKET, EXPRESS_SPECS, LAMBDA_SPECS} from "./metadata.mts";
 
 const RUNTIME = lambda.Runtime.NODEJS_22_X;
 
+const EXPRESS_BASE = "http://eb2.drfriendless.com";
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 let API_ROLE: iam.IRole | undefined = undefined;
 let DATABASE_VPC: ec2.IVpc = undefined;
@@ -26,7 +27,7 @@ let CLOUDFRONT: cf.IDistribution = undefined;
 
 export class ApiStack extends cdk.Stack {
 
-  defineLambda(scope: Construct, name: string, handler: string, route: string, method): lambda.Function {
+  defineLambda(scope: Construct, name: string, handler: string, route: string, method: HttpMethod): lambda.Function {
     const f = new lambda.Function(scope, name, {
       functionName: name,
       runtime: RUNTIME,
@@ -49,6 +50,16 @@ export class ApiStack extends cdk.Stack {
       })
     });
     return f;
+  }
+
+  defineExpressRoute(scope: Construct, key: string, route: string, method: HttpMethod) {
+    const r = new aws_apigatewayv2.HttpRoute(scope, route, {
+      httpApi: API_GATEWAY,
+      routeKey: HttpRouteKey.with(`/${route}`, method),
+      integration: new HttpUrlIntegration(`integration_${key}`, `${EXPRESS_BASE}/${route}`, {
+        method
+      })
+    });
   }
 
   lookupExternalResources() {
@@ -78,6 +89,13 @@ export class ApiStack extends cdk.Stack {
       } else {
         console.log("What's this?");
         console.log(spec);
+      }
+    }
+    for (const spec of EXPRESS_SPECS) {
+      if (spec.method === "GET") {
+        this.defineExpressRoute(this, spec.key, spec.route, HttpMethod.GET);
+      } else if (spec.method === "POST") {
+        this.defineExpressRoute(this, spec.key, spec.route, HttpMethod.POST);
       }
     }
   }

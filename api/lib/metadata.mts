@@ -12,6 +12,12 @@ export interface LambdaSpec {
     method: string;
 }
 
+export interface ExpressSpec {
+    key: string;
+    route: string;
+    method: string;
+}
+
 export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_wartable`, handler: "functions.getWarTable", route: "warTable", method: "GET" },
     { name: `${COMPONENT}_updates`, handler: "functions.getUpdates", route: "updates", method: "GET" },
@@ -26,4 +32,8 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_query`, handler: "functions.query", route: "query", method: "POST" },
     { name: `${COMPONENT}_plays`, handler: "functions.plays", route: "plays", method: "POST" },
     { name: `${COMPONENT}_retrieve`, handler: "retrieve.retrieve", route: "retrieve", method: "GET" },
+];
+
+export const EXPRESS_SPECS: ExpressSpec[] = [
+    { key: "findgeeks", route: "findgeeks",  method: "GET" },
 ];

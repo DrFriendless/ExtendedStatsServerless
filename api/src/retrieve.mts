@@ -66,7 +66,7 @@ function buildGameDataType(loaders: Loaders) {
     });
 }
 
-function buildGeekGameType(loaders: Loaders) {
+function buildGeekGameType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>) {
     return new GraphQLObjectType({
             name: "GeekGame",
             fields: {
@@ -92,7 +92,7 @@ function buildGeekGameType(loaders: Loaders) {
                 wantInTrade: {type: graphql.GraphQLBoolean!},
                 wish: {type: graphql.GraphQLInt!},
                 game: {
-                    type: buildGameDataType(loaders),
+                    type: gameDataType,
                     resolve: (parent: { bggid: number }) => loaders.games.load(parent.bggid)
                 }
             }
@@ -120,14 +120,14 @@ const VarBindingInputType = new GraphQLInputObjectType({
     }
 });
 
-function buildMultiGeekPlaysType(loaders: Loaders) {
+function buildMultiGeekPlaysType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<GeekGame>) {
     return new GraphQLObjectType({
         name: "MultiGeekPlays",
         fields: {
             geeks: {type: ListOfString},
             plays: {type: new graphql.GraphQLList(PlaysWithDateType!)},
-            games: {type: new graphql.GraphQLList(buildGameDataType(loaders))},
-            geekgames: {type: new graphql.GraphQLList(buildGeekGameType(loaders))}
+            games: {type: new graphql.GraphQLList(gameDataType)},
+            geekgames: {type: new graphql.GraphQLList(geekGameType)}
         }
     });
 }
@@ -143,12 +143,12 @@ const SelectorMetadataType = new GraphQLObjectType({
     }
 });
 
-function buildGeekGamesType(loaders: Loaders) {
+function buildGeekGamesType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<GeekGame>) {
     return new GraphQLObjectType({
         name: "GeekGames",
         fields: {
-            games: {type: new graphql.GraphQLList(buildGameDataType(loaders))},
-            geekGames: {type: new graphql.GraphQLList(buildGeekGameType(loaders))},
+            games: {type: new graphql.GraphQLList(gameDataType)},
+            geekGames: {type: new graphql.GraphQLList(geekGameType)},
             metadata: {type: new graphql.GraphQLList(SelectorMetadataType!)}
         }
     });
@@ -164,7 +164,7 @@ const MonthlyPlayCountType = new GraphQLObjectType({
     }
 });
 // plays of a geek for a game for a month
-function buildMonthlyPlaysType(loaders: Loaders) {
+function buildMonthlyPlaysType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>) {
     return new GraphQLObjectType({
         name: "MonthlyPlays",
         fields: {
@@ -174,25 +174,27 @@ function buildMonthlyPlaysType(loaders: Loaders) {
             quantity: {type: graphql.GraphQLInt!},
             bggid: {type: graphql.GraphQLInt!},
             game: {
-                type: buildGameDataType(loaders),
+                type: gameDataType,
                 resolve: (parent: { bggid: number }) => loaders.games.load(parent.bggid)
             }
         }
     });
 }
 
-function buildMonthlyPlaysAndCountsType(loaders: Loaders) {
+function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<GeekGame>) {
     return new GraphQLObjectType({
         name: "MonthlyPlaysAndCounts",
         fields: {
-            plays: {type: new graphql.GraphQLList(buildMonthlyPlaysType(loaders)!)},
+            plays: {type: new graphql.GraphQLList(buildMonthlyPlaysType(loaders, gameDataType)!)},
             counts: {type: new graphql.GraphQLList(MonthlyPlayCountType!)},
-            geekGames: {type: new graphql.GraphQLList(buildGeekGameType(loaders))}
+            geekGames: {type: new graphql.GraphQLList(geekGameType)}
         }
     });
 }
 
 function buildSchema(loaders: Loaders) {
+    const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
+    const geekGameType: GraphQLObjectType<GeekGame> = buildGeekGameType(loaders, gameDataType);
     return new graphql.GraphQLSchema({
         query: new graphql.GraphQLObjectType({
             name: "RetrieveQuery",
@@ -204,7 +206,7 @@ function buildSchema(loaders: Loaders) {
                         startYMD: { type: graphql.GraphQLInt },
                         endYMD: { type: graphql.GraphQLInt }
                     },
-                    type: buildMultiGeekPlaysType(loaders),
+                    type: buildMultiGeekPlaysType(gameDataType, geekGameType),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
                             async conn => playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
@@ -215,7 +217,7 @@ function buildSchema(loaders: Loaders) {
                         selector: { type: graphql.GraphQLString },
                         vars: { type: new graphql.GraphQLList(VarBindingInputType!) }
                     },
-                    type: buildGeekGamesType(loaders),
+                    type: buildGeekGamesType(gameDataType, geekGameType),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
                             async conn => geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars)))
@@ -234,7 +236,7 @@ function buildSchema(loaders: Loaders) {
                         selector: { type: graphql.GraphQLString },
                         vars: { type: new graphql.GraphQLList(VarBindingInputType!) }
                     },
-                    type: buildMonthlyPlaysAndCountsType(loaders),
+                    type: buildMonthlyPlaysAndCountsType(loaders, gameDataType, geekGameType),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
                             async conn => monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars)))

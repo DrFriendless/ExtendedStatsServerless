@@ -10,7 +10,7 @@ import {
 } from "extstats-core";
 
 export class ExtstatsApi {
-    constructor(private baseUrl: string = "https://extstats.drfriendless.com/api") {
+    constructor(private baseUrl: string) {
     }
 
     async getWarTable(): Promise<WarTableRow[]> {
@@ -119,11 +119,11 @@ export class ExtstatsApi {
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             },
-            method: "POST"
+            method: "GET"
         })).json()) as MultiGeekPlays;
     }
 
     async findGeeks(fragment: string): Promise<string[]> {
-        return (await (await fetch(`${this.baseUrl}/findGeeks?fragment=${fragment}`)).json()) as string[];
+        return (await (await fetch(`${this.baseUrl}/findgeeks?fragment=${fragment}`)).json()) as string[];
     }
 }
