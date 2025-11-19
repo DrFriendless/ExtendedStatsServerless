@@ -84,9 +84,9 @@ export class ExtstatsApi {
         return (await (await fetch(`${this.baseUrl}/incFAQCount`, {
             headers: {
                 "Content-Type": "application/json",
-                "Accept": "application/json",
-                "body": JSON.stringify(inc),
+                "Accept": "application/json"
             },
+            body: JSON.stringify(inc),
             method: "POST"
         })).json()) as FAQCount[];
     }

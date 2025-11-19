@@ -41,6 +41,7 @@ export async function getGeekSummary(event: APIGatewayProxyEvent): Promise<HttpR
 }
 
 export async function incFAQCount(event: APIGatewayProxyEvent): Promise<HttpResponse | FAQCount[]> {
+    console.log(event);
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
     return await updateFAQCount(system, JSON.parse(event.body) as number[]);
