@@ -8,7 +8,8 @@ import { returnWithConnectionAsync } from "./library";
  */
 export const findgeeks = async (req: Request, res: Response) => {
     const sql = "select username from geeks where LOWER(username) like ? order by 1 limit 10";
-    const name = req.params["fragment"].toLowerCase().replace(/%/g, "");
+    const f = (req.query["fragment"] || "").toString();
+    const name = f.toLowerCase().replace(/%/g, "");
     console.log(`findgeeks ${name}}`);
     const matches = await returnWithConnectionAsync(async (conn) => {
         let ms = await conn.query(sql, name + "%");

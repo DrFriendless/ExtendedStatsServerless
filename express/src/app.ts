@@ -39,7 +39,7 @@ downloaderRouter.use(basicAuth({
 downloaderRouter.post("/ensuregames", ensureGamesRoute.ensuregames);
 app.use("/downloader", downloaderRouter);
 
-app.get("/findgeeks/:fragment", cors(), findGeeksRoute.findgeeks);
+app.get("/findgeeks", cors(), findGeeksRoute.findgeeks);
 app.get("/login",
     nocache(),
     cors({origin: "https://extstats.drfriendless.com", credentials: true, exposedHeaders: "Set-Cookie"}),
