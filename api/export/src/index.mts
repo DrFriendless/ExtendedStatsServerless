@@ -9,6 +9,22 @@ import {
     WarTableRow
 } from "extstats-core";
 
+export type AuthResultType = "code" | "userdata" | "failure";
+
+export interface AuthResultCode {
+    type: "code";
+    code: string;
+}
+export interface AuthResultLoginSuccess {
+    type: "userdata";
+    data: any;
+}
+export interface AuthResultFailure {
+    type: "failure";
+    message: string;
+}
+export type AuthResult = AuthResultCode | AuthResultLoginSuccess | AuthResultFailure;
+
 export class ExtstatsApi {
     constructor(private baseUrl: string) {
     }
@@ -125,5 +141,71 @@ export class ExtstatsApi {
 
     async findGeeks(fragment: string): Promise<string[]> {
         return (await (await fetch(`${this.baseUrl}/findgeeks?fragment=${fragment}`)).json()) as string[];
+    }
+
+    async signup(username: string, password: string): Promise<AuthResult> {
+        const response = await fetch(`${this.baseUrl}/signup`, {
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            "body": JSON.stringify({ username, password }),
+            method: "POST"
+        });
+        const body = await response.json() as object;
+        if (response.status === 200 && "code" in body) {
+            return {
+                type: "code",
+                code: body.code as string,
+            }
+        } else if ("message" in body) {
+            return {
+                type: "failure",
+                message: body.message as string,
+            }
+        } else {
+            return {
+                type: "failure",
+                message: "I have no idea what happened",
+            };
+        }
+    }
+
+    async login(username: string, password: string): Promise<AuthResult> {
+        const response = await fetch(`${this.baseUrl}/login`, {
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            "body": JSON.stringify({ username, password }),
+            method: "POST"
+        });
+        const body = await response.json() as { message: string };
+        if (response.status === 200) {
+            return {
+                type: "userdata",
+                data: body
+            }
+        } else if ("message" in body) {
+            return {
+                type: "failure",
+                message: body.message as string,
+            }
+        } else {
+            return {
+                type: "failure",
+                message: "I have no idea what happened",
+            };
+        }
+    }
+
+    async logout(): Promise<string> {
+        return (await (await fetch(`${this.baseUrl}/logout`, {
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method: "POST"
+        })).json()) as string;
     }
 }

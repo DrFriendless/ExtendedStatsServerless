@@ -63,6 +63,7 @@ export class System {
 export interface HttpResponse {
     statusCode: number;
     body?: string;
+    headers?: Record<string, any>;
 }
 
 export function isHttpResponse(object: any): object is HttpResponse {

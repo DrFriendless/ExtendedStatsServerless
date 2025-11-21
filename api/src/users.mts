@@ -1,6 +1,7 @@
 import * as mysql from 'promise-mysql';
 import {UsersTableRow} from "./interfaces.mjs";
 import {UserConfig} from "extstats-core";
+import {System} from "./system.mjs";
 
 export class User {
     private readonly identity: string;
@@ -53,24 +54,24 @@ export class User {
 
 // for GDPR requirements we need to provide the user with all data stored about them. However we do not need to
 // present it in any particular fashion.
-// export async function retrieveAllData(identity: string): Promise<object> {
-//     const findSql = "select * from users where identity = ?";
-//     return asyncReturnWithConnection(async conn => {
-//         return await conn.query(findSql, [identity]);
-//     });
-// }
-//
-// export async function findOrCreateUser(identity: string, suggestedUsername: string): Promise<User> {
-//     return asyncReturnWithConnection(conn => doFindOrCreateUser(conn, identity, suggestedUsername));
-// }
-//
-// export async function findUser(identity: string): Promise<User | undefined> {
-//     return asyncReturnWithConnection(conn => doFindUser(conn, identity));
-// }
-//
-// export async function updateUser(identity: string, userConfig: UserConfig) {
-//     return asyncReturnWithConnection(conn => doUpdateUserConfig(conn, identity, userConfig));
-// }
+export async function retrieveAllData(system: System, identity: string): Promise<object> {
+    const findSql = "select * from users where identity = ?";
+    return system.asyncReturnWithConnection(async conn => {
+        return await conn.query(findSql, [identity]);
+    });
+}
+
+export async function findOrCreateUser(system: System, identity: string, suggestedUsername: string): Promise<User> {
+    return system.asyncReturnWithConnection(conn => doFindOrCreateUser(conn, identity, suggestedUsername));
+}
+
+export async function findUser(system: System, identity: string): Promise<User | undefined> {
+    return system.asyncReturnWithConnection(conn => doFindUser(conn, identity));
+}
+
+export async function updateUser(system: System, identity: string, userConfig: UserConfig) {
+    return system.asyncReturnWithConnection(conn => doUpdateUserConfig(conn, identity, userConfig));
+}
 
 export async function doFindOrCreateUser(conn: mysql.Connection, identity: string, suggestedUsername: string): Promise<User> {
     const findSql = "select * from users where identity = ?";

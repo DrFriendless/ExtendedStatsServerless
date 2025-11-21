@@ -32,6 +32,9 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_query`, handler: "functions.query", route: "query", method: "POST" },
     { name: `${COMPONENT}_plays`, handler: "functions.plays", route: "plays", method: "POST" },
     { name: `${COMPONENT}_retrieve`, handler: "retrieve.retrieve", route: "retrieve", method: "GET" },
+    { name: `${COMPONENT}_login`, handler: "auth.login", route: "login", method: "POST" },
+    { name: `${COMPONENT}_logout`, handler: "auth.logout", route: "logout", method: "POST" },
+    { name: `${COMPONENT}_signup`, handler: "auth.signup", route: "signup", method: "POST" },
 ];
 
 export const EXPRESS_SPECS: ExpressSpec[] = [

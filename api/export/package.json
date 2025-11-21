@@ -1,6 +1,6 @@
 {
   "name": "extstats-api",
-  "version": "1.0.8",
+  "version": "1.0.12",
   "description": "ExtendedStatsServerless API SDK",
   "type": "module",
   "main": "index.mjs",
@@ -9,7 +9,6 @@
   ],
   "scripts": {
     "build": "tsc"
-
   },
   "author": "John Farrell <friendless.farrell@gmail.com>",
   "license": "ISC",
