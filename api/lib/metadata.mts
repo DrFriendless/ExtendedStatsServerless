@@ -12,6 +12,11 @@ export interface LambdaSpec {
     method: string;
 }
 
+export interface LambdaOnlySpec {
+    name: string;
+    handler: string;
+}
+
 export interface ExpressSpec {
     key: string;
     route: string;
@@ -35,6 +40,11 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_login`, handler: "auth.login", route: "login", method: "POST" },
     { name: `${COMPONENT}_logout`, handler: "auth.logout", route: "logout", method: "POST" },
     { name: `${COMPONENT}_signup`, handler: "auth.signup", route: "signup", method: "POST" },
+    { name: `${COMPONENT}_changePassword`, handler: "auth.changePassword", route: "changePassword", method: "POST" },
+];
+
+export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [
+    { name: `auth_confirm`, handler: "auth.confirm" }
 ];
 
 export const EXPRESS_SPECS: ExpressSpec[] = [

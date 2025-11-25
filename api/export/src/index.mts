@@ -21,7 +21,7 @@ export interface AuthResultLoginSuccess {
 }
 export interface AuthResultFailure {
     type: "failure";
-    message: string;
+    state: string;
 }
 export type AuthResult = AuthResultCode | AuthResultLoginSuccess | AuthResultFailure;
 
@@ -158,15 +158,43 @@ export class ExtstatsApi {
                 type: "code",
                 code: body.code as string,
             }
-        } else if ("message" in body) {
+        } else if ("state" in body) {
             return {
                 type: "failure",
-                message: body.message as string,
+                state: body.state as string,
             }
         } else {
             return {
                 type: "failure",
-                message: "I have no idea what happened",
+                state: "START",
+            };
+        }
+    }
+
+    async changedPassword(username: string, password: string): Promise<AuthResult> {
+        const response = await fetch(`${this.baseUrl}/changePassword`, {
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            "body": JSON.stringify({ username, password }),
+            method: "POST"
+        });
+        const body = await response.json() as object;
+        if (response.status === 200 && "code" in body) {
+            return {
+                type: "code",
+                code: body.code as string,
+            }
+        } else if ("state" in body) {
+            return {
+                type: "failure",
+                state: body.state as string,
+            }
+        } else {
+            return {
+                type: "failure",
+                state: "START",
             };
         }
     }
@@ -180,21 +208,21 @@ export class ExtstatsApi {
             "body": JSON.stringify({ username, password }),
             method: "POST"
         });
-        const body = await response.json() as { message: string };
+        const body = await response.json() as { state: string };
         if (response.status === 200) {
             return {
                 type: "userdata",
                 data: body
             }
-        } else if ("message" in body) {
+        } else if ("state" in body) {
             return {
                 type: "failure",
-                message: body.message as string,
+                state: body.state as string,
             }
         } else {
             return {
                 type: "failure",
-                message: "I have no idea what happened",
+                state: "START",
             };
         }
     }

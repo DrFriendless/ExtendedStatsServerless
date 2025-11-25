@@ -8,7 +8,7 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as cf from "aws-cdk-lib/aws-cloudfront";
 import {HttpMethod, HttpRouteKey} from "aws-cdk-lib/aws-apigatewayv2";
 import {HttpLambdaIntegration, HttpUrlIntegration} from "aws-cdk-lib/aws-apigatewayv2-integrations";
-import {COMPONENT, DEPLOYMENT_BUCKET, EXPRESS_SPECS, LAMBDA_SPECS} from "./metadata.mts";
+import {COMPONENT, DEPLOYMENT_BUCKET, EXPRESS_SPECS, LAMBDA_ONLY_SPECS, LAMBDA_SPECS} from "./metadata.mts";
 
 const RUNTIME = lambda.Runtime.NODEJS_22_X;
 
@@ -52,6 +52,24 @@ export class ApiStack extends cdk.Stack {
     return f;
   }
 
+  defineLambdaOnly(scope: Construct, name: string, handler: string): lambda.Function {
+    const f = new lambda.Function(scope, name, {
+      functionName: name,
+      runtime: RUNTIME,
+      handler,
+      role: API_ROLE,
+      code: lambda.Code.fromBucketV2(ZIP_BUCKET,  COMPONENT + ".zip"),
+      timeout: Duration.seconds(60),
+      allowPublicSubnet: true,
+      vpc: DATABASE_VPC,
+      vpcSubnets: {
+        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_A ]
+      }
+    });
+    Tags.of(f).add("component", COMPONENT);
+    return f;
+  }
+
   defineExpressRoute(scope: Construct, key: string, route: string, method: HttpMethod) {
     const r = new aws_apigatewayv2.HttpRoute(scope, route, {
       httpApi: API_GATEWAY,
@@ -90,6 +108,9 @@ export class ApiStack extends cdk.Stack {
         console.log("What's this?");
         console.log(spec);
       }
+    }
+    for (const spec of LAMBDA_ONLY_SPECS) {
+      this.defineLambdaOnly(this, spec.name, spec.handler);
     }
     for (const spec of EXPRESS_SPECS) {
       if (spec.method === "GET") {
