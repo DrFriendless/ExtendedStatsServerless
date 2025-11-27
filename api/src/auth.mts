@@ -204,21 +204,23 @@ async function confirmTask(system: System, task: AuthTask) {
     }
 }
 
-export async function confirm(event: {username: string, code: string}) {
+export async function confirm(event: { Payload: {id: string, username: string, codes: string[]}[] }) {
     console.log(event);
     const system = await findSystem();
     console.log(system);
     if (isHttpResponse(system)) return system;
 
-    const tasks = await loadAuthTask(system, event.username, event.code);
-    console.log(tasks);
-    for (const task of tasks) {
-        await confirmTask(system, task);
-        await deleteAuthTask(system, task.id);
+    for (const row of event.Payload) {
+        for (const code of row.codes) {
+            const tasks = await loadAuthTask(system, row.username, code);
+            console.log(tasks);
+            for (const task of tasks) {
+                await confirmTask(system, task);
+                await deleteAuthTask(system, task.id);
+            }
+        }
     }
-    return {
-        statusCode: 200,
-    }
+    return event.Payload;
 }
 
 async function getUserData(system: System, decoded: Decoded): Promise<UserData> {

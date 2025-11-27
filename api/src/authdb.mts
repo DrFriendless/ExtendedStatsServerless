@@ -50,7 +50,6 @@ export async function loadAuthTask(system: System, username: string, code: strin
     const sql = "select id, created, task from authtask where username = ? and code = ?";
     return system.asyncReturnWithConnection(async conn => {
         const matches = await conn.query({ sql, values: [ username, code ] }) as { id: number, created: Date, task: string }[];
-        console.log(matches);
         return matches.map(x => {
             return { id: x.id, created: x.created, code, username, task: JSON.parse(x.task) as TaskData };
         });
