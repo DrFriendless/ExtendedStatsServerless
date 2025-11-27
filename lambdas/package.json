@@ -1,0 +1,26 @@
+{
+  "name": "extstats-misc",
+  "description": "Extended Stats Miscellaneous Functions",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npx tsc"
+  },
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.926.0",
+    "@aws-sdk/client-lambda": "^3.901.0",
+    "@aws-sdk/client-secrets-manager": "^3.848.0",
+    "@aws-sdk/client-ssm": "^3.901.0",
+    "extstats-core": "file:../../repo/extstats-core-1.21.0.tgz",
+    "fast-xml-parser": "^5.3.2"
+  },
+  "devDependencies": {
+    "@aws-sdk/types": "^3.862.0",
+    "@types/aws-lambda": "^8.10.59",
+    "@types/node": "^24.3.0",
+    "aws-cdk-lib": "^2.221.1",
+    "constructs": "^10.4.2",
+    "typescript": "^5.9.3"
+  }
+}
