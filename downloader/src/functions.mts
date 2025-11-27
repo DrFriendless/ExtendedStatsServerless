@@ -23,7 +23,7 @@ import {
     ProcessCollectionResult, ProcessPlaysResult,
     SeriesMetadata, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
 } from "extstats-core";
-import {loadSystem, System} from "./system.mjs";
+import {isHttpResponse, loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
 const MAX_GAMES_PER_CALL = 500;
@@ -31,11 +31,9 @@ const MAX_GAMES_PER_CALL = 500;
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export async function processUserList(_: UpdateUserListMessage) {
     const system = await loadSystem();
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processUserList");
-    if (!system.ok) {
-        console.log("Failed to load system for processUserList");
-        return;
-    }
+
     console.log(system.usersFile);
     const resp = await fetch(system.usersFile);
     console.log(resp);
@@ -54,10 +52,7 @@ export async function processUserList(_: UpdateUserListMessage) {
 // Lambda to get the metadata from pastebin and send it to the database.
 export async function processMetadata(_: UpdateMetadataMessage) {
     const system = await loadSystem();
-    if (!system.ok) {
-        console.log("Failed to load system for processUserList");
-        return;
-    }
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processMetadata");
 
     const resp = await fetch(system.metadataFile);
@@ -147,14 +142,11 @@ export async function processBGGTop50(ignored: UpdateTop50Message) {
 // Lambda to harvest data about a game
 export async function processGame(event: FileToProcess) {
     const system = await loadSystem();
-    if (!system.ok) {
-        console.log("Failed to load system for processUser");
-        return;
-    }
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processUser");
 
     const invocation = event as FileToProcess;
-    const resp = await fetch(invocation.url);
+    const resp = await fetchFromBGG(system.usersToken, invocation.url);
     const data = await resp.text();
     try {
         const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data.toString());
@@ -169,20 +161,26 @@ export async function processGame(event: FileToProcess) {
     await flushLogging();
 }
 
+async function fetchFromBGG(token: string, url: string): Promise<Response> {
+    return fetch(url, {
+        headers: {
+            "Accept": "application/xml",
+            "Authorization": `Bearer ${token}`,
+        }
+    });
+}
+
 // Lambda to harvest data about a user
 export async function processUser(event: FileToProcess) {
     const system = await loadSystem();
-    if (!system.ok) {
-        console.log("Failed to load system for processUser");
-        return;
-    }
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processUser");
 
     const invocation = event as FileToProcess;
 
     const url = `https://api.geekdo.com/api/users?username=${encodeURIComponent(invocation.geek)}`;
     console.log(url);
-    const resp = await fetch(url);
+    const resp = await fetchFromBGG(system.usersToken, url);
     console.log(resp);
     const data = await resp.json();
     console.log(data);
@@ -196,10 +194,7 @@ export async function processUser(event: FileToProcess) {
 // Lambda to harvest a user's collection
 export async function processCollection(invocation: FileToProcess) {
     const system = await loadSystem();
-    if (!system.ok) {
-        console.log("Failed to load system for processCollection");
-        return;
-    }
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processCollection");
 
     try {
@@ -227,7 +222,7 @@ export async function processCollection(invocation: FileToProcess) {
 
 // return success
 async function tryToProcessCollection(system: System, invocation: FileToProcess): Promise<number> {
-    const resp = await fetch(invocation.url);
+    const resp = await fetchFromBGG(system.collectionToken, invocation.url);
     if (resp.status !== 200) console.log(resp.status);
     if (resp.status === 202 || resp.status === 504) return resp.status;
     const data = await resp.text();
@@ -281,13 +276,10 @@ function splitCollection(original: ProcessCollectionResult): ProcessCollectionRe
 
 export async function processPlayed(invocation: FileToProcess) {
     const system = await loadSystem();
-    if (!system.ok) {
-        console.log("Failed to load system for processCollection");
-        return;
-    }
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processPlayed");
 
-    const resp = await fetch(invocation.url);
+    const resp = await fetchFromBGG(system.playsToken, invocation.url);
     const data = await resp.text();
     const toAdd: MonthPlayed[] = [];
     data.split("\n")
@@ -305,10 +297,7 @@ export async function processPlayed(invocation: FileToProcess) {
 
 export async function processPlays(invocation: FileToProcess) {
     const system = await loadSystem();
-    if (!system.ok) {
-        console.log("Failed to load system for processPlays");
-        return;
-    }
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processPlays");
 
     let playsData: PlayData[] = [];
@@ -316,7 +305,7 @@ export async function processPlays(invocation: FileToProcess) {
     let pagesNeeded = -1;
     while (pagesSoFar === 0 || pagesSoFar < pagesNeeded) {
         pagesSoFar++;
-        const resp = await fetch(invocation.url + "&page=" + pagesSoFar);
+        const resp = await fetchFromBGG(system.playsToken, invocation.url + "&page=" + pagesSoFar);
         const data = await resp.text();
         const processResult: { count: number, plays: PlayData[] } = await processPlaysFile(data, invocation);
         playsData = playsData.concat(processResult.plays);
@@ -331,13 +320,10 @@ export async function processPlays(invocation: FileToProcess) {
 
 export async function processDesigner(event: FileToProcess) {
     const system = await loadSystem();
-    if (!system.ok) {
-        console.log("Failed to load system for processDesigner");
-        return;
-    }
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processDesigner");
 
-    const resp = await fetch(event.url);
+    const resp = await fetchFromBGG(system.extrasToken, event.url);
     const data = await resp.text();
     // TODO
     console.log(data);
@@ -346,13 +332,10 @@ export async function processDesigner(event: FileToProcess) {
 
 export async function processPublisher(event: FileToProcess) {
     const system = await loadSystem();
-    if (!system.ok) {
-        console.log("Failed to load system for processPublisher");
-        return;
-    }
+    if (isHttpResponse(system)) return system;
     await initLogging(system, "processPublisher");
 
-    const resp = await fetch(event.url);
+    const resp = await fetchFromBGG(system.extrasToken, event.url);
     const data = await resp.text();
     // TODO
     console.log(data);

@@ -4,22 +4,22 @@
   "version": "0.3.0",
   "private": true,
   "scripts": {
-    "build": "npm run build-ts",
-    "build-ts": "npx tsc"
+    "build": "npx tsc"
   },
   "type": "module",
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.901.0",
-    "@aws-sdk/client-ssm": "^3.901.0",
-    "@aws-sdk/client-lambda": "^3.901.0",
-    "@aws-sdk/client-cloudwatch-logs": "^3.901.0",
+    "@aws-sdk/client-sqs": "^3.940.0",
+    "@aws-sdk/client-ssm": "^3.940.0",
+    "@aws-sdk/client-lambda": "^3.940.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.940.0",
+    "@aws-sdk/client-secrets-manager": "^3.940.0",
     "extstats-core": "^1.13.0",
     "lodash": "^4.17.21",
     "xml2js": "^0.6.2",
     "xml2js-es6-promise": "^1.1.1"
   },
   "devDependencies": {
-    "@aws-sdk/types": "^3.862.0",
+    "@aws-sdk/types": "^3.936.0",
     "@tsconfig/node-ts": "^23.6.1",
     "@types/async": "^3.2.25",
     "@types/lodash": "^4.17.20",

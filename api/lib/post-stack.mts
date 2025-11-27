@@ -39,7 +39,7 @@ const gs2 = await cwClient.send(cmd2);
 for (const g2 of gs2.logGroups) {
     const pcmd = new PutRetentionPolicyCommand({ logGroupName: g2.logGroupName, retentionInDays: 1 });
     const r = await cwClient.send(pcmd);
-    console.log(r);
+    console.log(r.$metadata.httpStatusCode, g2.logGroupName);
 }
 
 // Look up the log groups with DescribeLogGroups.

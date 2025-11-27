@@ -59,8 +59,6 @@ dotenv.config({ path: ".env", quiet: true });
 // Set the AWS Region.
 const REGION = process.env.AWS_REGION;
 // Create an Amazon S3 service client object.
-// Credentials are granted to the EC2 hosting this so we don't need to add them here.
-const sqsClient = new SQSClient({ region: REGION });
 
 async function main() {
     const system = await loadSystem();
@@ -68,16 +66,19 @@ async function main() {
     // TODO - do I need to send the account ID?
     while (true) {
         console.log(`Waiting for queue ${system.downloaderQueue}`);
-        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 20, MaxNumberOfMessages: 10 };
+        // Credentials are granted to the EC2 hosting this so we don't need to add them here.
+        const sqsClient = new SQSClient({ region: REGION });
+        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 3, MaxNumberOfMessages: 10 };
         const command = new ReceiveMessageCommand(input);
         const response = await sqsClient.send(command);
         if (response.Messages) {
-            await handleMessages(response.Messages, system.downloaderQueue);
-            await noMessages(1);
+            await handleMessages(sqsClient, response.Messages, system.downloaderQueue);
+            if (response.Messages.length < 2) await noMessages(2 - response.Messages.length);
         } else {
             console.log("No messages");
             await noMessages(20);
         }
+        await flushLogging();
     }
     log("We terminated.");
     await flushLogging();
@@ -110,7 +111,8 @@ async function noMessages(howManyToDo: number) {
     // TODO - allow a variety of types
     const todo: ToProcessElement[] =
         await returnWithConnection(conn =>
-            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame"], false))
+            // doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame"], false))
+            doListToProcess(conn, howManyToDo, ["processUser", "processCollection"], true))
     for (const element of todo) {
         if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
             // this shouldn't happen.
@@ -122,7 +124,7 @@ async function noMessages(howManyToDo: number) {
     }
 }
 
-async function handleMessages(messages: Message[], queueUrl: string): Promise<void> {
+async function handleMessages(sqsClient: SQSClient, messages: Message[], queueUrl: string): Promise<void> {
     console.log(`Retrieved ${messages.length} messages from downloader queue`);
     for (const message of messages) {
         const receiptHandle = message.ReceiptHandle;

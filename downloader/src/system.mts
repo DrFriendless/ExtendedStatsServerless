@@ -1,25 +1,27 @@
 import {GetParameterCommand, GetParametersByPathCommand, SSMClient} from "@aws-sdk/client-ssm";
+import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
+
+const BGG_SECRETS = "extstats/bgg";
 
 export async function loadSystem() {
     const s = new System();
-    return await s.loadSecrets();
+    const a = await s.loadSecrets();
+    if (isHttpResponse(a)) return a;
+    return await s.loadBGGSecrets();
 }
 
 export class System {
-    paramKey: string;
     logBucket: string;
     metadataFile: string;
     downloaderQueue: string;
     usersFile: string;
     systemLogGroup: string;
-    ok: boolean;
+    usersToken: string;
+    extrasToken: string;
+    playsToken: string;
+    collectionToken: string;
 
-    constructor() {
-        this.paramKey = `/extstats/downloader`;
-        this.ok = false;
-    }
-
-    async loadSecrets(): Promise<System> {
+    async loadSecrets(): Promise<System | HttpResponse> {
         const ssmClient = new SSMClient({
             apiVersion: '2014-11-06',
             region: process.env.AWS_REGION
@@ -49,12 +51,42 @@ export class System {
                 }
             }
             this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
-            this.ok = true;
         } catch (error) {
             console.log(error);
+            return {
+                "statusCode": 500,
+                "body": JSON.stringify({error: `Can't retrieve downloader parameters - make sure it exists in AWS.`})
+            }
         }
         return this;
     }
+
+    async loadBGGSecrets(): Promise<HttpResponse | System> {
+        const client = new SecretsManagerClient({
+            region: process.env.AWS_REGION
+        });
+        try {
+            const response = await client.send(
+                new GetSecretValueCommand({
+                    SecretId: BGG_SECRETS
+                })
+            );
+            const secret = response.SecretString;
+            const obj = JSON.parse(secret);
+            this.usersToken = obj.users_token;
+            this.extrasToken = obj.extras_token;
+            this.playsToken = obj.plays_token;
+            this.collectionToken = obj.collection_token;
+        } catch (error) {
+            console.log(error);
+            return {
+                "statusCode": 500,
+                "body": JSON.stringify({error: `Can't find secret ${BGG_SECRETS} - make sure it exists in AWS.`})
+            }
+        }
+        return this;
+    }
+
 
     async getParameter(key: string): Promise<string> {
         const ssmClient = new SSMClient({
@@ -68,4 +100,14 @@ export class System {
         );
         return response.Parameter.Value;
     }
+}
+
+export interface HttpResponse {
+    statusCode: number;
+    body?: string;
+    headers?: Record<string, any>;
+}
+
+export function isHttpResponse(object: any): object is HttpResponse {
+    return object && 'statusCode' in object;
 }
