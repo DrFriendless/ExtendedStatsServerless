@@ -118,6 +118,11 @@ export async function changePassword(event: APIGatewayProxyEvent) {
                 body: JSON.stringify({ state: "NEED_TO_SIGN_UP" })
             }
         }
+    } else if (!existing) {
+        return {
+            statusCode: 403,
+            body: JSON.stringify({ state: "NEED_TO_SIGN_UP" })
+        }
     }
     const hash = hashPassword(password);
     const b = { code: makeid(12) }
