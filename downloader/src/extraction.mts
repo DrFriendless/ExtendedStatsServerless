@@ -179,28 +179,26 @@ export class NoSuchGameError {
     }
 }
 
-export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<{ count: number, plays: PlayData[] }> {
-    const dom = await parseStringPromise(fileContents, {trim: true});
-    const result: PlayData[] = [];
-    if (!dom || !dom.plays || !dom.plays.play) {
-        console.log("Plays not found");
-        console.log(dom);
-        log("Plays not found in " + invocation.url);
-        return { count: -1, plays: result };
-    }
-    const playCount = parseInt(dom.plays.$.total);
-    dom.plays.play.forEach((play: any) => {
-        const date = play.$.date;
-        const items = play.item;
-        const quantity = play.$.quantity;
-        const location = play.$.location;
-        const gameid = parseInt(items[0].$.objectid);
-        const raters = 0; // TODO
-        const ratingsTotal = 0; // TODO
-        result.push({ quantity, location, date, gameid, raters, ratingsTotal });
-    });
-    return { count: playCount, plays: result };
-}
+// export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<{ count: number, plays: PlayData[] }> {
+//     const dom = await parseStringPromise(fileContents, {trim: true});
+//     const result: PlayData[] = [];
+//     if (!dom || !dom.plays || !dom.plays.play) {
+//         console.log("Plays not found");
+//         console.log(dom);
+//         log("Plays not found in " + invocation.url);
+//         return { count: -1, plays: result };
+//     }
+//     const playCount = parseInt(dom.plays.$.total);
+//     dom.plays.play.forEach((play: any) => {
+//         const date = play.$.date;
+//         const items = play.item;
+//         const quantity = play.$.quantity;
+//         const location = play.$.location;
+//         const gameid = parseInt(items[0].$.objectid);
+//         result.push({ quantity, location, date, gameid, id: 0 });
+//     });
+//     return { count: playCount, plays: result };
+// }
 
 // TODO - get player ratings
 // def processPlaysFile(filename, recorded):

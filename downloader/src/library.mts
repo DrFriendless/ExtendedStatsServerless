@@ -39,3 +39,7 @@ export function between(s: string, before: string, after: string): string {
     if (j < 0) return "";
     return s.substring(0, j);
 }
+
+export async function sleep(waitTimeInMs: number){
+   await new Promise(resolve => setTimeout(resolve, waitTimeInMs));
+}

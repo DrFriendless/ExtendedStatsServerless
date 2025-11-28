@@ -7,20 +7,20 @@ const INSIDE_PREFIX = "inside-dev-";
 // lambda names we expect to see
 const FUNCTION_UPDATE_METADATA = "updateMetadata";
 const FUNCTION_UPDATE_TOP50 = "updateBGGTop50";
-const FUNCTION_PROCESS_PLAYED_RESULT = "processPlayedMonthsResult";
 const FUNCTION_PROCESS_PLAYS_RESULT = "processPlaysResult";
-const FUNCTION_PROCESS_GAME_RESULT = "processGameResult";
-const FUNCTION_NO_SUCH_GAME = "updateGameAsDoesNotExist";
-const FUNCTION_PROCESS_COLLECTION_UPDATE_GAMES = "processCollectionUpdateGames";
-const FUNCTION_PROCESS_COLLECTION_CLEANUP = "processCollectionCleanup";
-const FUNCTION_MARK_PROCESSED = "updateUrlAsProcessed";
-const FUNCTION_MARK_UNPROCESSED = "updateUrlAsUnprocessed";
-const FUNCTION_MARK_TOMORROW = "updateUrlAsTryTomorrow";
 
 import {invokeLambdaAsync, invokeLambdaSync} from "./library.mjs";
 import {
-    ProcessGameResult, FileToProcess, Metadata, ProcessCollectionResult,
-    MonthPlayedData, ProcessPlaysResult, ProcessUserResult, CleanUpCollectionResult, QueueMessage
+    ProcessGameResult,
+    FileToProcess,
+    Metadata,
+    ProcessCollectionResult,
+    MonthPlayedData,
+    ProcessPlaysResult,
+    ProcessUserResult,
+    CleanUpCollectionResult,
+    QueueMessage,
+    ProcessPlaysForPeriodResult
 } from 'extstats-core';
 import {loadSystem, System} from "./system.mjs";
 
@@ -93,19 +93,10 @@ export async function dispatchProcessCleanUpCollection(system: System, params: C
     await sendToDownloaderQueue(system, { discriminator: "CleanUpCollectionMessage", params });
 }
 
-export function dispatchProcessPlayedResult(system: System, monthsData: MonthPlayedData): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_PLAYED_RESULT, monthsData);
+export async function dispatchProcessPlayedResult(system: System, monthsData: MonthPlayedData): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "PlayedResultMessage", monthsData });
 }
 
-export function dispatchProcessPlaysResult(system: System, result: ProcessPlaysResult): Promise<void> {
-    // TODO
-    if (result.plays.length > 2000) {
-        // synchronous invocations can take a much larger payload than async ones, and around 2000 plays we hit the limit.
-        // https://www.stackery.io/blog/RequestEntityTooLargeException-aws-lambda-message-invocation-limits/
-        return invokeLambdaSync(INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, result)
-            .then();
-    } else {
-        return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_PROCESS_PLAYS_RESULT, result);
-    }
+export async function dispatchPlaysForPeriodResult(system: System, result: ProcessPlaysForPeriodResult): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: result });
 }

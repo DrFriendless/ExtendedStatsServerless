@@ -1,5 +1,4 @@
 
-import mysql from 'promise-mysql';
 import {
     DeleteMessageCommand,
     Message,
@@ -30,7 +29,7 @@ import {
     getGeeksThatDontExist
 } from "./mysql-rds.mjs";
 import {invokeLambdaAsync} from "./library.mjs";
-import {loadSystem} from "./system.mjs";
+import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
 const OUTSIDE_PREFIX = "downloader-";
@@ -63,7 +62,6 @@ const REGION = process.env.AWS_REGION;
 async function main() {
     const system = await loadSystem();
     await initLogging(system, "InsideQueue");
-    // TODO - do I need to send the account ID?
     while (true) {
         console.log(`Waiting for queue ${system.downloaderQueue}`);
         // Credentials are granted to the EC2 hosting this so we don't need to add them here.
@@ -72,11 +70,11 @@ async function main() {
         const command = new ReceiveMessageCommand(input);
         const response = await sqsClient.send(command);
         if (response.Messages) {
-            await handleMessages(sqsClient, response.Messages, system.downloaderQueue);
-            if (response.Messages.length < 2) await noMessages(2 - response.Messages.length);
+            await handleMessages(system, sqsClient, response.Messages, system.downloaderQueue);
+            if (response.Messages.length < 2) await noMessages(system, 2 - response.Messages.length);
         } else {
             console.log("No messages");
-            await noMessages(20);
+            await noMessages(system, 20);
         }
         await flushLogging();
     }
@@ -106,31 +104,30 @@ async function scheduleProcessing(element: ToProcessElement) {
     }
 }
 
-async function noMessages(howManyToDo: number) {
-    const geeksThatDontExist = await returnWithConnection(getGeeksThatDontExist);
+async function noMessages(system: System, howManyToDo: number) {
+    const geeksThatDontExist = await system.returnWithConnection(getGeeksThatDontExist);
     // TODO - allow a variety of types
     const todo: ToProcessElement[] =
-        await returnWithConnection(conn =>
-            // doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame"], false))
-            doListToProcess(conn, howManyToDo, ["processUser", "processCollection"], true))
+        await system.returnWithConnection(conn =>
+            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame"], true))
     for (const element of todo) {
         if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
             // this shouldn't happen.
             log(`Geek ${element.geek} doesn't even exist.`);
-            await withConnectionAsync(conn => doMarkUrlProcessed(conn, element.processMethod as ProcessMethod, element.url));
+            await system.withConnectionAsync(conn => doMarkUrlProcessed(conn, element.processMethod as ProcessMethod, element.url));
         } else {
             await scheduleProcessing(element);
         }
     }
 }
 
-async function handleMessages(sqsClient: SQSClient, messages: Message[], queueUrl: string): Promise<void> {
+async function handleMessages(system: System, sqsClient: SQSClient, messages: Message[], queueUrl: string): Promise<void> {
     console.log(`Retrieved ${messages.length} messages from downloader queue`);
     for (const message of messages) {
         const receiptHandle = message.ReceiptHandle;
         if (message.Body) {
             const payload = JSON.parse(message.Body);
-            await handleQueueMessage(payload as QueueMessage);
+            await handleQueueMessage(system, payload as QueueMessage);
         } else {
             console.log("What is this?");
             console.log(JSON.stringify(message));
@@ -140,35 +137,35 @@ async function handleMessages(sqsClient: SQSClient, messages: Message[], queueUr
     await flushLogging();
 }
 
-async function handleQueueMessage(message: QueueMessage) {
+async function handleQueueMessage(system: System, message: QueueMessage) {
     switch (message.discriminator) {
         case "CleanUpCollectionMessage":
             console.log(`CleanUpCollectionMessage ${message.params.geek} ${message.params.items.length}`);
-            await withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
+            await system.withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
             break;
         case "CollectionResultMessage":
             console.log(`CollectionResultMessage ${message.result.geek} ${message.result.items.length}`);
-            await withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
+            await system.withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
             break;
         case "EnsureGamesMessage":
             console.log(`EnsureGamesMessage ${message.gameIds.length}`);
-            await withConnectionAsync(conn => doEnsureGames(conn, message.gameIds));
+            await system.withConnectionAsync(conn => doEnsureGames(conn, message.gameIds));
             break;
         case "GameResultMessage":
             console.log(`GameResultMessage ${message.result.name}`);
-            await withConnectionAsync(conn => doProcessGameResult(conn, message.result));
+            await system.withConnectionAsync(conn => doProcessGameResult(conn, message.result));
             break;
         case "MarkAsProcessedMessage":
             console.log(JSON.stringify(message));
-            await withConnectionAsync(conn => doMarkUrlProcessed(conn, message.fileDetails.processMethod as ProcessMethod, message.fileDetails.url));
+            await system.withConnectionAsync(conn => doMarkUrlProcessed(conn, message.fileDetails.processMethod as ProcessMethod, message.fileDetails.url));
             break;
         case "MarkAsTryAgainMessage":
             console.log(JSON.stringify(message));
-            await withConnectionAsync(conn => doMarkUrlTryTomorrow(conn, message.fileDetails.processMethod, message.fileDetails.url));
+            await system.withConnectionAsync(conn => doMarkUrlTryTomorrow(conn, message.fileDetails.processMethod, message.fileDetails.url));
             break;
         case "MarkAsUnprocessedMessage":
             console.log(`MarkAsUnprocessedMessage ${message.fileDetails.processMethod} ${message.fileDetails.geek}`)
-            await withConnectionAsync(conn => doMarkUrlUnprocessed(conn, message.fileDetails.processMethod, message.fileDetails.url));
+            await system.withConnectionAsync(conn => doMarkUrlUnprocessed(conn, message.fileDetails.processMethod, message.fileDetails.url));
             // reschedule while BGG has the data.
             const fd: FileToProcess = message.fileDetails;
             if (message.fileDetails.processMethod === "processCollection") {
@@ -189,35 +186,35 @@ async function handleQueueMessage(message: QueueMessage) {
             break;
         case "NoSuchGameMessage":
             console.log(JSON.stringify(message));
-            await withConnectionAsync(conn => doMarkGameDoesNotExist(conn, message.gameId));
+            await system.withConnectionAsync(conn => doMarkGameDoesNotExist(conn, message.gameId));
             break;
         case "NoSuchGeekMessage":
             console.log(`NoSuchGeek ${message.geek}`);
-            await withConnectionAsync(conn => doMarkGeekDoesNotExist(conn, message.geek));
+            await system.withConnectionAsync(conn => doMarkGeekDoesNotExist(conn, message.geek));
             break;
         case "PlayedResultMessage":
             console.log(JSON.stringify(message));
-            await withConnectionAsync(conn => doProcessPlayedMonths(conn, message.monthsData.geek, message.monthsData.monthsPlayed, message.monthsData.url));
+            await system.withConnectionAsync(conn => doProcessPlayedMonths(conn, message.monthsData.geek, message.monthsData.monthsPlayed, message.monthsData.url));
             break;
         case "PlaysResultMessage":
             console.log(JSON.stringify(message));
-            await withConnectionAsync(conn => doProcessPlaysResult(conn, message.result));
+            await system.withConnectionAsync(conn => doProcessPlaysResult(conn, message.result));
             break;
         case "UpdateMetadataMessage":
             console.log(JSON.stringify(message));
-            await withConnectionAsync(conn => doUpdateMetadata(conn, message.metadata.series, message.metadata.rules));
+            await system.withConnectionAsync(conn => doUpdateMetadata(conn, message.metadata.series, message.metadata.rules));
             break;
         case "UpdateTop50Message":
             console.log(JSON.stringify(message));
-            await withConnectionAsync(conn => doUpdateBGGTop50(conn, message.top50));
+            await system.withConnectionAsync(conn => doUpdateBGGTop50(conn, message.top50));
             break;
         case "UpdateUserListMessage":
             console.log("UpdateUserListMessage");
-            await withConnectionAsync(conn => doEnsureUsers(conn, message.users));
+            await system.withConnectionAsync(conn => doEnsureUsers(conn, message.users));
             break;
         case "UserResultMessage":
             console.log(`UserResultMessage ${message.result.geek}`);
-            await withConnectionAsync(conn =>
+            await system.withConnectionAsync(conn =>
                 doUpdateProcessUserResult(conn, message.result.geek, message.result.bggid, message.result.country, message.result.url));
             break;
         default:
@@ -228,43 +225,7 @@ async function handleQueueMessage(message: QueueMessage) {
     }
 }
 
-async function withConnectionAsync(func: (conn: mysql.Connection) => Promise<any>) {
-    const connection = await getConnection();
-    try {
-        await func(connection);
-        connection.destroy();
-    } catch (e) {
-        connection.destroy();
-        throw e;
-    }
-}
 
-function returnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
-    let connection: mysql.Connection;
-    let result: PromiseLike<T>;
-    return getConnection()
-        .then(conn => {
-            connection = conn;
-            return conn;
-        })
-        .then(conn => result = func(conn))
-        .then(() => connection.destroy())
-        .catch(err => {
-            connection.destroy();
-            throw err;
-        })
-        .then(() => result);
-}
-
-async function getConnection(): Promise<mysql.Connection> {
-    const params = {
-        host: process.env.mysqlHost,
-        user: process.env.mysqlUsername,
-        password: process.env.mysqlPassword,
-        database: process.env.mysqlDatabase
-    };
-    return mysql.createConnection(params);
-}
 
 main()
     .catch(err => console.log(err))

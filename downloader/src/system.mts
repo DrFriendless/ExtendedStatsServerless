@@ -17,6 +17,7 @@ export class System {
     usersFile: string;
     systemLogGroup: string;
     usersToken: string;
+    gamesToken: string;
     extrasToken: string;
     playsToken: string;
     collectionToken: string;
@@ -77,6 +78,7 @@ export class System {
             this.extrasToken = obj.extras_token;
             this.playsToken = obj.plays_token;
             this.collectionToken = obj.collection_token;
+            this.gamesToken = obj.games_token;
         } catch (error) {
             console.log(error);
             return {

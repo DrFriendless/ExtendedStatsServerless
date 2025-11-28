@@ -1,16 +1,22 @@
-import { between } from "./library.mjs";
+import {between, sleep} from "./library.mjs";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
     extractUserDataFromPage,
-    NoSuchGameError, processPlaysFile
+    NoSuchGameError
 } from "./extraction.mjs";
-import _ from "lodash";
 import {
     dispatchEnsureGames,
-    dispatchMarkAsProcessed, dispatchMarkAsTryAgainTomorrow, dispatchMarkAsUnprocessed,
-    dispatchNoSuchGame, dispatchNoSuchUser, dispatchProcessCleanUpCollection, dispatchProcessCollectionUpdateGames,
-    dispatchProcessGameResult, dispatchProcessPlayedResult, dispatchProcessPlaysResult, dispatchProcessUserResult,
+    dispatchMarkAsProcessed,
+    dispatchMarkAsTryAgainTomorrow,
+    dispatchMarkAsUnprocessed,
+    dispatchNoSuchGame,
+    dispatchNoSuchUser,
+    dispatchPlaysForPeriodResult,
+    dispatchProcessCleanUpCollection,
+    dispatchProcessCollectionUpdateGames,
+    dispatchProcessGameResult,
+    dispatchProcessUserResult,
     dispatchUpdateMetadata,
     dispatchUpdateTop50,
     dispatchUpdateUserList
@@ -19,12 +25,14 @@ import {
     CleanUpCollectionResult,
     FileToProcess,
     METADATA_RULE_BASEGAME,
-    MetadataRule, MonthPlayed, MonthPlayedData, PlayData,
-    ProcessCollectionResult, ProcessPlaysResult,
+    MetadataRule, PlayData, PlaysToProcess,
+    ProcessCollectionResult, ProcessPlaysForPeriodResult, ProcessPlaysResult,
     SeriesMetadata, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
 } from "extstats-core";
 import {isHttpResponse, loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
+import {XMLParser} from "fast-xml-parser";
+import * as _ from 'lodash-es';
 
 const MAX_GAMES_PER_CALL = 500;
 
@@ -103,50 +111,14 @@ export async function processBGGTop50(ignored: UpdateTop50Message) {
     await dispatchUpdateTop50(top50);
 }
 
-// // Lambda to get files to be processed and invoke the lambdas to do that
-// export async function fireFileProcessing(event: FileToProcess) {
-//     let count = PROCESS_COUNT;
-//     const envCount = process.env["COUNT"];
-//     if (parseInt(envCount)) count = parseInt(envCount);
-//     // TODO - figure out what this means
-//     if (event.hasOwnProperty("count")) { // @ts-ignore
-//         count = event['count'];
-//     }
-//     const payload = { count: count, updateLastScheduled: true };
-//     if (event.hasOwnProperty("processMethod")) {
-//         Object.assign(payload, {processMethod: event.processMethod});
-//     }
-//     const data = await invokeLambdaSync(INSIDE_PREFIX + FUNCTION_RETRIEVE_FILES, payload);
-//     const files = data as ToProcessElement[];
-//     files.forEach(element => {
-//         console.log(element);
-//         if (element.processMethod === METHOD_PROCESS_USER) {
-//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
-//         } else if (element.processMethod === METHOD_PROCESS_COLLECTION) {
-//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
-//         } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
-//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, element);
-//         } else if (element.processMethod === METHOD_PROCESS_GAME) {
-//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
-//         } else if (element.processMethod === METHOD_PROCESS_PLAYS) {
-//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
-//         } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
-//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
-//         } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {
-//             return invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
-//         }
-//     });
-//     return { count: files.length };
-// }
-
 // Lambda to harvest data about a game
 export async function processGame(event: FileToProcess) {
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
-    await initLogging(system, "processUser");
+    await initLogging(system, "processGame");
 
     const invocation = event as FileToProcess;
-    const resp = await fetchFromBGG(system.usersToken, invocation.url);
+    const resp = await fetchFromBGG(system.gamesToken, invocation.url);
     const data = await resp.text();
     try {
         const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data.toString());
@@ -274,49 +246,86 @@ function splitCollection(original: ProcessCollectionResult): ProcessCollectionRe
         .map(items => { return { geek: original.geek, items: items }; });
 }
 
-export async function processPlayed(invocation: FileToProcess) {
+export async function processPlayed(invocation: PlaysToProcess) {
+    console.log(invocation);
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
     await initLogging(system, "processPlayed");
 
-    const resp = await fetchFromBGG(system.playsToken, invocation.url);
-    const data = await resp.text();
-    const toAdd: MonthPlayed[] = [];
-    data.split("\n")
-        .filter(line => line.indexOf(">By date<") >= 0)
-        .forEach(line => {
-            const s = between(line, '/end/', '"');
-            const fields = s.split('-');
-            const data = { month: parseInt(fields[1]), year: parseInt(fields[0]) };
-            toAdd.push(data);
-        });
-    const monthsData: MonthPlayedData = { geek: invocation.geek, monthsPlayed: toAdd, url: invocation.url };
-    await dispatchProcessPlayedResult(system, monthsData);
-    await flushLogging();
-}
+    const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${invocation.geek}&type=thing&mindate=${invocation.startYmdInc}&maxdate=${invocation.endYmdInc}&subtype=boardgame&page=`;
 
-export async function processPlays(invocation: FileToProcess) {
-    const system = await loadSystem();
-    if (isHttpResponse(system)) return system;
-    await initLogging(system, "processPlays");
-
-    let playsData: PlayData[] = [];
-    let pagesSoFar = 0;
-    let pagesNeeded = -1;
-    while (pagesSoFar === 0 || pagesSoFar < pagesNeeded) {
-        pagesSoFar++;
-        const resp = await fetchFromBGG(system.playsToken, invocation.url + "&page=" + pagesSoFar);
-        const data = await resp.text();
-        const processResult: { count: number, plays: PlayData[] } = await processPlaysFile(data, invocation);
-        playsData = playsData.concat(processResult.plays);
-        pagesNeeded = Math.ceil(processResult.count / 100);
+    const parser = new XMLParser({ ignoreAttributes: false, trimValues: true });
+    const plays: PlayData[] = [];
+    let maxEntries: number | undefined;
+    let maxPages = 1000;
+    let pageNum = 1;
+    while (pageNum <= maxPages) {
+        const url = baseUrl + pageNum;
+        const resp = await fetchFromBGG(system.playsToken, url);
+        const xml = await resp.text();
+        const doc = parser.parse(xml);
+        if (maxEntries === undefined) {
+            maxEntries = parseInt(doc.plays['@_total']);
+            maxPages = Math.floor((maxEntries + 99)/100);
+            console.log(`maxEntries=${maxEntries} ${maxPages}`);
+        }
+        let playCount = 0;
+        if (!doc.plays || !doc.plays.play) {
+            console.log(`broken on page ${pageNum}`);
+            console.log(xml);
+            break;
+        }
+        for (const play of doc.plays.play) {
+            const p: PlayData = {
+                quantity: parseInt(play['@_quantity']),
+                location: play['@_location'],
+                date: play['@_date'],
+                gameid: parseInt(play.item['@_objectid']),
+                id: parseInt(play['@_id'])
+            }
+            if (p.quantity > 0) plays.push(p);
+            playCount++;
+        }
+        console.log(`Page ${pageNum} ${playCount}`);
+        if (playCount === 0) break;
+        await sleep(5000);
+        pageNum++;
     }
-    const playsResult: ProcessPlaysResult = {
-        geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url
-    };
-    await dispatchProcessPlaysResult(system, playsResult);
+    const result: ProcessPlaysForPeriodResult = {
+        processMethod: invocation.processMethod,
+        plays: plays,
+        geek: invocation.geek,
+        geekid: invocation.geekid,
+        endYmdInc: invocation.endYmdInc,
+        startYmdInc: invocation.startYmdInc
+    }
+    console.log(JSON.stringify(result));
+    await dispatchPlaysForPeriodResult(system, result);
     await flushLogging();
 }
+
+// export async function processPlays(invocation: FileToProcess) {
+//     const system = await loadSystem();
+//     if (isHttpResponse(system)) return system;
+//     await initLogging(system, "processPlays");
+//
+//     let playsData: PlayData[] = [];
+//     let pagesSoFar = 0;
+//     let pagesNeeded = -1;
+//     while (pagesSoFar === 0 || pagesSoFar < pagesNeeded) {
+//         pagesSoFar++;
+//         const resp = await fetchFromBGG(system.playsToken, invocation.url + "&page=" + pagesSoFar);
+//         const data = await resp.text();
+//         const processResult: { count: number, plays: PlayData[] } = await processPlaysFile(data, invocation);
+//         playsData = playsData.concat(processResult.plays);
+//         pagesNeeded = Math.ceil(processResult.count / 100);
+//     }
+//     const playsResult: ProcessPlaysResult = {
+//         geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url
+//     };
+//     await dispatchProcessPlaysResult(system, playsResult);
+//     await flushLogging();
+// }
 
 export async function processDesigner(event: FileToProcess) {
     const system = await loadSystem();
