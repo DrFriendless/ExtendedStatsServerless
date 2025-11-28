@@ -767,7 +767,7 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
 export async function doSetGeekPlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number,
                                              plays: PlayData[], notGames: number[]) {
     const deleteSql = "delete from plays where geek = ? and month = ? and year = ?";
-    const insertSql = "insert into plays (game, geek, playDate, quantity, raters, ratingsTotal, location, month, year) values ?";
+    const insertSql = "insert into plays (game, geek, playDate, quantity, location, month, year) values ?";
     const playsAlready = await countWhere(conn, "plays where geek = ? and month = ? and year = ?", [geekId, month, year]);
     if (playsAlready > 0 && plays.length === 0) {
         console.log("Not updating plays for " + geekId + " " + month + "/" + year + " because there are existing plays and none to replace them.");
@@ -777,7 +777,7 @@ export async function doSetGeekPlaysForMonth(conn: mysql.Connection, geekId: num
     const values = [];
     for (const play of plays) {
         if (notGames.indexOf(play.gameid) >= 0) continue;
-        values.push([play.gameid, geekId, play.date, play.quantity, play.raters, play.ratingsTotal, play.location, month, year]);
+        values.push([play.gameid, geekId, play.date, play.quantity, play.location, month, year]);
     }
     if (values.length > 0) {
         await conn.query(insertSql, [values]);
