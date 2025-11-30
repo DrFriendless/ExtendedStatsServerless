@@ -26,7 +26,7 @@ import {
     doUpdateMetadata,
     doUpdateProcessUserResult,
     doMarkGeekDoesNotExist,
-    getGeeksThatDontExist
+    getGeeksThatDontExist, doUpdatePlaysForPeriod
 } from "./mysql-rds.mjs";
 import {invokeLambdaAsync} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
@@ -91,6 +91,7 @@ async function scheduleProcessing(system: System, element: ToProcessElement) {
         console.log(`scheduling processCollection ${element.geek}`);
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
     } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
+        console.log(`* updating played years for ${element.geek}`);
         await updatePlayedYears(system, element.geek, element.geekid, element.id);
     } else if (element.processMethod === METHOD_PROCESS_GAME) {
         console.log(`scheduling processGame ${element.bggid}`);
@@ -105,9 +106,8 @@ async function scheduleProcessing(system: System, element: ToProcessElement) {
 }
 
 async function updatePlayedYears(system: System, geek: string, geekid: number, fileId: number) {
-    console.log(`updating played years for ${geek}`);
-    const sql = "delete from files where processMethod = 'processPlays' and geekid = ?";
-    await system.withConnectionAsync(conn => conn.query(sql, [ geekid ]));
+    const sql = "delete from files where processMethod = 'processPlays' and geek = ?";
+    await system.withConnectionAsync(conn => conn.query(sql, [ geek ]));
     const thisYear = (new Date()).getFullYear();
 
     const periods = [
@@ -205,7 +205,7 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             // reschedule while BGG has the data.
             const fd: FileToProcess = message.fileDetails;
             if (message.fileDetails.processMethod === "processCollection") {
-                console.log(`rescheduling processCollection for ${fd.geek}`);
+                console.log(`* rescheduling processCollection for ${fd.geek}`);
                 const toProcess: ToProcessElement = {
                     ...fd,
                     lastUpdate: null,
@@ -236,6 +236,10 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             console.log(JSON.stringify(message));
             await system.withConnectionAsync(conn => doProcessPlaysResult(conn, message.result));
             break;
+        case "PlaysForPeriodResultMessage":
+            console.log(`PlaysForPeriodResultMessage ${message.plays.geek} ${message.plays.startYmdInc} ${message.plays.endYmdInc} ${message.plays.plays.length}`);
+            await system.withConnectionAsync(conn => doUpdatePlaysForPeriod(conn, message.plays));
+            break;
         case "UpdateMetadataMessage":
             console.log(JSON.stringify(message));
             await system.withConnectionAsync(conn => doUpdateMetadata(conn, message.metadata.series, message.metadata.rules));
@@ -255,8 +259,13 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             break;
         default:
             // this should not happen
+            const m = message as any;
             console.log(`=== ${message} not handled.`);
-            log(`${message} not handled.`);
+            if ("discriminator" in m) {
+                log(`${m.discriminator} not handled.`);
+            } else {
+                log(`InsideQ got unknown ${JSON.stringify(m)}`);
+            }
             break;
     }
 }

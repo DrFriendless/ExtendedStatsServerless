@@ -7,13 +7,13 @@ import mysql = require('promise-mysql');
 import {
     CollectionGame,
     ExpansionData,
-    MetadataRule, MonthPlayed, PlayData,
+    MetadataRule, MonthPlayed, PlayData, ProcessPlaysForPeriodResult,
     ProcessGameResult, ProcessMethod,
     RankingTableRow,
     SeriesMetadata, ToProcessElement,
     WarTableRow
 } from "extstats-core";
-import { count, eqSet, listIntersect, listMinus } from "./library.mjs";
+import {count, eqSet, listIntersect, listMinus, parseYmd, splitYmd} from "./library.mjs";
 import { PlaysRow } from "./library.mjs";
 import {normalise} from "./plays.mjs";
 
@@ -293,6 +293,11 @@ export async function doMarkUrlProcessed(conn: mysql.Connection, processMethod: 
 export async function doMarkUrlProcessedWithUpdate(conn: mysql.Connection, processMethod: string, url: string, delta: string) {
     const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
     await conn.query(sqlSet, [delta, url, processMethod]);
+}
+
+export async function doMarkUrlProcessedNoUpdate(conn: mysql.Connection, processMethod: string, url: string) {
+    const sqlSet = "update files set lastUpdate = now(), nextUpdate = null where url = ? and processMethod = ?";
+    await conn.query(sqlSet, [url, processMethod]);
 }
 
 export async function doMarkUrlUnprocessed(conn: mysql.Connection, processMethod: string, url: string) {
@@ -716,6 +721,55 @@ function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
     return { utilisation, cfm, friendless };
 }
 
+export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: number, playsMonths: { y: number, m: number }[],
+                                              expansionData: ExpansionData) {
+    const selectSql = "select game, playDate, quantity, location from plays where geek = ? and month = ? and year = ?";
+    const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values ?";
+    const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
+    const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values ?";
+
+    for (const {y, m} of playsMonths) {
+        const rows: PlaysRow[] = await conn.query(selectSql, [geekId, m, y]);
+        const normalised = normalise(rows, geekId, m, y, expansionData);
+        // insert all of the base plays
+        const basePlays: any[][] = [];
+        for (const np of normalised) {
+            basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, 0]);
+        }
+        if (basePlays.length > 0) {
+            try {
+                await conn.query(insertBasePlaySql, [basePlays]);
+            } catch (ex) {
+                console.log(ex);
+                throw ex;
+            }
+        }
+        // construct the expansion plays with references to the base plays
+        const expPlays = [];
+        for (const np of normalised) {
+            if (np.expansions.length > 0) {
+                const args = [np.game, geekId, np.quantity, np.year, np.month, np.date];
+                const result = await conn.query(getIdSql, args);
+                if (!result || result.length === 0 || !result[0]) {
+                    continue;
+                }
+                const id = result[0].id;
+                for (const e of np.expansions) {
+                    expPlays.push([e, geekId, np.quantity, np.year, np.month, np.date, 1, id]);
+                }
+            }
+        }
+        if (expPlays.length > 0) {
+            try {
+                await conn.query(insertExpansionPlaySql, [expPlays]);
+            } catch (ex) {
+                console.log(ex);
+                throw ex;
+            }
+        }
+    }
+}
+
 export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number,
                                                expansionData: ExpansionData) {
     const selectSql = "select game, playDate, quantity, location from plays where geek = ? and month = ? and year = ?";
@@ -761,6 +815,36 @@ export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: n
             console.log(ex);
             throw ex;
         }
+    }
+}
+
+export async function doSetGeekPlaysForYear(conn: mysql.Connection, geekId: number, startYmdInc: string, endYmdInc: string,
+                                             plays: PlayData[], notGames: number[], playsMonths: { y: number, m: number }[]) {
+    const s = splitYmd(startYmdInc);
+    const e = splitYmd(endYmdInc);
+    const deleteSql = "delete from plays where geek = ? and (year > ? || (year = ? and month >= ?)) and (year < ? || (year = ? and month <= ?))";
+    const deleteSql2 = "delete from plays_normalised where geek = ? and (year > ? || (year = ? and month >= ?)) and (year < ? || (year = ? and month <= ?))";
+    const deleteParams = [ geekId, s.y, s.y, s.m, e.y, e.y, e.m ];
+    const insertSql = "insert into plays (game, geek, playDate, quantity, location, month, year) values ?";
+
+    await conn.query(deleteSql, deleteParams);
+    await conn.query(deleteSql2, deleteParams);
+    const values = [];
+    const yms = new Set<string>();
+    for (const play of plays) {
+        if (notGames.indexOf(play.gameid) >= 0) {
+            continue;
+        }
+        const p = splitYmd(play.date);
+        values.push([play.gameid, geekId, play.date, play.quantity, play.location, p.m, p.y]);
+        const key = `${p.y}-${p.m}`;
+        if (!yms.has(key)) {
+            yms.add(key);
+            playsMonths.push({ y: p.y, m: p.m });
+        }
+    }
+    if (values.length > 0) {
+        await conn.query(insertSql, [values]);
     }
 }
 
@@ -850,6 +934,31 @@ export async function doProcessPlayedMonths(conn: mysql.Connection, geek: string
     await doEnsureMonthsPlayed(conn, geek, months);
     await doEnsureProcessPlaysFiles(conn, geek, months);
     await doMarkUrlProcessed(conn, "processPlayed", url);
+}
+
+export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: ProcessPlaysForPeriodResult) {
+    const gameIds = [];
+    for (const play of data.plays) {
+        if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
+    }
+    const geekId = await getGeekId(conn, data.geek);
+    const expansionData = await loadExpansionData(conn); // 2.1 sec
+    const notGames = await doEnsureGames(conn, gameIds);
+    const now = new Date();
+    const end = parseYmd(data.endYmdInc);
+    const daysSince = (end.getTime() - now.getTime())/1000 / 1440;
+    const playsMonths: { y: number, m: number}[] = [];
+    await doSetGeekPlaysForYear(conn, geekId, data.startYmdInc, data.endYmdInc, data.plays, notGames, playsMonths);
+    await doNormalisePlaysForYear(conn, geekId, playsMonths, expansionData);
+    if (daysSince < 14) {
+        await doMarkUrlProcessedWithUpdate(conn, data.processMethod, data.url, "72:00:00");
+    } else if (daysSince < 30) {
+        await doMarkUrlProcessedWithUpdate(conn, data.processMethod, data.url, "168:00:00");
+    } else {
+        await doMarkUrlProcessedNoUpdate(conn, data.processMethod, data.url);
+    }
+
+    await doUpdateFrontPageGeek(conn, data.geek);
 }
 
 export async function doProcessPlaysResult(conn: mysql.Connection, data: ProcessPlaysResult) {

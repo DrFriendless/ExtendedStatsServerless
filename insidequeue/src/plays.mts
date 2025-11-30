@@ -1,5 +1,5 @@
-import * as _ from "lodash";
-import {extractNormalisedPlayFromPlayRow, playDate, PlaysRow} from "./library.mjs";
+import lodash from "lodash";
+import {extractNormalisedPlayFromPlayRow, playDate, PlaysRow, splitBy, groupBy} from "./library.mjs";
 import {ExpansionData} from "extstats-core";
 
 export interface NormalisedPlays {
@@ -47,13 +47,9 @@ export function sumQuantities(plays: WorkingNormalisedPlays[]): WorkingNormalise
     return plays[0];
 }
 
-function splitBy<T>(items: T[], iteratee: (value: T) => number | string | undefined): T[][] {
-    return Object.values(_.groupBy(items, iteratee));
-}
-
 export function coalescePlays(initial: WorkingNormalisedPlays[]): WorkingNormalisedPlays[] {
-    const byGame = splitBy(initial, wnp => wnp.game);
-    return _.flatten(byGame.map(plays => splitBy(plays, ps => ps.location))).map(sumQuantities);
+    const byGame = splitBy(initial, wnp => wnp.game.toString());
+    return lodash.flatten(byGame.map(plays => splitBy(plays, ps => ps.location))).map(sumQuantities);
 }
 
 // figure out the canonical list of plays for a single geek on a single date
@@ -72,11 +68,12 @@ export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: 
     return current;
 }
 
+
 export function splitPlaysByDateAndLocation(plays: NormalisedPlays[]): NormalisedPlays[][] {
-    const splitByDate: NormalisedPlays[][] = Object.values(_.groupBy(plays, playDate));
-    return _.flatMap(
+    const splitByDate: NormalisedPlays[][] = Object.values(groupBy(plays, playDate));
+    return lodash.flatMap(
         splitByDate.map(
-            (ps: NormalisedPlays[]) => Object.values(_.groupBy(ps,
+            (ps: NormalisedPlays[]) => Object.values(groupBy(ps,
                 (p: NormalisedPlays) => p.location))));
 }
 
@@ -84,7 +81,7 @@ export function normalise(rows: PlaysRow[], geekId: number, month: number, year:
                           expansionData: ExpansionData): WorkingNormalisedPlays[] {
     const rawData: NormalisedPlays[] = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
     const byDate: NormalisedPlays[][] = splitPlaysByDateAndLocation(rawData);
-    return _.flatMap(byDate.map((plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData)));
+    return lodash.flatMap(byDate.map((plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData)));
 }
 
 function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: ExpansionData): WorkingNormalisedPlays[] | undefined {
@@ -108,7 +105,7 @@ function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: Expansi
                     year: basegamePlay.year,
                     location: basegamePlay.location,
                     isExpansion: basegamePlay.isExpansion,
-                    expansions: _.flatten([expansionPlay.game, expansionPlay.expansions, basegamePlay.expansions])
+                    expansions: lodash.flatten([expansionPlay.game, expansionPlay.expansions, basegamePlay.expansions])
                 };
                 const newPlays = current.filter(p => !Object.is(p, basegamePlay) && !Object.is(p, expansionPlay));
                 newPlays.push(newPlay);

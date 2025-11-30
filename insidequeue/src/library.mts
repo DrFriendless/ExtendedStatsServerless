@@ -56,8 +56,8 @@ export function listIntersect(ints: number[], other: number[]): number[] {
     return ints.filter(x => other.indexOf(x) >= 0);
 }
 
-export function playDate(play: NormalisedPlays): number {
-    return play.year * 10000 + play.month * 100 + play.date;
+export function playDate(play: NormalisedPlays): string {
+    return (play.year * 10000 + play.month * 100 + play.date).toString();
 }
 
 export function extractNormalisedPlayFromPlayRow(row: PlaysRow, geek: number, month: number, year: number): NormalisedPlays {
@@ -85,4 +85,42 @@ export async function invokeLambdaAsync(func: string, payload: object): Promise<
     } catch (error) {
         console.log(error);
     }
+}
+
+export function parseYmd(ymd: string): Date | undefined {
+    const f = ymd.split("-");
+    if (f.length !== 3) return undefined;
+    const y = parseInt(f[0]);
+    const m = parseInt(f[1]);
+    const d = parseInt(f[2]);
+    const result = new Date();
+    result.setFullYear(y);
+    result.setMonth(m-1);
+    result.setDate(d);
+    return result;
+}
+
+export function splitYmd(ymd: string): { y: number; m: number; d: number } {
+    const f = ymd.split("-");
+    if (f.length !== 3) return undefined;
+    const y = parseInt(f[0]);
+    const m = parseInt(f[1]);
+    const d = parseInt(f[2]);
+    return { y, m, d };
+}
+
+export function groupBy<T>(items: T[], sortFunc: (x: T) => string): Record<string, T[]> {
+    const result: Record<string, T[]> = {};
+    for (const item of items) {
+        const s = sortFunc(item);
+        if (!result.hasOwnProperty(s)) {
+            result[s] = [];
+        }
+        result[s].push(item);
+    }
+    return result;
+}
+
+export function splitBy<T>(items: T[], iteratee: (value: T) => string): T[][] {
+    return Object.values(groupBy(items, iteratee));
 }
