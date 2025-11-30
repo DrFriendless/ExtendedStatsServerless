@@ -1,4 +1,4 @@
-import {between, sleep} from "./library.mjs";
+import {between} from "./library.mjs";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
@@ -26,7 +26,7 @@ import {
     FileToProcess,
     METADATA_RULE_BASEGAME,
     MetadataRule, PlayData, PlaysToProcess,
-    ProcessCollectionResult, ProcessPlaysForPeriodResult, ProcessPlaysResult,
+    ProcessCollectionResult, ProcessPlaysForPeriodResult,
     SeriesMetadata, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
 } from "extstats-core";
 import {isHttpResponse, loadSystem, System} from "./system.mjs";
@@ -200,7 +200,7 @@ async function tryToProcessCollection(system: System, invocation: FileToProcess)
     const data = await resp.text();
 
     try {
-        const collection = await extractUserCollectionFromPage(invocation.geek, data);
+        const collection = await extractUserCollectionFromPage(invocation.geek, data, invocation.url);
         const ids = collection.items.map(item => item.gameId);
         console.log(ids);
         // make sure that all of these games are in the database
@@ -288,16 +288,16 @@ export async function processPlayed(invocation: PlaysToProcess) {
         }
         console.log(`Page ${pageNum} ${playCount}`);
         if (playCount === 0) break;
-        await sleep(5000);
+        // await sleep(5000);
         pageNum++;
     }
     const result: ProcessPlaysForPeriodResult = {
         processMethod: invocation.processMethod,
         plays: plays,
         geek: invocation.geek,
-        geekid: invocation.geekid,
         endYmdInc: invocation.endYmdInc,
-        startYmdInc: invocation.startYmdInc
+        startYmdInc: invocation.startYmdInc,
+        url: invocation.url
     }
     console.log(JSON.stringify(result));
     await dispatchPlaysForPeriodResult(system, result);

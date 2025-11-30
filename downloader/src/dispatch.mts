@@ -1,28 +1,27 @@
 // methods to send data to the Inside module
 
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { log } from "./logging.mjs";
 
 const INSIDE_PREFIX = "inside-dev-";
 
 // lambda names we expect to see
 const FUNCTION_UPDATE_METADATA = "updateMetadata";
 const FUNCTION_UPDATE_TOP50 = "updateBGGTop50";
-const FUNCTION_PROCESS_PLAYS_RESULT = "processPlaysResult";
 
-import {invokeLambdaAsync, invokeLambdaSync} from "./library.mjs";
+import {invokeLambdaAsync} from "./library.mjs";
 import {
     ProcessGameResult,
     FileToProcess,
     Metadata,
     ProcessCollectionResult,
     MonthPlayedData,
-    ProcessPlaysResult,
     ProcessUserResult,
     CleanUpCollectionResult,
     QueueMessage,
     ProcessPlaysForPeriodResult
 } from 'extstats-core';
-import {loadSystem, System} from "./system.mjs";
+import {System} from "./system.mjs";
 
 
 // Set the AWS Region.
@@ -32,9 +31,15 @@ const credentials = { accessKeyId: process.env.AWS_ACCESS_KEY || "", secretAcces
 const sqsClient = new SQSClient({ region: process.env.REGION });
 
 async function sendToDownloaderQueue(system: System, body: QueueMessage) {
+    const b = JSON.stringify(body);
+    if (b.length > 260000) {
+        // exceed SendMessage size
+        log(`SQS message size exceeded: ${b.length} ${body.discriminator}`);
+        return;
+    }
     const command = new SendMessageCommand({
         QueueUrl: system.downloaderQueue,
-        MessageBody: JSON.stringify(body),
+        MessageBody: b,
     });
     await sqsClient.send(command);
 }

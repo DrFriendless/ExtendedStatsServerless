@@ -1,13 +1,8 @@
-import {
-    CollectionGame,
-    PlayData,
-    ProcessCollectionResult, ProcessGameResult,
-    ProcessUserResult, FileToProcess
-} from "extstats-core";
+import { CollectionGame, ProcessCollectionResult, ProcessGameResult, ProcessUserResult } from "extstats-core";
 import { parseStringPromise } from 'xml2js';
 import {log} from "./logging.mjs";
 
-export async function extractUserCollectionFromPage(geek: string, pageContent: string): Promise<ProcessCollectionResult> {
+export async function extractUserCollectionFromPage(geek: string, pageContent: string, url: string): Promise<ProcessCollectionResult> {
     const dom = await parseStringPromise(pageContent, {trim: true});
     if (dom && dom.message) {
         console.log("BGG says come back later");
@@ -23,7 +18,8 @@ export async function extractUserCollectionFromPage(geek: string, pageContent: s
             throw new Error(`It looks like ${geek} no longer exists.`);
         }
         console.log("Found incorrect DOM");
-        log("Found incorrect DOM for " + geek);
+        console.log(pageContent);
+        log(`Found incorrect DOM for ${geek} from URL ${url}`);
         throw new Error("Found incorrect DOM for " + geek);
     }
     if (!dom.items.item || dom.items.item.length === 0) {
