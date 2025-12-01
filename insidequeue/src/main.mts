@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/client-sqs";
 import dotenv from "dotenv";
 import process from "process";
-import {FileToProcess, ProcessMethod, QueueMessage, ToProcessElement} from "extstats-core";
+import {EnsureGamesMessage, FileToProcess, ProcessMethod, QueueMessage, ToProcessElement} from "extstats-core";
 import {
     doEnsureUsers,
     doListToProcess,
@@ -28,7 +28,7 @@ import {
     doMarkGeekDoesNotExist,
     getGeeksThatDontExist, doUpdatePlaysForPeriod
 } from "./mysql-rds.mjs";
-import {invokeLambdaAsync, sleep} from "./library.mjs";
+import {invokeLambdaAsync, listAdd, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
@@ -172,19 +172,57 @@ async function noMessages(system: System, howManyToDo: number, slowDowns: number
     return eaten;
 }
 
+interface SQSMessage {
+    receiptHandle: string;
+    payload: QueueMessage | undefined;
+    isSlowdown: boolean;
+    discriminator: QueueMessage["discriminator"]
+}
+
+function processSQSMessage(message: Message): SQSMessage {
+    const payload: QueueMessage | undefined = message.Body ? JSON.parse(message.Body) : undefined
+    return {
+        receiptHandle: message.ReceiptHandle,
+        payload,
+        isSlowdown: payload && payload.discriminator === "SlowDownMessage",
+        discriminator: payload.discriminator
+    }
+}
+
 async function handleMessages(system: System, sqsClient: SQSClient, messages: Message[], queueUrl: string): Promise<number> {
     console.log(`Retrieved ${messages.length} messages from downloader queue`);
-    let slowdowns = 0;
-    for (const message of messages) {
-        const receiptHandle = message.ReceiptHandle;
-        if (message.Body) {
-            const payload = JSON.parse(message.Body);
-            if (await handleQueueMessage(system, payload as QueueMessage)) slowdowns++;
+    const processedMessages = messages.map(processSQSMessage);
+    // count the slowdowns
+    const slowdowns = processedMessages.filter(m => m.isSlowdown).length;
+    // coalesce the ensure games messages
+    const ensures = processedMessages
+        .filter(m => m.discriminator === "EnsureGamesMessage")
+        .map(m => (m.payload as EnsureGamesMessage).gameIds);
+    if (ensures.length > 0) {
+        let ids: number[] | undefined;
+        for (const e of ensures) {
+            if (!ids) {
+                ids = e;
+            } else {
+                listAdd(ids, e);
+            }
+        }
+        console.log(`Coalesced ${ensures.length} ensure games messages: ${ids.length}`);
+        await system.withConnectionAsync(conn => doEnsureGames(conn, ids));
+    }
+    // ack the ones we've done
+    for (const message of processedMessages.filter(m => m.isSlowdown || m.discriminator === "EnsureGamesMessage")) {
+        await sqsClient.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: message.receiptHandle }));
+    }
+    // process everything else one by one
+    for (const message of processedMessages.filter(m => !m.isSlowdown && m.discriminator !== "EnsureGamesMessage")) {
+        if (message.payload) {
+            await handleQueueMessage(system, message.payload);
         } else {
             console.log("What is this?");
             console.log(JSON.stringify(message));
         }
-        await sqsClient.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: receiptHandle }));
+        await sqsClient.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: message.receiptHandle }));
     }
     await flushLogging();
     return slowdowns;
@@ -192,9 +230,6 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
 
 async function handleQueueMessage(system: System, message: QueueMessage) {
     switch (message.discriminator) {
-        case "SlowDownMessage":
-            console.log("SLOW DOWN!!!!");
-            return true;
         case "CleanUpCollectionMessage":
             console.log(`CleanUpCollectionMessage ${message.params.geek} ${message.params.items.length}`);
             await system.withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
@@ -203,10 +238,10 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             console.log(`CollectionResultMessage ${message.result.geek} ${message.result.items.length}`);
             await system.withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
             break;
-        case "EnsureGamesMessage":
-            console.log(`EnsureGamesMessage ${message.gameIds.length}`);
-            await system.withConnectionAsync(conn => doEnsureGames(conn, message.gameIds));
-            break;
+        // case "EnsureGamesMessage":
+        //     console.log(`EnsureGamesMessage ${message.gameIds.length}`);
+        //     await system.withConnectionAsync(conn => doEnsureGames(conn, message.gameIds));
+        //     break;
         case "GameResultMessage":
             console.log(`GameResultMessage ${message.result.name}`);
             await system.withConnectionAsync(conn => doProcessGameResult(conn, message.result));
@@ -288,7 +323,6 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             }
             break;
     }
-    return false;
 }
 
 

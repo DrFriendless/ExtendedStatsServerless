@@ -452,6 +452,7 @@ export async function doEnsureMonthsPlayed(conn: mysql.Connection, geek: string,
     }
 }
 
+// ensure that these games have a row in the database.
 // can't trust that the IDs are actually numbers, TYVM TypeScript.
 export async function doEnsureGames(conn: mysql.Connection, anyIds: any[]): Promise<number[]> {
     if (anyIds.length === 0) return [];
@@ -484,6 +485,7 @@ async function doRecordGame(conn: mysql.Connection, bggid: number) {
     await conn.query(insertSql, insertParams).catch(err => {
         console.log(err);
     });
+    console.log(`Added new game ${bggid}`);
 }
 
 async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | undefined,

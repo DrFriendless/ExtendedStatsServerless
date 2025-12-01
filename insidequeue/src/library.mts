@@ -56,6 +56,12 @@ export function listIntersect(ints: number[], other: number[]): number[] {
     return ints.filter(x => other.indexOf(x) >= 0);
 }
 
+export function listAdd(ints: number[], other: number[]) {
+    for (const i of other) {
+        if (!ints.includes(i)) ints.push(i);
+    }
+}
+
 export function playDate(play: NormalisedPlays): string {
     return (play.year * 10000 + play.month * 100 + play.date).toString();
 }
