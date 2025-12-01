@@ -34,7 +34,7 @@ import {flushLogging, initLogging, log} from "./logging.mjs";
 import {XMLParser} from "fast-xml-parser";
 import * as _ from 'lodash-es';
 
-const MAX_GAMES_PER_CALL = 500;
+const MAX_GAMES_PER_CALL = 1000;
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export async function processUserList(_: UpdateUserListMessage) {
@@ -233,7 +233,9 @@ async function tryToProcessCollection(system: System, invocation: FileToProcess)
         // make sure that all of these games are in the database
         // if there are a lot, this lambda might timeout, but next time more of them will be there.
         await dispatchEnsureGames(system, ids);
+        console.log(`Collection data size ${JSON.stringify(collection).length}`);
         for (const games of splitCollection(collection)) {
+            console.log(`subcollection data size ${JSON.stringify(games).length}`);
             await dispatchProcessCollectionUpdateGames(system, games);
         }
         await cleanupCollection(system, collection, invocation.url);
