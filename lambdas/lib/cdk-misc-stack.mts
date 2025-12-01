@@ -9,9 +9,10 @@ import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
-import {VpcEndpointIpAddressType} from "aws-cdk-lib/aws-ec2";
 import {COMPONENT, DEPLOYMENT_BUCKET} from "./metadata.mts";
 import {Rule} from "aws-cdk-lib/aws-events";
+import {Role} from "aws-cdk-lib/aws-iam";
+import {VpcEndpointIpAddressType} from "aws-cdk-lib/aws-ec2";
 
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 let DATABASE_VPC: ec2.IVpc = undefined;
@@ -24,15 +25,21 @@ let PUBLIC_SUBNET_C: ec2.ISubnet = undefined;
 let CONFIRM_LAMBDA: lambda.IFunction = undefined;
 
 export const RUNTIME = lambda.Runtime.NODEJS_22_X;
+type OptsType = "bgg" | "db" | "logging";
 
 export class MiscStack extends cdk.Stack {
-  // defineVpcEndpoint() {
-  //   DATABASE_VPC.addInterfaceEndpoint("ep", {
-  //     service: ec2.InterfaceVpcEndpointAwsService.SSM,
-  //     open: true,
-  //     ipAddressType: VpcEndpointIpAddressType.IPV4
-  //   })
-  // }
+  defineVpcEndpoints() {
+    DATABASE_VPC.addInterfaceEndpoint("ep", {
+      service: ec2.InterfaceVpcEndpointAwsService.SSM,
+      open: true,
+      ipAddressType: VpcEndpointIpAddressType.IPV4
+    })
+    DATABASE_VPC.addInterfaceEndpoint("ep2", {
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+      open: true,
+      ipAddressType: VpcEndpointIpAddressType.IPV4
+    })
+  }
 
   defineStateMachine(threadFunc: lambda.Function): sfn.StateMachine {
     return new sfn.StateMachine(this, 'authStateMachine', {
@@ -70,8 +77,28 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
-  defineLambda(name: string, handler: string, opts: string[], subnetType: "public" | "private"): lambda.Function {
-    const role = this.defineRole(opts, name);
+  defineRuleToInvokeLambda(lambda: lambda.IFunction): Rule {
+    const st1 = new iam.PolicyStatement();
+    st1.addActions("lambda:InvokeFunction");
+    st1.addResources(lambda.functionArn);
+    const policies: Record<string, iam.PolicyDocument> = {
+      "policy_invoke_auth_thread": new iam.PolicyDocument({
+        statements: [st1]
+      })
+    };
+    const ruleRole = new iam.Role(this, "role_invoke_reports_thread", {
+      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
+      inlinePolicies: policies,
+    });
+    return new events.Rule(this, 'reportRule', {
+      schedule: events.Schedule.cron({ minute: '0' }),
+      targets: [ new targets.LambdaFunction(lambda) ],
+      role: ruleRole
+    });
+  }
+
+  defineLambda(name: string, handler: string, opts: OptsType[], subnetType: "public" | "private", n: number): lambda.Function {
+    const role = this.defineRole(opts, name, n);
     const vpcOpts: Partial<lambda.FunctionProps> = {
       vpc: DATABASE_VPC,
       vpcSubnets: {
@@ -104,15 +131,19 @@ export class MiscStack extends cdk.Stack {
     return f;
   }
 
-  private defineRole(opts: string[], name: string) {
-    const policies: Record<string, iam.PolicyDocument> = {};
+  private definePolicies(opts: OptsType[], n: number) {
     const managedPolicies: iam.IManagedPolicy[] = [
-      iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s", "CreateEC2sForLambda"),
-      iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs", "WriteToCloudwatchLogs"),
+      iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s" + n, "CreateEC2sForLambda"),
+      iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs" + n, "WriteToCloudwatchLogs"),
     ];
     if (opts.includes("db")) {
-      managedPolicies.push(iam.ManagedPolicy.fromManagedPolicyName(this, "dbSecrets", "AccessDatabaseSecrets"))
+      managedPolicies.push(iam.ManagedPolicy.fromManagedPolicyName(this, "dbSecrets" + n, "AccessDatabaseSecrets"))
     }
+    return managedPolicies;
+  }
+
+  private defineRole(opts: OptsType[], name: string, n: number): Role {
+    const policies: Record<string, iam.PolicyDocument> = {};
     if (opts.includes("bgg")) {
       const bggParameters = new iam.PolicyStatement();
       bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
@@ -125,10 +156,22 @@ export class MiscStack extends cdk.Stack {
         statements: [bggParameters, bggSecrets]
       });
     }
+    if (opts.includes("logging")) {
+      const loggingParameters = new iam.PolicyStatement();
+      loggingParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters");
+      loggingParameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/systemLogGroup*`);
+      const loggingCloudWatch = new iam.PolicyStatement();
+      loggingCloudWatch.addActions("logs:PutLogEvents", "logs:CreateLogStream");
+      loggingCloudWatch.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:log-group:extstats-system:*`);
+
+      policies[`policy_${name}_logging`] = new iam.PolicyDocument({
+        statements: [loggingParameters, loggingCloudWatch]
+      });
+    }
     return new iam.Role(this, `role_${name}`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       inlinePolicies: policies,
-      managedPolicies: managedPolicies,
+      managedPolicies: this.definePolicies(opts, n),
     });
   }
 
@@ -150,9 +193,11 @@ export class MiscStack extends cdk.Stack {
     this.lookupExternalResources();
 
     // the VPC endpoint is so that the Lambdas inside the VPC can see the parameter store which is public.
-    // this.defineVpcEndpoint();
-    const threadFunction = this.defineLambda("auth_thread", "auththread.handler", ["bgg"], "public");
+    this.defineVpcEndpoints();
+    const threadFunction = this.defineLambda("auth_thread", "auththread.handler", ["bgg"], "public", 1);
     const sm = this.defineStateMachine(threadFunction);
     const rule = this.defineRuleToInvoke(sm);
+    const reportFunction = this.defineLambda("report", "report.handler", ["db","logging"], "private", 2);
+    const rule2 = this.defineRuleToInvokeLambda(reportFunction);
   }
 }

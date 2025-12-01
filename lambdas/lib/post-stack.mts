@@ -20,6 +20,7 @@ async function updateCode(client: LambdaClient, funcName: string) {
 // poke the lambdas to tell them they may have new code
 const lClient = new LambdaClient({ region: REGION, profile: PROFILE });
 await updateCode(lClient, "auth_thread");
+await updateCode(lClient, "report");
 // set the retention period on the log groups
 const cwClient = new CloudWatchLogsClient({ region: REGION, profile: PROFILE });
 const cmd = new DescribeLogGroupsCommand({ logGroupNamePrefix: "/aws/lambda/misc_",  });

@@ -1,11 +1,14 @@
 import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
-import {GetParametersByPathCommand, SSMClient} from "@aws-sdk/client-ssm";
+import {GetParameterCommand, GetParametersByPathCommand, SSMClient} from "@aws-sdk/client-ssm";
+import * as mysql from 'promise-mysql';
 
 const BGG_SECRETS = "extstats/bgg";
 
-export async function findSystem(): Promise<System> {
+export async function findSystem(opts: string[]): Promise<System | HttpResponse> {
     const s = new System();
-    await s.loadBGGSecrets();
+    if (opts.includes("bgg")) await s.loadBGGSecrets();
+    if (opts.includes("logging")) await s.loadLoggingSecrets();
+    if (opts.includes("db")) await s.loadDatabaseSecrets();
     return s;
 }
 
@@ -13,6 +16,54 @@ export class System {
     public forumChecker: string | undefined;
     public minarticleid: number;
     public authcheckThread: string | undefined;
+    public systemLogGroup: string | undefined;
+    private mysqlHost: string | undefined;
+    private mysqlUsername: string | undefined;
+    private mysqlPassword: string | undefined;
+    private mysqlDatabase: string | undefined;
+
+    async loadDatabaseSecrets(): Promise<HttpResponse | void> {
+        const secretName = "/extstats/database";
+        const client = new SecretsManagerClient({
+            region: process.env.AWS_REGION
+        });
+        try {
+            const response = await client.send(
+                new GetSecretValueCommand({
+                    SecretId: secretName
+                })
+            );
+            const secret = response.SecretString;
+            const obj = JSON.parse(secret);
+            console.log(JSON.stringify(obj));
+            this.mysqlHost = obj.mysqlHost;
+            this.mysqlUsername = obj.mysqlUsername;
+            this.mysqlPassword = obj.mysqlPassword;
+            this.mysqlDatabase = obj.mysqlDatabase;
+        } catch (error) {
+            console.log(error);
+            return { "statusCode": 500, "body": JSON.stringify({ error: `Can't find secret ${secretName} - make sure it exists in AWS.` })}
+        }
+    }
+
+    async loadLoggingSecrets(): Promise<HttpResponse | void> {
+        this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
+    }
+
+    async getParameter(key: string): Promise<string> {
+        const ssmClient = new SSMClient({
+            apiVersion: '2014-11-06',
+            region: process.env.AWS_REGION
+        });
+        const response = await ssmClient.send(
+            new GetParameterCommand({
+                Name: key
+            })
+        );
+        console.log(`key = ${key}`);
+        console.log(`Value = ${response.Parameter.Value}`);
+        return response.Parameter.Value;
+    }
 
     async loadBGGSecrets(): Promise<HttpResponse | void> {
         const client = new SecretsManagerClient({
@@ -55,6 +106,25 @@ export class System {
                     this.authcheckThread = p.Value;
                     break;
             }
+        }
+    }
+
+    async getConnection(): Promise<mysql.Connection> {
+        const params = {
+            host: this.mysqlHost,
+            user: this.mysqlUsername,
+            password: this.mysqlPassword,
+            database: this.mysqlDatabase
+        };
+        return mysql.createConnection(params);
+    }
+
+    async asyncReturnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
+        const connection = await this.getConnection();
+        try {
+            return await func(connection);
+        } finally {
+            if (connection) connection.destroy();
         }
     }
 }

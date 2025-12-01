@@ -5,9 +5,8 @@ import {PutParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 
 export async function handler(event: APIGatewayProxyEvent): Promise<any[] | HttpResponse> {
     console.log(event);
-    const system = await findSystem();
-    const e2 = await system.loadBGGSecrets();
-    if (isHttpResponse(e2)) return e2;
+    const system = await findSystem(["bgg"]);
+    if (isHttpResponse(system)) return system;
 
     const url = `${system.authcheckThread}&minarticleid=${system.minarticleid}`;
     console.log(url);
@@ -22,11 +21,13 @@ export async function handler(event: APIGatewayProxyEvent): Promise<any[] | Http
         return;
     }
     const xml = await response.text();
+    console.log(xml);
     const parser = new XMLParser({ ignoreAttributes: false, trimValues: true });
     let doc = parser.parse(xml);
-    const articles: any[] = doc.thread.articles.article;
+    let articles: any[] = doc.thread.articles.article;
     const result = [];
     let latestId = undefined;
+    if ("subject" in articles) articles = [ articles ];
     for (const a of articles) {
         const username = a["@_username"];
         const id = a["@_id"];
