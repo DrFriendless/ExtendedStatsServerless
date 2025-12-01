@@ -70,6 +70,10 @@ export function dispatchNoSuchUser(system: System, geek: string): Promise<void> 
     return sendToDownloaderQueue(system, { discriminator: "NoSuchGeekMessage", geek });
 }
 
+export function dispatchSlowDown(system: System): Promise<void> {
+    return sendToDownloaderQueue(system, { discriminator: "SlowDownMessage" });
+}
+
 export function dispatchProcessGameResult(system: System, result: ProcessGameResult): Promise<void> {
     return sendToDownloaderQueue(system, { discriminator: "GameResultMessage", result });
 }

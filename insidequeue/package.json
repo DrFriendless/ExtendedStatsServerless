@@ -20,7 +20,7 @@
     "@aws-sdk/client-ssm": "^3.901.0",
     "async": "^3.2.6",
     "dotenv": "^17.2.1",
-    "extstats-core": "file:../../repo/extstats-core-1.30.0.tgz",
+    "extstats-core": "file:../../repo/extstats-core-1.31.0.tgz",
     "lodash": "^4.17.21",
     "mysql": "^2.18.1",
     "promise-mysql": "^5.2.0"

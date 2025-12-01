@@ -124,3 +124,7 @@ export function groupBy<T>(items: T[], sortFunc: (x: T) => string): Record<strin
 export function splitBy<T>(items: T[], iteratee: (value: T) => string): T[][] {
     return Object.values(groupBy(items, iteratee));
 }
+
+export async function sleep(waitTimeInMs: number){
+    await new Promise(resolve => setTimeout(resolve, waitTimeInMs));
+}

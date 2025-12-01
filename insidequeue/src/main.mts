@@ -28,7 +28,7 @@ import {
     doMarkGeekDoesNotExist,
     getGeeksThatDontExist, doUpdatePlaysForPeriod
 } from "./mysql-rds.mjs";
-import {invokeLambdaAsync} from "./library.mjs";
+import {invokeLambdaAsync, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
@@ -50,7 +50,6 @@ const FUNCTION_PROCESS_GAME = "processGame";
 const FUNCTION_PROCESS_PLAYS = "processPlays";
 const FUNCTION_PROCESS_DESIGNER = "processDesigner";
 const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
-const FUNCTION_PROCESS_PLAYED = "processPlayed";
 
 dotenv.config({ path: ".env", quiet: true });
 
@@ -62,19 +61,22 @@ const REGION = process.env.AWS_REGION;
 async function main() {
     const system = await loadSystem();
     await initLogging(system, "InsideQueue");
+    let slowdowns = 0;
     while (true) {
-        console.log(`Waiting for queue ${system.downloaderQueue}`);
+        console.log(`Waiting for queue ${system.downloaderQueue} with ${slowdowns} slowdowns.`);
         // Credentials are granted to the EC2 hosting this so we don't need to add them here.
         const sqsClient = new SQSClient({ region: REGION });
         const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 3, MaxNumberOfMessages: 10 };
         const command = new ReceiveMessageCommand(input);
         const response = await sqsClient.send(command);
         if (response.Messages) {
-            await handleMessages(system, sqsClient, response.Messages, system.downloaderQueue);
-            if (response.Messages.length < 2) await noMessages(system, 2 - response.Messages.length);
+            slowdowns += await handleMessages(system, sqsClient, response.Messages, system.downloaderQueue);
+            if (response.Messages.length < 2) {
+                slowdowns -= await noMessages(system, 2 - response.Messages.length, slowdowns);
+            }
         } else {
             console.log("No messages");
-            await noMessages(system, 20);
+            slowdowns -= await noMessages(system, 10, slowdowns);
         }
         await flushLogging();
     }
@@ -140,7 +142,19 @@ async function updatePlayedYears(system: System, geek: string, geekid: number, f
     await system.withConnectionAsync(async conn => await conn.query(updateSql, updateParams));
 }
 
-async function noMessages(system: System, howManyToDo: number) {
+// return how many slowdowns we ate up
+async function noMessages(system: System, howManyToDo: number, slowDowns: number): Promise<number> {
+    let eaten = 0;
+    if (slowDowns > 0) {
+        const toDo = Math.min(slowDowns, 5);
+        eaten = toDo;
+        slowDowns -= eaten;
+        console.log(`... sleeping for ${toDo} seconds due to ${slowDowns} slowdowns`);
+        await sleep(toDo * 1000);
+    }
+    if (slowDowns >= howManyToDo) return (eaten + howManyToDo);
+    howManyToDo -= slowDowns;
+    eaten += slowDowns;
     const geeksThatDontExist = await system.returnWithConnection(getGeeksThatDontExist);
     // TODO - allow a variety of types
     const todo: ToProcessElement[] =
@@ -155,15 +169,17 @@ async function noMessages(system: System, howManyToDo: number) {
             await scheduleProcessing(system, element);
         }
     }
+    return eaten;
 }
 
-async function handleMessages(system: System, sqsClient: SQSClient, messages: Message[], queueUrl: string): Promise<void> {
+async function handleMessages(system: System, sqsClient: SQSClient, messages: Message[], queueUrl: string): Promise<number> {
     console.log(`Retrieved ${messages.length} messages from downloader queue`);
+    let slowdowns = 0;
     for (const message of messages) {
         const receiptHandle = message.ReceiptHandle;
         if (message.Body) {
             const payload = JSON.parse(message.Body);
-            await handleQueueMessage(system, payload as QueueMessage);
+            if (await handleQueueMessage(system, payload as QueueMessage)) slowdowns++;
         } else {
             console.log("What is this?");
             console.log(JSON.stringify(message));
@@ -171,10 +187,14 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
         await sqsClient.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: receiptHandle }));
     }
     await flushLogging();
+    return slowdowns;
 }
 
 async function handleQueueMessage(system: System, message: QueueMessage) {
     switch (message.discriminator) {
+        case "SlowDownMessage":
+            console.log("SLOW DOWN!!!!");
+            return true;
         case "CleanUpCollectionMessage":
             console.log(`CleanUpCollectionMessage ${message.params.geek} ${message.params.items.length}`);
             await system.withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
@@ -268,6 +288,7 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             }
             break;
     }
+    return false;
 }
 
 

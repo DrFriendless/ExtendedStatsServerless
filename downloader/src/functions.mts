@@ -16,7 +16,7 @@ import {
     dispatchProcessCleanUpCollection,
     dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult,
-    dispatchProcessUserResult,
+    dispatchProcessUserResult, dispatchSlowDown,
     dispatchUpdateMetadata,
     dispatchUpdateTop50,
     dispatchUpdateUserList
@@ -118,19 +118,31 @@ export async function processGame(event: FileToProcess) {
     await initLogging(system, "processGame");
 
     const invocation = event as FileToProcess;
-    const resp = await fetchFromBGG(system.gamesToken, invocation.url);
-    const data = await resp.text();
-    try {
-        const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data.toString());
-        await dispatchProcessGameResult(system, result);
-    } catch (err) {
-        if (err instanceof NoSuchGameError) {
-            await dispatchNoSuchGame(system, err.getId());
-        } else {
-            console.log(err);
+    const data = await fetchXMLFromBGG(system.gamesToken, invocation.url, event);
+    if (data) {
+        try {
+            const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data);
+            await dispatchProcessGameResult(system, result);
+        } catch (err) {
+            if (err instanceof NoSuchGameError) {
+                await dispatchNoSuchGame(system, err.getId());
+            } else {
+                console.log(err);
+            }
         }
     }
     await flushLogging();
+}
+
+async function fetchXMLFromBGG(token: string, url: string, task: object): Promise<string | undefined> {
+    const resp = await fetchFromBGG(token, url);
+    console.log(resp.url, resp.status);
+    const xml = await resp.text();
+    if (xml.indexOf("Rate limit exceeded") >= 0) {
+        log(`Rate limit exceeded downloading ${url}, task was ${JSON.stringify(task)}`);
+        return undefined;
+    }
+    return xml;
 }
 
 async function fetchFromBGG(token: string, url: string): Promise<Response> {
@@ -194,13 +206,28 @@ export async function processCollection(invocation: FileToProcess) {
 
 // return success
 async function tryToProcessCollection(system: System, invocation: FileToProcess): Promise<number> {
-    const resp = await fetchFromBGG(system.collectionToken, invocation.url);
-    if (resp.status !== 200) console.log(resp.status);
-    if (resp.status === 202 || resp.status === 504) return resp.status;
-    const data = await resp.text();
-
-    try {
-        const collection = await extractUserCollectionFromPage(invocation.geek, data, invocation.url);
+    const data = await fetchXMLFromBGG(system.collectionToken, invocation.url, invocation);
+    if (!data) {
+        log(`Rate limit exceeded processing collection for ${invocation.geek}`);
+        await dispatchSlowDown(system);
+        return 429;
+    }
+    const collection = await extractUserCollectionFromPage(invocation.geek, data, invocation.url);
+    if (collection === "InvalidUsername") {
+        log(`It looks like ${invocation.geek} no longer exists.`);
+        await dispatchNoSuchUser(system, invocation.geek);
+    } else if (collection === "RateLimitExceeded") {
+        log(`Rate limit exceeded processing collection for ${invocation.geek}`);
+        await dispatchSlowDown(system);
+        return 429;
+    } else if (collection === "IncorrectDOM") {
+        log(`Incorrect DOM for URL ${invocation.url}`);
+    } else if (collection === "ComeBackLater") {
+        // TODO
+    } else if (collection === "TooBig") {
+        log(`Collection exceeds maximum export size for ${invocation.geek}`);
+        // TODO
+    } else {
         const ids = collection.items.map(item => item.gameId);
         console.log(ids);
         // make sure that all of these games are in the database
@@ -210,14 +237,8 @@ async function tryToProcessCollection(system: System, invocation: FileToProcess)
             await dispatchProcessCollectionUpdateGames(system, games);
         }
         await cleanupCollection(system, collection, invocation.url);
-        return 200;
-    } catch (e) {
-        if (data.includes("Invalid username specified")) {
-            await dispatchNoSuchUser(system, invocation.geek);
-            return 400;
-        }
-        return 401;
     }
+    return 200;
 }
 
 async function cleanupCollection(system: System, collection: ProcessCollectionResult, url: string) {
@@ -261,8 +282,12 @@ export async function processPlayed(invocation: PlaysToProcess) {
     let pageNum = 1;
     while (pageNum <= maxPages) {
         const url = baseUrl + pageNum;
-        const resp = await fetchFromBGG(system.playsToken, url);
-        const xml = await resp.text();
+        const xml = await fetchXMLFromBGG(system.playsToken, url, invocation);
+        if (!xml) {
+            console.log(`didn't receive data on page ${pageNum}`);
+            console.log(xml);
+            break;
+        }
         const doc = parser.parse(xml);
         if (maxEntries === undefined) {
             maxEntries = parseInt(doc.plays['@_total']);
@@ -304,36 +329,12 @@ export async function processPlayed(invocation: PlaysToProcess) {
     await flushLogging();
 }
 
-// export async function processPlays(invocation: FileToProcess) {
-//     const system = await loadSystem();
-//     if (isHttpResponse(system)) return system;
-//     await initLogging(system, "processPlays");
-//
-//     let playsData: PlayData[] = [];
-//     let pagesSoFar = 0;
-//     let pagesNeeded = -1;
-//     while (pagesSoFar === 0 || pagesSoFar < pagesNeeded) {
-//         pagesSoFar++;
-//         const resp = await fetchFromBGG(system.playsToken, invocation.url + "&page=" + pagesSoFar);
-//         const data = await resp.text();
-//         const processResult: { count: number, plays: PlayData[] } = await processPlaysFile(data, invocation);
-//         playsData = playsData.concat(processResult.plays);
-//         pagesNeeded = Math.ceil(processResult.count / 100);
-//     }
-//     const playsResult: ProcessPlaysResult = {
-//         geek: invocation.geek, month: invocation.month, year: invocation.year, plays: playsData, url: invocation.url
-//     };
-//     await dispatchProcessPlaysResult(system, playsResult);
-//     await flushLogging();
-// }
-
 export async function processDesigner(event: FileToProcess) {
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
     await initLogging(system, "processDesigner");
 
-    const resp = await fetchFromBGG(system.extrasToken, event.url);
-    const data = await resp.text();
+    const data = await fetchXMLFromBGG(system.extrasToken, event.url, event);
     // TODO
     console.log(data);
     await flushLogging();
@@ -344,8 +345,7 @@ export async function processPublisher(event: FileToProcess) {
     if (isHttpResponse(system)) return system;
     await initLogging(system, "processPublisher");
 
-    const resp = await fetchFromBGG(system.extrasToken, event.url);
-    const data = await resp.text();
+    const data = await fetchXMLFromBGG(system.extrasToken, event.url, event);
     // TODO
     console.log(data);
     await flushLogging();

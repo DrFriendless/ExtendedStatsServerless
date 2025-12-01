@@ -2,25 +2,27 @@ import { CollectionGame, ProcessCollectionResult, ProcessGameResult, ProcessUser
 import { parseStringPromise } from 'xml2js';
 import {log} from "./logging.mjs";
 
-export async function extractUserCollectionFromPage(geek: string, pageContent: string, url: string): Promise<ProcessCollectionResult> {
+type USER_PAGE_ERROR = "ComeBackLater" | "TooBig" | "InvalidUsername" | "RateLimitExceeded" | "IncorrectDOM";
+
+export async function extractUserCollectionFromPage(geek: string, pageContent: string, url: string): Promise<ProcessCollectionResult | USER_PAGE_ERROR> {
     const dom = await parseStringPromise(pageContent, {trim: true});
     if (dom && dom.message) {
         console.log("BGG says come back later");
-        throw new Error("BGG says come back later to get collection for " + geek);
+        return "ComeBackLater";
     }
     if (!dom || !dom.items) {
         if (pageContent.includes("Collection exceeds maximum export size")) {
-            log("Collection exceeds maximum export size for " + geek);
-            throw new Error("Collection exceeds maximum export size for " + geek);
+            return "TooBig";
         }
         if (pageContent.includes("Invalid username specified")) {
-            log(`It looks like ${geek} no longer exists.`);
-            throw new Error(`It looks like ${geek} no longer exists.`);
+            return "InvalidUsername";
         }
-        console.log("Found incorrect DOM");
+        if (pageContent.includes("Rate limit exceeded")) {
+            return "RateLimitExceeded";
+        }
+        console.log(`Found incorrect DOM for ${geek} from URL ${url}`);
         console.log(pageContent);
-        log(`Found incorrect DOM for ${geek} from URL ${url}`);
-        throw new Error("Found incorrect DOM for " + geek);
+        return "IncorrectDOM";
     }
     if (!dom.items.item || dom.items.item.length === 0) {
         console.log("Found no games in collection");
