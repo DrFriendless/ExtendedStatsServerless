@@ -8,7 +8,15 @@ import {
 } from "@aws-sdk/client-sqs";
 import dotenv from "dotenv";
 import process from "process";
-import {EnsureGamesMessage, FileToProcess, ProcessMethod, QueueMessage, ToProcessElement} from "extstats-core";
+import {
+    EnsureGamesMessage,
+    PlaysForPeriodResultMessage,
+    FileToProcess,
+    PlaysToProcess,
+    ProcessMethod,
+    QueueMessage,
+    ToProcessElement
+} from "extstats-core";
 import {
     doEnsureUsers,
     doListToProcess,
@@ -39,7 +47,7 @@ const METHOD_PROCESS_USER = "processUser";
 const METHOD_PROCESS_COLLECTION = "processCollection";
 const METHOD_PROCESS_PLAYED = "processPlayed";
 const METHOD_PROCESS_GAME = "processGame";
-const METHOD_PROCESS_PLAYS = "processPlays";
+const METHOD_PROCESS_YEAR = "processYear";
 const METHOD_PROCESS_DESIGNER = "processDesigner";
 const METHOD_PROCESS_PUBLISHER = "processPublisher";
 
@@ -47,7 +55,7 @@ const METHOD_PROCESS_PUBLISHER = "processPublisher";
 const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
 const FUNCTION_PROCESS_GAME = "processGame";
-const FUNCTION_PROCESS_PLAYS = "processPlays";
+const FUNCTION_PROCESS_PLAYED = "processPlayed";
 const FUNCTION_PROCESS_DESIGNER = "processDesigner";
 const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
 
@@ -98,8 +106,18 @@ async function scheduleProcessing(system: System, element: ToProcessElement) {
     } else if (element.processMethod === METHOD_PROCESS_GAME) {
         console.log(`scheduling processGame ${element.bggid}`);
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
-    } else if (element.processMethod === METHOD_PROCESS_PLAYS) {
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYS, element);
+    } else if (element.processMethod === METHOD_PROCESS_YEAR) {
+        const fs = element.url.split("=");
+        const p2p = {
+            url: element.url,
+            processMethod: METHOD_PROCESS_YEAR,
+            geek: element.geek,
+            geekid: element.geekid,
+            startYmdInc: fs[0],
+            endYmdInc: fs[1]
+        } as PlaysToProcess;
+        console.log(`scheduling processYear ${element.url}`);
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, p2p);
     } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
     } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {
@@ -159,7 +177,7 @@ async function noMessages(system: System, howManyToDo: number, slowDowns: number
     // TODO - allow a variety of types
     const todo: ToProcessElement[] =
         await system.returnWithConnection(conn =>
-            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed"], true))
+            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed", "processYear"], true))
     for (const element of todo) {
         if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
             // this shouldn't happen.
@@ -198,7 +216,11 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
     const ensures = processedMessages
         .filter(m => m.discriminator === "EnsureGamesMessage")
         .map(m => (m.payload as EnsureGamesMessage).gameIds);
-    if (ensures.length > 0) {
+    // make sure played games are in the database as well.
+    const playeds: number[][] = processedMessages
+        .filter(m => m.discriminator === "PlaysForPeriodResultMessage")
+        .map(m => (m.payload as PlaysForPeriodResultMessage).plays.plays.map(pd => pd.gameid));
+    if (ensures.length > 0 || playeds.length > 0) {
         let ids: number[] | undefined;
         for (const e of ensures) {
             if (!ids) {
@@ -207,7 +229,14 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
                 listAdd(ids, e);
             }
         }
-        console.log(`Coalesced ${ensures.length} ensure games messages: ${ids.length}`);
+        for (const e of playeds) {
+            if (!ids) {
+                ids = e;
+            } else {
+                listAdd(ids, e);
+            }
+        }
+        console.log(`Coalesced ${ensures.length} ensure games messages ${playeds.length} played games messages : ${ids.length}`);
         await system.withConnectionAsync(conn => doEnsureGames(conn, ids));
     }
     // ack the ones we've done

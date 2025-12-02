@@ -461,14 +461,19 @@ export async function doEnsureGames(conn: mysql.Connection, anyIds: any[]): Prom
     const sqlOne = "select bggid from files where bggid = ? and processMethod = 'processGame'";
     let params;
     let sql;
+    let sql2;
     if (ids.length == 1) {
         sql = sqlOne;
+        sql2 = "select bggid from games where bggid = ?";
         params = ids;
     } else {
         sql = sqlSome;
+        sql2 = "select bggid from games where bggid in (?)";
         params = [ids];
     }
-    const found = (await conn.query(sql, params)).map((row: { bggid: any }) => parseInt(row.bggid.toString()));
+    const found1: number[] = (await conn.query(sql, params)).map((row: { bggid: any }) => parseInt(row.bggid.toString()));
+    const found2: number[] = (await conn.query(sql2, params)).map((row: { bggid: any }) => parseInt(row.bggid.toString()));
+    const found = listIntersect(found1, found2);
     const notExist = await getGamesThatDontExist(conn);
     const uniques = Array.from(new Set(listMinus(listMinus(ids, found), notExist)));
     for (const id of uniques) {
@@ -483,7 +488,11 @@ async function doRecordGame(conn: mysql.Connection, bggid: number) {
     const tillNext = tillNextUpdate("processGame");
     const insertParams = [url, "processGame", undefined, undefined, tillNext, "Game #" + bggid, bggid];
     await conn.query(insertSql, insertParams).catch(err => {
-        console.log(err);
+        // console.log(err);
+    });
+    const insertSql2 = "insert into games (bggid, name) values (?,?)";
+    await conn.query(insertSql2, [bggid, "?"]).catch(err => {
+        // console.log(err);
     });
     console.log(`Added new game ${bggid}`);
 }
@@ -532,6 +541,17 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
         query = await doListToProcessByMethod(conn, count, processMethods);
     } else {
         query = await doListToProcessAll(conn, count);
+    }
+    let foundYear = false;
+    let good = 0;
+    for (const q of query) {
+        if (q.processMethod === 'processYear' && foundYear) break;
+        good++;
+        if (q.processMethod === 'processYear') foundYear = true;
+    }
+    if (good < query.length) {
+        query = query.slice(0, good);
+        console.log(`Only processing ${query.length} files right now`);
     }
     if (updateLastScheduled) {
         const urls = query.map(element => element.url);
@@ -740,6 +760,7 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
         }
         if (basePlays.length > 0) {
             try {
+                console.log(basePlays.map(bp => bp[0]));
                 await conn.query(insertBasePlaySql, [basePlays]);
             } catch (ex) {
                 console.log(ex);
@@ -939,6 +960,7 @@ export async function doProcessPlayedMonths(conn: mysql.Connection, geek: string
 }
 
 export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: ProcessPlaysForPeriodResult) {
+    console.log(data.geek, data.startYmdInc, data.endYmdInc);
     const gameIds = [];
     for (const play of data.plays) {
         if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
