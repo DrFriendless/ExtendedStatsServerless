@@ -1,7 +1,7 @@
 {
   "name": "extended-stats-api",
   "description": "Extended Stats API",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "build": "npx tsc"
@@ -13,7 +13,7 @@
     "bluebird": "^3.7.2",
     "dataloader": "^2.2.3",
     "date-arithmetic": "^4.1.0",
-    "extstats-core": "file:../../repo/extstats-core-1.21.0.tgz",
+    "extstats-core": "file:../../repo/extstats-core-1.31.0.tgz",
     "graphql": "^16.11.0",
     "lodash-es": "^4.17.21",
     "moo": "^0.5.2",

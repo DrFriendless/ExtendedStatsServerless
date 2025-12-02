@@ -41,6 +41,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_logout`, handler: "auth.logout", route: "logout", method: "POST" },
     { name: `${COMPONENT}_signup`, handler: "auth.signup", route: "signup", method: "POST" },
     { name: `${COMPONENT}_changePassword`, handler: "auth.changePassword", route: "changePassword", method: "POST" },
+    { name: `${COMPONENT}_update`, handler: "functions.markForUpdate", route: "update", method: "POST" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [
