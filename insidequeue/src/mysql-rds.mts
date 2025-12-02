@@ -542,12 +542,19 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
     } else {
         query = await doListToProcessAll(conn, count);
     }
-    let foundYear = false;
+    let risk = 0;
     let good = 0;
     for (const q of query) {
-        if (q.processMethod === 'processYear' && foundYear) break;
-        good++;
-        if (q.processMethod === 'processYear') foundYear = true;
+        if (q.processMethod === 'processYear') {
+            risk += 5;
+        } else if (q.processMethod === 'processCollection') {
+            risk += 2;
+        }
+        if (risk <= 5) {
+            good++;
+        } else {
+            break;
+        }
     }
     if (good < query.length) {
         query = query.slice(0, good);
