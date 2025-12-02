@@ -267,10 +267,6 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             console.log(`CollectionResultMessage ${message.result.geek} ${message.result.items.length}`);
             await system.withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
             break;
-        // case "EnsureGamesMessage":
-        //     console.log(`EnsureGamesMessage ${message.gameIds.length}`);
-        //     await system.withConnectionAsync(conn => doEnsureGames(conn, message.gameIds));
-        //     break;
         case "GameResultMessage":
             console.log(`GameResultMessage ${message.result.name}`);
             await system.withConnectionAsync(conn => doProcessGameResult(conn, message.result));
@@ -312,14 +308,14 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             console.log(`NoSuchGeek ${message.geek}`);
             await system.withConnectionAsync(conn => doMarkGeekDoesNotExist(conn, message.geek));
             break;
-        case "PlayedResultMessage":
-            console.log(JSON.stringify(message));
-            await system.withConnectionAsync(conn => doProcessPlayedMonths(conn, message.monthsData.geek, message.monthsData.monthsPlayed, message.monthsData.url));
-            break;
-        case "PlaysResultMessage":
-            console.log(JSON.stringify(message));
-            await system.withConnectionAsync(conn => doProcessPlaysResult(conn, message.result));
-            break;
+        // case "PlayedResultMessage":
+        //     console.log(JSON.stringify(message));
+        //     await system.withConnectionAsync(conn => doProcessPlayedMonths(conn, message.monthsData.geek, message.monthsData.monthsPlayed, message.monthsData.url));
+        //     break;
+        // case "PlaysResultMessage":
+        //     console.log(JSON.stringify(message));
+        //     await system.withConnectionAsync(conn => doProcessPlaysResult(conn, message.result));
+        //     break;
         case "PlaysForPeriodResultMessage":
             console.log(`PlaysForPeriodResultMessage ${message.plays.geek} ${message.plays.startYmdInc} ${message.plays.endYmdInc} ${message.plays.plays.length}`);
             await system.withConnectionAsync(conn => doUpdatePlaysForPeriod(conn, message.plays));

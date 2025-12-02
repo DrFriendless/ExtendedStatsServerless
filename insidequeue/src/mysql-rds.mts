@@ -546,11 +546,13 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
     let good = 0;
     for (const q of query) {
         if (q.processMethod === 'processYear') {
-            risk += 5;
+            risk += 7;
         } else if (q.processMethod === 'processCollection') {
-            risk += 2;
+            risk += 6;
+        } else {
+            risk++;
         }
-        if (risk <= 5) {
+        if (risk <= count || good == 0) {
             good++;
         } else {
             break;
@@ -767,7 +769,6 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
         }
         if (basePlays.length > 0) {
             try {
-                console.log(basePlays.map(bp => bp[0]));
                 await conn.query(insertBasePlaySql, [basePlays]);
             } catch (ex) {
                 console.log(ex);
@@ -977,7 +978,7 @@ export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: Proce
     const notGames = await doEnsureGames(conn, gameIds);
     const now = new Date();
     const end = parseYmd(data.endYmdInc);
-    const daysSince = (end.getTime() - now.getTime())/1000 / 1440;
+    const daysSince = (now.getTime() - end.getTime())/1000 / 1440;
     const playsMonths: { y: number, m: number}[] = [];
     await doSetGeekPlaysForYear(conn, geekId, data.startYmdInc, data.endYmdInc, data.plays, notGames, playsMonths);
     await doNormalisePlaysForYear(conn, geekId, playsMonths, expansionData);
@@ -988,7 +989,6 @@ export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: Proce
     } else {
         await doMarkUrlProcessedNoUpdate(conn, data.processMethod, data.url);
     }
-
     await doUpdateFrontPageGeek(conn, data.geek);
 }
 
