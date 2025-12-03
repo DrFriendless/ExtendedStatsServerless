@@ -13,6 +13,7 @@ export interface GeekGameRow {
     wantInTrade: boolean;
     wish: number;
     forTrade: boolean;
+    normRating: number;
 }
 
 export interface RetrievePlay {
@@ -187,6 +188,7 @@ export interface GeekGamesTableRow {
     wanttobuy: number;
     wanttoplay: number;
     wish: number;
+    normrating: number;
 }
 
 export interface GameDesignersTableRow {

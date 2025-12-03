@@ -246,7 +246,8 @@ function extractGeekGame(geek: string, row: GeekGamesTableRow): GeekGameRow {
         preordered: row['preordered'] > 0,
         wantInTrade: row['want'] > 0,
         wish: row['wish'],
-        forTrade: row['trade'] > 0
+        forTrade: row['trade'] > 0,
+        normRating: row.normrating
     };
 }
 

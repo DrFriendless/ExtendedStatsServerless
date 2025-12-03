@@ -91,6 +91,7 @@ function buildGeekGameType(loaders: Loaders, gameDataType: GraphQLObjectType<Gam
                 forTrade: {type: graphql.GraphQLBoolean!},
                 wantInTrade: {type: graphql.GraphQLBoolean!},
                 wish: {type: graphql.GraphQLInt!},
+                normRating: {type: graphql.GraphQLFloat!},
                 game: {
                     type: gameDataType,
                     resolve: (parent: { bggid: number }) => loaders.games.load(parent.bggid)
@@ -128,7 +129,7 @@ const VarBindingInputType = new GraphQLInputObjectType({
     }
 });
 
-function buildMultiGeekPlaysType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<GeekGame>, playsWithDateType: GraphQLObjectType<PlaysWithDate>) {
+function buildMultiGeekPlaysType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<ExtendedGeekGame>, playsWithDateType: GraphQLObjectType<PlaysWithDate>) {
     return new GraphQLObjectType({
         name: "MultiGeekPlays",
         fields: {
@@ -151,7 +152,7 @@ const SelectorMetadataType = new GraphQLObjectType({
     }
 });
 
-function buildGeekGamesType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<GeekGame>) {
+function buildGeekGamesType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<ExtendedGeekGame>) {
     return new GraphQLObjectType({
         name: "GeekGames",
         fields: {
@@ -189,7 +190,7 @@ function buildMonthlyPlaysType(loaders: Loaders, gameDataType: GraphQLObjectType
     });
 }
 
-function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<GeekGame>) {
+function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<ExtendedGeekGame>) {
     return new GraphQLObjectType({
         name: "MonthlyPlaysAndCounts",
         fields: {
@@ -202,7 +203,7 @@ function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLO
 
 function buildSchema(loaders: Loaders) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
-    const geekGameType: GraphQLObjectType<GeekGame> = buildGeekGameType(loaders, gameDataType);
+    const geekGameType: GraphQLObjectType<ExtendedGeekGame> = buildGeekGameType(loaders, gameDataType);
     const playsWithDateType: GraphQLObjectType<{ }> = buildPlaysWithDateType(loaders, gameDataType);
     return new graphql.GraphQLSchema({
         query: new graphql.GraphQLObjectType({
@@ -263,6 +264,10 @@ interface CoreMonthlyPlays {
     bggid: number;
 }
 
+interface ExtendedGeekGame extends GeekGame {
+    normRating: number;
+}
+
 type GeekGameSelectWithGames = GeekGameSelectResult & { games: GameData[] };
 interface DesignerData {
     bggid: number;
@@ -273,7 +278,7 @@ interface DesignerData {
 interface MonthlyPlaysAndCounts {
     plays: CoreMonthlyPlays[],
     counts: MonthlyPlayCount[],
-    geekGames: GeekGame[]
+    geekGames: ExtendedGeekGame[]
 }
 
 async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBindings): Promise<MonthlyPlaysAndCounts> {
@@ -322,7 +327,7 @@ async function addLastPlayOfGamesForGeek(conn: mysql.Connection, geekGames: (Gee
     if (geekGames.length === 0) return;
     const geekid = geekGames[0]['geekid'];
     const bggids = geekGames.map(gg => gg.bggid);
-    const index: Record<number, GeekGame & ShouldPlayAdditionalData> = {};
+    const index: Record<number, ExtendedGeekGame & ShouldPlayAdditionalData> = {};
     geekGames.forEach(gg => {
         index[gg.bggid] = gg;
         gg['shouldPlayScore'] = 0;
