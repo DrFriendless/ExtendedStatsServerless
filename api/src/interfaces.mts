@@ -24,6 +24,7 @@ export interface RetrievePlay {
     day: number;
     geek: string;
     expansions: number[];
+    location: string;
 }
 
 
@@ -159,6 +160,7 @@ export interface RawPlaysQueryResult {
     date: number;
     expansion_play: number;
     baseplay: number | undefined;
+    location: string;
 }
 
 export interface UsersTableRow {

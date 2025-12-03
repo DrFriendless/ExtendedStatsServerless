@@ -374,7 +374,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
         args[0] = parseInt(Object.keys(geekNameIds)[0]);
     }
     if (first) where += " order by ymd asc";
-    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay from plays_normalised where " + where;
+    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
     const playsResult = await conn.query(playsSql, args) as RawPlaysQueryResult[];
     const expPlays: RawPlaysQueryResult[] = [];
     const basePlays: RetrievePlay[] = [];
@@ -396,7 +396,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
                 continue;
             }
             const pwd: RetrievePlay = { game: row.game, quantity: row.quantity, ymd: row.ymd, year: row.year, month: row.month,
-                day: row.date, geek: username, expansions: [] };
+                day: row.date, geek: username, expansions: [], location: row.location || "" };
             basePlays.push(pwd);
             playsById[row.id] = pwd;
         }
