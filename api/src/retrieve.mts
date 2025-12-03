@@ -2,7 +2,7 @@ import * as graphql from "graphql";
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
-import {GameData, GeekGame, MonthlyPlayCount, MonthlyPlays} from "extstats-core";
+import {GameData, GeekGame, MonthlyPlayCount, MonthlyPlays, PlaysWithDate} from "extstats-core";
 import {doRetrieveGames, getMonthlyCounts, getMonthlyPlays} from "./mysql-rds.mjs";
 import {getGeekId, getGeekIds} from "./library.mjs";
 import { parse } from "./parser.mjs";
@@ -99,20 +99,27 @@ function buildGeekGameType(loaders: Loaders, gameDataType: GraphQLObjectType<Gam
         }
     );
 }
-const PlaysWithDateType = new graphql.GraphQLObjectType({
-    name: "PlaysWithDate",
-    fields: {
-        geek: { type: graphql.GraphQLString! },
-        year: { type: graphql.GraphQLInt! },
-        month: { type: graphql.GraphQLInt! },
-        day: { type: graphql.GraphQLInt! },
-        ymd: { type: graphql.GraphQLInt! },
-        game: { type: graphql.GraphQLInt! },
-        expansions: { type: ListOfInt },
-        quantity: { type: graphql.GraphQLInt! },
-        location: { type: graphql.GraphQLString! }
-    }
-});
+function buildPlaysWithDateType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>) {
+    return new graphql.GraphQLObjectType({
+        name: "PlaysWithDate",
+        fields: {
+            geek: { type: graphql.GraphQLString! },
+            year: { type: graphql.GraphQLInt! },
+            month: { type: graphql.GraphQLInt! },
+            day: { type: graphql.GraphQLInt! },
+            ymd: { type: graphql.GraphQLInt! },
+            bggid: { type: graphql.GraphQLInt! },
+            expansions: { type: ListOfInt },
+            quantity: { type: graphql.GraphQLInt! },
+            location: { type: graphql.GraphQLString! },
+            game: {
+                type: gameDataType,
+                resolve: (parent: { bggid: number }) => loaders.games.load(parent.bggid)
+            }
+        }
+    });
+}
+
 const VarBindingInputType = new GraphQLInputObjectType({
     name: "VarBinding",
     fields: {
@@ -121,12 +128,12 @@ const VarBindingInputType = new GraphQLInputObjectType({
     }
 });
 
-function buildMultiGeekPlaysType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<GeekGame>) {
+function buildMultiGeekPlaysType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<GeekGame>, playsWithDateType: GraphQLObjectType<PlaysWithDate>) {
     return new GraphQLObjectType({
         name: "MultiGeekPlays",
         fields: {
             geeks: {type: ListOfString},
-            plays: {type: new graphql.GraphQLList(PlaysWithDateType!)},
+            plays: {type: new graphql.GraphQLList(playsWithDateType)},
             games: {type: new graphql.GraphQLList(gameDataType)},
             geekgames: {type: new graphql.GraphQLList(geekGameType)}
         }
@@ -196,6 +203,7 @@ function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLO
 function buildSchema(loaders: Loaders) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
     const geekGameType: GraphQLObjectType<GeekGame> = buildGeekGameType(loaders, gameDataType);
+    const playsWithDateType: GraphQLObjectType<{ }> = buildPlaysWithDateType(loaders, gameDataType);
     return new graphql.GraphQLSchema({
         query: new graphql.GraphQLObjectType({
             name: "RetrieveQuery",
@@ -207,7 +215,7 @@ function buildSchema(loaders: Loaders) {
                         startYMD: { type: graphql.GraphQLInt },
                         endYMD: { type: graphql.GraphQLInt }
                     },
-                    type: buildMultiGeekPlaysType(gameDataType, geekGameType),
+                    type: buildMultiGeekPlaysType(gameDataType, geekGameType, playsWithDateType),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
                             async conn => playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
@@ -374,17 +382,17 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
         args[0] = parseInt(Object.keys(geekNameIds)[0]);
     }
     if (first) where += " order by ymd asc";
-    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
+    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game bggid, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
     const playsResult = await conn.query(playsSql, args) as RawPlaysQueryResult[];
     const expPlays: RawPlaysQueryResult[] = [];
     const basePlays: RetrievePlay[] = [];
     const playsById: Record<string, RetrievePlay> = {};
-    const firstKeys: string[] = [];
+    const firstKeys: Set<string> = new Set();
     for (const row of playsResult) {
         if (first) {
-            const firstKey = `${row.game}-${row.geek}`;
-            if (firstKeys.indexOf(firstKey) >= 0) continue;
-            firstKeys.push(firstKey);
+            const firstKey = `${row.bggid}-${row.geek}`;
+            if (firstKeys.has(firstKey)) continue;
+            firstKeys.add(firstKey);
         }
         if (row.ymd < startInc || row.ymd >= endExc) continue;
         if (row["expansion_play"]) {
@@ -395,23 +403,23 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
                 console.log("No user found for " + row.geek);
                 continue;
             }
-            const pwd: RetrievePlay = { game: row.game, quantity: row.quantity, ymd: row.ymd, year: row.year, month: row.month,
+            const pwd: RetrievePlay = { bggid: row.bggid, quantity: row.quantity, ymd: row.ymd, year: row.year, month: row.month,
                 day: row.date, geek: username, expansions: [], location: row.location || "" };
             basePlays.push(pwd);
             playsById[row.id] = pwd;
         }
     }
     for (const ep of expPlays) {
-        const pwd = playsById[ep["baseplay"]];
+        const pwd = playsById[ep["baseplay"].toString()];
         if (!pwd) {
             console.log("No base play " + ep["baseplay"] + " found");
             continue;
         }
-        pwd.expansions.push(ep["game"]);
+        pwd.expansions.push(ep["bggid"]);
     }
     const gameIds: number[] = [];
     for (const p of basePlays) {
-        if (gameIds.indexOf(p.game) < 0) gameIds.push(p.game);
+        if (gameIds.indexOf(p.bggid) < 0) gameIds.push(p.bggid);
         for (const e of p.expansions) {
             if (gameIds.indexOf(e) < 0) gameIds.push(e);
         }

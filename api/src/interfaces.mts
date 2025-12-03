@@ -16,7 +16,7 @@ export interface GeekGameRow {
 }
 
 export interface RetrievePlay {
-    game: number;
+    bggid: number;
     quantity: number;
     ymd: number;
     year: number;
@@ -152,7 +152,7 @@ export interface PlaysRetrieveResult {
 export interface RawPlaysQueryResult {
     ymd: number;
     id: number;
-    game: number;
+    bggid: number;
     geek: number;
     quantity: number;
     year: number;

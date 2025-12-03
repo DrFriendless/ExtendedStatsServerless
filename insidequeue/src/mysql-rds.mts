@@ -241,6 +241,7 @@ export async function doProcessCollectionCleanup(conn: mysql.Connection, geek: s
     await doRestrictCollectionToGames(conn, geekid, items);
     await doMarkUrlProcessed(conn, "processCollection", url);
     await doUpdateFrontPageGeek(conn, geek);
+    await doUpdateNormalisedRankings(conn, geek);
 }
 
 async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: number, items: number[]) {
@@ -643,6 +644,36 @@ export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekI
         (await conn.query(usesSql, [geekId, owned])).map((row: { c: number }) => row.c);
     while (uses.length < owned.length) uses.push(0);
     return { totalPlays, distinctGames, tens, zeros, hindex, gindex, hrindex, sdj, ext100, uses };
+}
+
+async function doUpdateNormalisedRankings(conn: mysql.Connection, geekName: string) {
+    const geekId = await getGeekId(conn, geekName);
+    const geekRows: { game: number, rating: number }[] =
+        [... await conn.query("select game, rating from geekgames where geekId = ? and rating > 0", [geekId])];
+    const c = geekRows.length;
+    if (c === 0) return;
+    geekRows.sort((r1, r2) => r2.rating - r1.rating);
+    let currentRating = -1;
+    let numberHigher = 0;
+    let numberProcessed = 0;
+    const normalisedRatingsForGames: Record<string, number> = {};
+    for (const gr of geekRows) {
+        if (currentRating < 0) {
+            currentRating = gr.rating;
+        } else if (gr.rating < currentRating) {
+            numberHigher = numberProcessed;
+            currentRating = gr.rating;
+        }
+        normalisedRatingsForGames[gr.game.toString()] = (c - numberHigher) / c;
+        numberProcessed++;
+    }
+    const ggs: number[] = (await conn.query("select game from geekgames where geekid = ?", [geekId])).map((row: { game: number }) => row.game);
+    for (const gg of ggs) {
+        let nr = normalisedRatingsForGames[gg.toString()];
+        if (nr === undefined) nr = 0;
+        await conn.query("update geekgames set normrating = ? where geekid = ? and game = ?",
+            [ nr, geekId, gg ]);
+    }
 }
 
 async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
