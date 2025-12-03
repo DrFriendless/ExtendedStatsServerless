@@ -1,6 +1,17 @@
 import {
-    doGetNews, doQuery, gatherGeekSummary, doPlaysQuery, gatherGeekUpdates,
-    gatherSystemStats, listUsers, listWarTable, rankGames, updateFAQCount, markUrlForUpdate, markGeekForUpdate
+    doGetNews,
+    doQuery,
+    gatherGeekSummary,
+    doPlaysQuery,
+    gatherGeekUpdates,
+    gatherSystemStats,
+    listUsers,
+    listWarTable,
+    rankGames,
+    updateFAQCount,
+    markUrlForUpdate,
+    markGeekForUpdate,
+    gatherSystemUpdates
 } from "./mysql-rds.mjs";
 import {
     Collection, CollectionWithMonthlyPlays, CollectionWithPlays,
@@ -10,16 +21,19 @@ import {
     NewsItem,
     PlaysQuery,
     RankingTableRow,
-    SystemStats,
+    SystemStats, ToProcessElement,
     WarTableRow
 } from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
 
-export async function getUpdates(event: APIGatewayProxyEvent) {
+export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
-    return await gatherGeekUpdates(system, event.queryStringParameters.geek);
+    return {
+        forGeek: await gatherGeekUpdates(system, event.queryStringParameters.geek),
+        forSystem: await gatherSystemUpdates(system)
+    };
 }
 
 export async function markForUpdate(event: APIGatewayProxyEvent) {
@@ -105,7 +119,8 @@ export async function getNews(event: APIGatewayProxyEvent): Promise<NewsItem[] |
 }
 
 export async function getRankings(event: any): Promise<RankingTableRow[] | HttpResponse> {
-    if (event && event.body) {
+    console.log(event);
+    if (event) {
         const query = {}; // TODO
         const system = await findSystem();
         if (isHttpResponse(system)) return system;

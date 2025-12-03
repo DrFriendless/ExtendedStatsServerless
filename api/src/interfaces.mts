@@ -52,6 +52,7 @@ export interface NormalisedPlay {
     year: number;
     month: number;
     date: number;
+    location?: string;
 }
 
 export interface PlayWithDate {
@@ -62,6 +63,7 @@ export interface PlayWithDate {
     month?: number;
     date?: number;
     expansions?: number[];
+    location: string;
 }
 
 export interface ExtractedGameData extends GameData {

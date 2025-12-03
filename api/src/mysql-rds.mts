@@ -114,7 +114,7 @@ export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): P
     const first = filterTags.indexOf("first") >= 0;
     const ymd = filterTags.indexOf("ymd") >= 0;
     if (first) where += " order by ymd asc";
-    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay from plays_normalised where " + where;
+    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
     const playsResult = await conn.query(playsSql, args) as NormalisedPlay[];
     const expPlays: ExpansionPlay[] = [];
     const basePlays: { [geek: string]: object[] } = {};
@@ -131,7 +131,7 @@ export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): P
         if (row["expansion_play"]) {
             expPlays.push({...row, baseplay: undefined});
         } else {
-            const pwd: PlayWithDate = { game: row.game, quantity: row.quantity };
+            const pwd: PlayWithDate = { game: row.game, quantity: row.quantity, location: row.location || "" };
             if (ymd) {
                 pwd['ymd'] = row.ymd;
             } else {
@@ -208,6 +208,16 @@ export async function gatherSystemStats(system: System): Promise<SystemStats> {
 
 export async function gatherGeekSummary(system: System, geek: string): Promise<GeekSummary> {
     return await system.asyncReturnWithConnection(async conn => await doGetGeekSummary(conn, geek));
+}
+
+export async function gatherSystemUpdates(system: System): Promise<Record<string, number>> {
+    return await system.asyncReturnWithConnection(async conn => {
+        const sql = "select count(id) c, processMethod from files where lastUpdate is null or nextUpdate < now() group by processMethod";
+        const rows = (await conn.query(sql)) as { c: number, processMethod: string}[];
+        const result: Record<string, number> = {};
+        for (const row of rows) result[row.processMethod] = row.c;
+        return result;
+    });
 }
 
 export async function gatherGeekUpdates(system: System, geek: string): Promise<ToProcessElement[]> {

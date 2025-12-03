@@ -109,7 +109,8 @@ const PlaysWithDateType = new graphql.GraphQLObjectType({
         ymd: { type: graphql.GraphQLInt! },
         game: { type: graphql.GraphQLInt! },
         expansions: { type: ListOfInt },
-        quantity: { type: graphql.GraphQLInt! }
+        quantity: { type: graphql.GraphQLInt! },
+        location: { type: graphql.GraphQLString! }
     }
 });
 const VarBindingInputType = new GraphQLInputObjectType({

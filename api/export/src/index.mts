@@ -37,12 +37,12 @@ export class ExtstatsApi {
         })).json()) as WarTableRow[];
     }
 
-    async getUpdates(geek: string): Promise<ToProcessElement[]> {
+    async getUpdates(geek: string): Promise<{ forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
         return (await (await fetch(`${this.baseUrl}/updates?geek=${geek}`, {
             headers: {
                 "Content-Type": "application/json"
             }
-        })).json()) as ToProcessElement[];
+        })).json()) as { forGeek: ToProcessElement[], forSystem: Record<string, number> };
     }
 
     async getGeekSummary(geek: string): Promise<GeekSummary> {
@@ -94,6 +94,15 @@ export class ExtstatsApi {
             },
             method: "POST"
         })).json()) as ToProcessElement;
+    }
+
+    async updateOld(geek: string): Promise<string[]> {
+        return (await (await fetch(`${this.baseUrl}/updateOld?geek=${geek}`, {
+            headers: {
+                "Accept": "application/json",
+            },
+            method: "POST"
+        })).json()) as string[];
     }
 
     async incFAQCount(inc: number[]): Promise<FAQCount[]> {
