@@ -182,13 +182,14 @@ async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
 }
 
 async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: number, data: ProcessGameResult) {
-    const ratingSql = "select sum(rating), count(rating) from geekgames where game = ? and rating > 0";
+    const ratingSql = "select sum(rating), count(rating), sum(normrating) norm from geekgames where game = ? and rating > 0";
     const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays, hindex, gindex) values (?,?,?,?,?,?,?,?,?,?)";
     const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ?, hindex = ?, gindex = ? where game = ?";
     const playsSql = "select sum(quantity) q from plays_normalised where plays_normalised.game = ? group by geek order by q desc";
     const ratings = await conn.query(ratingSql, [game]);
     const total = ratings[0]["sum(rating)"];
     const count = ratings[0]["count(rating)"];
+    const normRating = ratings[0]["norm"];
     const hindexData: number[] = (await conn.query(playsSql, [game])).map((row: { q: number }) => row.q);
     let hindex = 0;
     while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
@@ -204,7 +205,7 @@ async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: nu
         game_name: data.name,
         bgg_ranking: data.rank || 1000000,
         bgg_rating: data.average || 0,
-        normalised_ranking: 0,
+        normalised_ranking: normRating,
         total_plays: howManyPlays,
         total_ratings: total || 0,
         num_ratings: count,
