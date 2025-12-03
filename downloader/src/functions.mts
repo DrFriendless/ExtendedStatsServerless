@@ -277,7 +277,16 @@ export async function processPlayed(invocation: PlaysToProcess) {
 
     const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${invocation.geek}&type=thing&mindate=${invocation.startYmdInc}&maxdate=${invocation.endYmdInc}&subtype=boardgame&page=`;
 
-    const parser = new XMLParser({ ignoreAttributes: false, trimValues: true });
+    const parser = new XMLParser({
+        ignoreAttributes: false, trimValues: true,
+        isArray: (name, jpath, isLeafNode, isAttribute) => {
+            if (["play","subtype"].indexOf(name) >= 0) return true;
+            if (["item","players","subtypes"].indexOf(name) >= 0) return false;
+            if (name.startsWith("@_") || name.startsWith("?")) return false;
+            console.log(name);
+            return false;
+        }
+    });
     const plays: PlayData[] = [];
     let maxEntries: number | undefined;
     let maxPages = 1000;
