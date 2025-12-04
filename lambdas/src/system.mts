@@ -23,6 +23,7 @@ export class System {
     private mysqlDatabase: string | undefined;
 
     async loadDatabaseSecrets(): Promise<HttpResponse | void> {
+        console.log("loadDatabaseSecrets");
         const secretName = "/extstats/database";
         const client = new SecretsManagerClient({
             region: process.env.AWS_REGION
@@ -47,7 +48,9 @@ export class System {
     }
 
     async loadLoggingSecrets(): Promise<HttpResponse | void> {
-        this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
+        console.log("loadLoggingSecrets");
+        // this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
+        this.systemLogGroup = "extstats-system";
     }
 
     async getParameter(key: string): Promise<string> {
@@ -66,6 +69,7 @@ export class System {
     }
 
     async loadBGGSecrets(): Promise<HttpResponse | void> {
+        console.log("loadBGGSecrets");
         const client = new SecretsManagerClient({
             region: process.env.AWS_REGION
         });
@@ -85,6 +89,7 @@ export class System {
                 "body": JSON.stringify({error: `Can't find secret ${BGG_SECRETS} - make sure it exists in AWS.`})
             }
         }
+        console.log("loadBGGSecrets2");
         const ssmClient = new SSMClient({
             apiVersion: '2014-11-06',
             region: process.env.AWS_REGION

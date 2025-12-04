@@ -36,14 +36,17 @@ export async function flushLogging() {
     const d = new Date();
     const ts = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     const logStreamName = `${logParams.streamName}-${ts}`;
+    console.log("A");
     await client.send(new CreateLogStreamCommand({
         logGroupName: logParams.logGroupName,
         logStreamName: logStreamName,
-    })).catch(_ => {});
+    })).catch(ex => console.log(ex));
+    console.log("B");
     await client.send(new PutLogEventsCommand({
         logGroupName: logParams.logGroupName,
         logStreamName: logStreamName,
         logEvents: [ ...logParams.buffer ]
     })).catch(err => console.log(err));
+    console.log("C");
     logParams.buffer = [];
 }

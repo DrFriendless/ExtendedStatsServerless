@@ -12,7 +12,7 @@ import * as targets from "aws-cdk-lib/aws-events-targets";
 import {COMPONENT, DEPLOYMENT_BUCKET} from "./metadata.mts";
 import {Rule} from "aws-cdk-lib/aws-events";
 import {Role} from "aws-cdk-lib/aws-iam";
-import {VpcEndpointIpAddressType} from "aws-cdk-lib/aws-ec2";
+// import {VpcEndpointIpAddressType} from "aws-cdk-lib/aws-ec2";
 
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 let DATABASE_VPC: ec2.IVpc = undefined;
@@ -28,20 +28,21 @@ export const RUNTIME = lambda.Runtime.NODEJS_22_X;
 type OptsType = "bgg" | "db" | "logging";
 
 export class MiscStack extends cdk.Stack {
-  defineVpcEndpoints() {
-    DATABASE_VPC.addInterfaceEndpoint("ep", {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM,
-      open: true,
-      ipAddressType: VpcEndpointIpAddressType.IPV4
-    })
-    DATABASE_VPC.addInterfaceEndpoint("ep2", {
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-      open: true,
-      ipAddressType: VpcEndpointIpAddressType.IPV4
-    })
-  }
+  // don't do this, it costs too much.
+  // defineVpcEndpoints() {
+  //   DATABASE_VPC.addInterfaceEndpoint("ep", {
+  //     service: ec2.InterfaceVpcEndpointAwsService.SSM,
+  //     open: true,
+  //     ipAddressType: VpcEndpointIpAddressType.IPV4
+  //   })
+  //   DATABASE_VPC.addInterfaceEndpoint("ep2", {
+  //     service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+  //     open: true,
+  //     ipAddressType: VpcEndpointIpAddressType.IPV4
+  //   })
+  // }
 
-  defineStateMachine(threadFunc: lambda.Function): sfn.StateMachine {
+  defineAuthStateMachine(threadFunc: lambda.Function): sfn.StateMachine {
     return new sfn.StateMachine(this, 'authStateMachine', {
       definitionBody: sfn.DefinitionBody.fromChainable(
           new tasks.LambdaInvoke(this, "threadTask", {
@@ -57,7 +58,23 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
-  defineRuleToInvoke(machine: sfn.IStateMachine): Rule {
+  defineReportStateMachine(reportFunc: lambda.Function, writeFunc: lambda.Function): sfn.StateMachine {
+    return new sfn.StateMachine(this, 'reportStateMachine', {
+      definitionBody: sfn.DefinitionBody.fromChainable(
+          new tasks.LambdaInvoke(this, "reportTask", {
+            lambdaFunction: reportFunc,
+          }).next(
+              new tasks.LambdaInvoke(this, "writeTask", {
+                lambdaFunction: writeFunc,
+              }).next(
+                  new sfn.Succeed(this, "Report completed")
+              )
+          )
+      ),
+    });
+  }
+
+  defineRuleToInvokeAuth(machine: sfn.IStateMachine, n: number): Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("states:StartExecution");
     st1.addResources(machine.stateMachineArn);
@@ -70,29 +87,29 @@ export class MiscStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
       inlinePolicies: policies,
     });
-    return new events.Rule(this, 'threadRule', {
+    return new events.Rule(this, `machineRule${n}`, {
       schedule: events.Schedule.cron({ minute: '0' }),
       targets: [ new targets.SfnStateMachine(machine) ],
       role: ruleRole
     });
   }
 
-  defineRuleToInvokeLambda(lambda: lambda.IFunction): Rule {
+  defineRuleToInvokeReport(machine: sfn.IStateMachine, n: number): Rule {
     const st1 = new iam.PolicyStatement();
-    st1.addActions("lambda:InvokeFunction");
-    st1.addResources(lambda.functionArn);
+    st1.addActions("states:StartExecution");
+    st1.addResources(machine.stateMachineArn);
     const policies: Record<string, iam.PolicyDocument> = {
-      "policy_invoke_auth_thread": new iam.PolicyDocument({
+      "policy_invoke_report": new iam.PolicyDocument({
         statements: [st1]
       })
     };
-    const ruleRole = new iam.Role(this, "role_invoke_reports_thread", {
+    const ruleRole = new iam.Role(this, "role_invoke_report", {
       assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
       inlinePolicies: policies,
     });
-    return new events.Rule(this, 'reportRule', {
-      schedule: events.Schedule.cron({ minute: '0' }),
-      targets: [ new targets.LambdaFunction(lambda) ],
+    return new events.Rule(this, `machineRule${n}`, {
+      schedule: events.Schedule.cron({ minute: '30' }),
+      targets: [ new targets.SfnStateMachine(machine) ],
       role: ruleRole
     });
   }
@@ -161,11 +178,11 @@ export class MiscStack extends cdk.Stack {
       loggingParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters");
       loggingParameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/systemLogGroup*`);
       const loggingCloudWatch = new iam.PolicyStatement();
-      loggingCloudWatch.addActions("logs:PutLogEvents", "logs:CreateLogStream");
-      loggingCloudWatch.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:log-group:extstats-system:*`);
+      loggingCloudWatch.addActions("logs:PutLogEvents", "logs:CreateLogStream", "logs:CreateLogGroup");
+      loggingCloudWatch.addResources("*");
 
       policies[`policy_${name}_logging`] = new iam.PolicyDocument({
-        statements: [loggingParameters, loggingCloudWatch]
+        statements: [loggingCloudWatch]
       });
     }
     return new iam.Role(this, `role_${name}`, {
@@ -193,11 +210,13 @@ export class MiscStack extends cdk.Stack {
     this.lookupExternalResources();
 
     // the VPC endpoint is so that the Lambdas inside the VPC can see the parameter store which is public.
-    this.defineVpcEndpoints();
-    const threadFunction = this.defineLambda("auth_thread", "auththread.handler", ["bgg"], "public", 1);
-    const sm = this.defineStateMachine(threadFunction);
-    const rule = this.defineRuleToInvoke(sm);
-    const reportFunction = this.defineLambda("report", "report.handler", ["db","logging"], "private", 2);
-    const rule2 = this.defineRuleToInvokeLambda(reportFunction);
+    // this.defineVpcEndpoints();
+    const threadFunction = this.defineLambda("misc_auth_thread", "auththread.handler", ["bgg"], "public", 1);
+    const sm = this.defineAuthStateMachine(threadFunction);
+    const rule = this.defineRuleToInvokeAuth(sm, 1);
+    const reportFunction = this.defineLambda("misc_report_read", "report.handler", ["db"], "private", 2);
+    const writeFunction = this.defineLambda("misc_report_write", "report.write", ["logging"], "public", 3);
+    const sm2 = this.defineReportStateMachine(reportFunction, writeFunction);
+    const rule2 = this.defineRuleToInvokeReport(sm2, 2);
   }
 }
