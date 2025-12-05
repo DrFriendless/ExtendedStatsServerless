@@ -10,6 +10,7 @@ export async function loadSystem() {
 export class System {
     downloaderQueue: string;
     systemLogGroup: string;
+    playsQueue: string;
     ok: boolean;
 
     constructor() {
@@ -19,6 +20,7 @@ export class System {
     async loadSecrets(): Promise<System> {
         this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
         this.downloaderQueue = await this.getParameter("/extstats/downloader/queue");
+        this.playsQueue = await this.getParameter("/extstats/downloader/playsqueue");
         this.ok = true;
         return this;
     }

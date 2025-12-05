@@ -27,8 +27,6 @@ import {
     doMarkUrlUnprocessed,
     doProcessCollectionCleanup,
     doProcessGameResult,
-    doProcessPlayedMonths,
-    doProcessPlaysResult,
     doUpdateBGGTop50,
     doUpdateGamesForGeek,
     doUpdateMetadata,
@@ -36,11 +34,11 @@ import {
     doMarkGeekDoesNotExist,
     getGeeksThatDontExist, doUpdatePlaysForPeriod
 } from "./mysql-rds.mjs";
-import {invokeLambdaAsync, listAdd, sleep} from "./library.mjs";
+import {invokeLambdaAsync, listAdd, sendToQueue, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
-const OUTSIDE_PREFIX = "downloader-";
+const OUTSIDE_PREFIX = "downloader_";
 
 // method names from the database - this is the type of thing we have to do.
 const METHOD_PROCESS_USER = "processUser";
@@ -55,7 +53,6 @@ const METHOD_PROCESS_PUBLISHER = "processPublisher";
 const FUNCTION_PROCESS_USER = "processUser";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
 const FUNCTION_PROCESS_GAME = "processGame";
-const FUNCTION_PROCESS_PLAYED = "processPlayed";
 const FUNCTION_PROCESS_DESIGNER = "processDesigner";
 const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
 
@@ -117,7 +114,7 @@ async function scheduleProcessing(system: System, element: ToProcessElement) {
             endYmdInc: fs[1]
         } as PlaysToProcess;
         console.log(`scheduling processYear ${element.url}`);
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PLAYED, p2p);
+        await sendToQueue(system.playsQueue, p2p);
     } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
     } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {

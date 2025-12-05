@@ -1,6 +1,7 @@
 import mysql = require('promise-mysql');
 import {NormalisedPlays} from "./interfaces.mjs";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
+import {SendMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 
 export type PlaysRow = { game: number, playDate: string, quantity: number, location: string };
 
@@ -77,6 +78,19 @@ export function eqSet(as: Set<number>, bs: Set<number>): boolean {
     if (as.size !== bs.size) return false;
     for (const a of as) if (!bs.has(a)) return false;
     return true;
+}
+
+export async function sendToQueue(queueUrl: string, payload: any): Promise<void> {
+    const sqs = new SQSClient({ region: process.env.REGION });
+    const command = new SendMessageCommand({
+        QueueUrl: queueUrl,
+        MessageBody: JSON.stringify(payload)
+    });
+    try {
+        const resp = await sqs.send(command);
+    } catch (error) {
+        console.log(error);
+    }
 }
 
 export async function invokeLambdaAsync(func: string, payload: object): Promise<void> {

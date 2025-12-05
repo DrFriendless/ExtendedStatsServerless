@@ -29,7 +29,7 @@ export class DownloadStack extends cdk.Stack {
     return f;
   }
 
-  defineDownloaderRole(): iam.IRole {
+  defineDownloaderRole(outputQueue: sqs.IQueue): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
     bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
@@ -50,7 +50,14 @@ export class DownloadStack extends cdk.Stack {
     loggingCloudWatch.addResources("*");
 
     policies[`policy_downloader_logging`] = new iam.PolicyDocument({
-      statements: [loggingCloudWatch]
+      statements: [loggingParameters, loggingCloudWatch]
+    });
+
+    const sendToOutputQueue = new iam.PolicyStatement();
+    sendToOutputQueue.addActions("sqs:SendMessage");
+    sendToOutputQueue.addResources(outputQueue.queueArn);
+    policies[`policy_downloader_queue`] = new iam.PolicyDocument({
+      statements: [sendToOutputQueue]
     });
 
     const managedPolicies: iam.IManagedPolicy[] = [
@@ -90,7 +97,7 @@ export class DownloadStack extends cdk.Stack {
     const outputQueue = this.defineOutputQueue();
     const playsQueue = this.definePlaysQueue();
 
-    const role = this.defineDownloaderRole();
+    const role = this.defineDownloaderRole(outputQueue);
     let playsLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
       const f = this.defineLambda(spec.name, spec.handler, role, spec.maxConcurrency);
