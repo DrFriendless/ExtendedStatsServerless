@@ -89,9 +89,9 @@ export class ExtstatsApi {
         return (await (await fetch(`${this.baseUrl}/markForUpdate`, {
             headers: {
                 "Content-Type": "application/json",
-                "Accept": "application/json",
-                "body": JSON.stringify({ url }),
+                "Accept": "application/json"
             },
+            body: JSON.stringify({ url }),
             method: "POST"
         })).json()) as ToProcessElement;
     }
@@ -120,9 +120,9 @@ export class ExtstatsApi {
         return (await (await fetch(`${this.baseUrl}/query`, {
             headers: {
                 "Content-Type": "application/json",
-                "Accept": "application/json",
-                "body": JSON.stringify(query),
+                "Accept": "application/json"
             },
+            body: JSON.stringify(query),
             method: "POST"
         })).json()) as Collection | CollectionWithPlays | CollectionWithMonthlyPlays;
     }
@@ -132,8 +132,8 @@ export class ExtstatsApi {
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "body": JSON.stringify(query),
             },
+            body: JSON.stringify(query),
             method: "POST"
         })).json()) as MultiGeekPlays;
     }
