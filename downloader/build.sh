@@ -4,7 +4,8 @@ npm run build
 success=$?
 if [ $success -eq 0 ]; then
     zip -q downloader.zip -j dist/*
-    zip -q downloader.zip -r node_modules/@aws*
+    zip -q downloader.zip -r node_modules/@aws/*
+    zip -q downloader.zip -r node_modules/@aws-crypto/*
     zip -q downloader.zip -r node_modules/@smithy
     zip -q downloader.zip -r node_modules/extstats-*
     zip -q downloader.zip -r node_modules/fast-xml-parser

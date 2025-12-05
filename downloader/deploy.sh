@@ -7,26 +7,9 @@ export AWS="aws --region $AWS_REGION --profile drfriendless --output text --no-c
 # upload code to S3
 $AWS s3 cp $COMPONENT.zip s3://$DEPLOYMENT_BUCKET/
 
-function define_lambda() {
-  # https://docs.aws.amazon.com/cli/latest/reference/lambda/create-function.html
-  $AWS lambda create-function --function-name $1 --handler $2 --runtime $RUNTIME --role $INVOKE_LAMBDAS --timeout 60 --tags component=$COMPONENT --code S3Bucket=$DEPLOYMENT_BUCKET,S3Key=$COMPONENT.zip --publish
-  if [ "$?" -ne 0 ]; then
-    $AWS lambda update-function-code --function-name $1 --s3-bucket=$DEPLOYMENT_BUCKET --s3-key=$COMPONENT.zip --publish
-  fi
-}
-
-function define_long_lambda() {
-  # https://docs.aws.amazon.com/cli/latest/reference/lambda/create-function.html
-  $AWS lambda create-function --function-name $1 --handler $2 --runtime $RUNTIME --role $INVOKE_LAMBDAS --timeout 900 --tags component=$COMPONENT --code S3Bucket=$DEPLOYMENT_BUCKET,S3Key=$COMPONENT.zip --publish
-  if [ "$?" -ne 0 ]; then
-    $AWS lambda update-function-code --function-name $1 --s3-bucket=$DEPLOYMENT_BUCKET --s3-key=$COMPONENT.zip --publish
-  fi
-}
-
-define_lambda "downloader-processUserList" "functions.processUserList"
-define_lambda "downloader-processUser" "functions.processUser"
-define_lambda "downloader-processCollection" "functions.processCollection"
-define_lambda "downloader-processGame" "functions.processGame"
-define_long_lambda "downloader-processPlayed" "functions.processPlayed"
-
+# deploy the stack
+cdk deploy --profile drfriendless --require-approval never
+# tell the Lambdas to refresh from their code source, because CloudFront is too special to do that.
+cd lib
+npx ts-node --prefer-ts-exts ./post-stack.mts
 date

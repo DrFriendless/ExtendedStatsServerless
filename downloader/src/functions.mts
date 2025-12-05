@@ -1,4 +1,4 @@
-import {between} from "./library.mjs";
+import {between, sleep} from "./library.mjs";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
@@ -292,12 +292,13 @@ export async function processPlayed(invocation: PlaysToProcess) {
     let maxPages = 1000;
     let pageNum = 1;
     while (pageNum <= maxPages) {
+        if (pageNum > 1) await sleep(2000);
         const url = baseUrl + pageNum;
         const xml = await fetchXMLFromBGG(system.playsToken, url, invocation);
         if (!xml) {
             console.log(`didn't receive data on page ${pageNum}`);
-            console.log(xml);
-            break;
+            await dispatchSlowDown(system);
+            return;
         }
         const doc = parser.parse(xml);
         if (maxEntries === undefined) {
@@ -324,7 +325,6 @@ export async function processPlayed(invocation: PlaysToProcess) {
         }
         console.log(`Page ${pageNum} ${playCount}`);
         if (playCount === 0) break;
-        // await sleep(5000);
         pageNum++;
     }
     const result: ProcessPlaysForPeriodResult = {
