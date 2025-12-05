@@ -163,9 +163,9 @@ async function noMessages(system: System, howManyToDo: number, slowDowns: number
     if (slowDowns > 0) {
         const toDo = Math.min(slowDowns, 5);
         eaten = toDo;
-        console.log(`... sleeping for ${toDo} seconds due to ${slowDowns} slowdowns`);
+        console.log(`... sleeping for ${toDo * 2} seconds due to ${slowDowns} slowdowns`);
         slowDowns -= eaten;
-        await sleep(toDo * 1000);
+        await sleep(toDo * 2000);
     }
     if (slowDowns >= howManyToDo) return (eaten + howManyToDo);
     howManyToDo -= slowDowns;
