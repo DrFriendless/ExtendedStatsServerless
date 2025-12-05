@@ -954,11 +954,12 @@ export async function doRecordError(conn: mysql.Connection, message: string, sou
     }
 }
 
-async function getGeekId(conn: mysql.Connection, geek: string): Promise<number> {
+async function getGeekId(conn: mysql.Connection, geek: string): Promise<number | undefined> {
     const getIdSql = "select id from geeks where geeks.username = ?";
     const results = await conn.query(getIdSql, [geek]);
     if (!results || results.length === 0 || !results[0]) {
         console.log("No geek ID for " + geek);
+        return undefined;
     }
     return results[0]["id"];
 }
@@ -1006,6 +1007,7 @@ export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: Proce
         if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
     }
     const geekId = await getGeekId(conn, data.geek);
+    if (geekId === undefined) return;
     const expansionData = await loadExpansionData(conn); // 2.1 sec
     const notGames = await doEnsureGames(conn, gameIds);
     const now = new Date();

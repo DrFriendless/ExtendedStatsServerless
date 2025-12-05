@@ -14,6 +14,7 @@ export class System {
     logBucket: string;
     metadataFile: string;
     downloaderQueue: string;
+    playsQueue: string;
     usersFile: string;
     systemLogGroup: string;
     usersToken: string;
@@ -48,6 +49,9 @@ export class System {
                         break;
                     case `${path}/queue`:
                         this.downloaderQueue = p.Value;
+                        break;
+                    case `${path}/playsqueue`:
+                        this.playsQueue = p.Value;
                         break;
                 }
             }

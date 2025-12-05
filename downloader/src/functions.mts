@@ -33,6 +33,7 @@ import {isHttpResponse, loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 import {XMLParser} from "fast-xml-parser";
 import * as _ from 'lodash-es';
+import {DeleteMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 
 const MAX_GAMES_PER_CALL = 1000;
 
@@ -269,13 +270,18 @@ function splitCollection(original: ProcessCollectionResult): ProcessCollectionRe
         .map(items => { return { geek: original.geek, items: items }; });
 }
 
-export async function processPlayed(invocation: PlaysToProcess) {
-    console.log(invocation);
+interface QueueInput {
+    Records: {
+        receiptHandle: string;
+        body: string;
+        awsRegion: string;
+    }[]
+}
+
+export async function processPlayed(event: QueueInput) {
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
     await initLogging(system, "processPlayed");
-
-    const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${invocation.geek}&type=thing&mindate=${invocation.startYmdInc}&maxdate=${invocation.endYmdInc}&subtype=boardgame&page=`;
 
     const parser = new XMLParser({
         ignoreAttributes: false, trimValues: true,
@@ -287,56 +293,71 @@ export async function processPlayed(invocation: PlaysToProcess) {
             return false;
         }
     });
-    const plays: PlayData[] = [];
-    let maxEntries: number | undefined;
-    let maxPages = 1000;
-    let pageNum = 1;
-    while (pageNum <= maxPages) {
-        if (pageNum > 1) await sleep(2000);
-        const url = baseUrl + pageNum;
-        const xml = await fetchXMLFromBGG(system.playsToken, url, invocation);
-        if (!xml) {
-            console.log(`didn't receive data on page ${pageNum}`);
-            await dispatchSlowDown(system);
-            return;
-        }
-        const doc = parser.parse(xml);
-        if (maxEntries === undefined) {
-            maxEntries = parseInt(doc.plays['@_total']);
-            maxPages = Math.floor((maxEntries + 99)/100);
-            console.log(`maxEntries=${maxEntries} ${maxPages}`);
-        }
-        let playCount = 0;
-        if (!doc.plays || !doc.plays.play) {
-            console.log(`broken on page ${pageNum}`);
-            console.log(xml);
-            break;
-        }
-        for (const play of doc.plays.play) {
-            const p: PlayData = {
-                quantity: parseInt(play['@_quantity']),
-                location: play['@_location'],
-                date: play['@_date'],
-                gameid: parseInt(play.item['@_objectid']),
-                id: parseInt(play['@_id'])
+
+    console.log(event);
+    for (const record of event.Records) {
+        const invocation = JSON.parse(record.body);
+        const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${invocation.geek}&type=thing&mindate=${invocation.startYmdInc}&maxdate=${invocation.endYmdInc}&subtype=boardgame&page=`;
+        const plays: PlayData[] = [];
+        let maxEntries: number | undefined;
+        let maxPages = 1000;
+        let pageNum = 1;
+        while (pageNum <= maxPages) {
+            if (pageNum > 1) await sleep(2000);
+            const url = baseUrl + pageNum;
+            const xml = await fetchXMLFromBGG(system.playsToken, url, invocation);
+            if (!xml) {
+                console.log(`didn't receive data on page ${pageNum}`);
+                await dispatchSlowDown(system);
+                return;
             }
-            if (p.quantity > 0) plays.push(p);
-            playCount++;
+            const doc = parser.parse(xml);
+            if (maxEntries === undefined) {
+                maxEntries = parseInt(doc.plays['@_total']);
+                maxPages = Math.floor((maxEntries + 99)/100);
+                console.log(`maxEntries=${maxEntries} ${maxPages}`);
+            }
+            let playCount = 0;
+            if (!doc.plays || !doc.plays.play) {
+                console.log(`broken on page ${pageNum}`);
+                console.log(xml);
+                break;
+            }
+            for (const play of doc.plays.play) {
+                const p: PlayData = {
+                    quantity: parseInt(play['@_quantity']),
+                    location: play['@_location'],
+                    date: play['@_date'],
+                    gameid: parseInt(play.item['@_objectid']),
+                    id: parseInt(play['@_id'])
+                }
+                if (p.quantity > 0) plays.push(p);
+                playCount++;
+            }
+            console.log(`Page ${pageNum} ${playCount}`);
+            if (playCount === 0) break;
+            pageNum++;
         }
-        console.log(`Page ${pageNum} ${playCount}`);
-        if (playCount === 0) break;
-        pageNum++;
+        const result: ProcessPlaysForPeriodResult = {
+            processMethod: invocation.processMethod,
+            plays: plays,
+            geek: invocation.geek,
+            endYmdInc: invocation.endYmdInc,
+            startYmdInc: invocation.startYmdInc,
+            url: invocation.url
+        }
+        console.log(JSON.stringify(result));
+        await dispatchPlaysForPeriodResult(system, result);
+
+        // ack message
+        const sqsClient = new SQSClient({ region: record.awsRegion });
+        const command = new DeleteMessageCommand({
+            QueueUrl: system.playsQueue,
+            ReceiptHandle: record.receiptHandle
+        });
+        const response = await sqsClient.send(command);
+        console.log(response);
     }
-    const result: ProcessPlaysForPeriodResult = {
-        processMethod: invocation.processMethod,
-        plays: plays,
-        geek: invocation.geek,
-        endYmdInc: invocation.endYmdInc,
-        startYmdInc: invocation.startYmdInc,
-        url: invocation.url
-    }
-    console.log(JSON.stringify(result));
-    await dispatchPlaysForPeriodResult(system, result);
     await flushLogging();
 }
 
