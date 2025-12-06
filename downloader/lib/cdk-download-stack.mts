@@ -13,7 +13,7 @@ const RUNTIME = lambda.Runtime.NODEJS_22_X;
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 
 export class DownloadStack extends cdk.Stack {
-  defineLambda(name: string, handler: string, role: iam.IRole, maxConcurrency: number | undefined): lambda.Function {
+  defineLambda(name: string, handler: string, role: iam.IRole, duration: number, maxConcurrency: number | undefined): lambda.Function {
     const code = lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip");
     let opts: lambda.FunctionProps = {
       functionName: name,
@@ -21,7 +21,7 @@ export class DownloadStack extends cdk.Stack {
       handler,
       role: role,
       code: code,
-      timeout: Duration.seconds(60),
+      timeout: Duration.seconds(duration),
       reservedConcurrentExecutions: maxConcurrency
     }
     const f = new lambda.Function(this, name, opts);
@@ -100,7 +100,7 @@ export class DownloadStack extends cdk.Stack {
     const role = this.defineDownloaderRole(outputQueue);
     let playsLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
-      const f = this.defineLambda(spec.name, spec.handler, role, spec.maxConcurrency);
+      const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.maxConcurrency);
       if (spec.name.endsWith("_processPlayed")) playsLambda = f;
     }
     if (playsLambda) {

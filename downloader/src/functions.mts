@@ -286,7 +286,7 @@ export async function processPlayed(event: QueueInput) {
     const parser = new XMLParser({
         ignoreAttributes: false, trimValues: true,
         isArray: (name, jpath, isLeafNode, isAttribute) => {
-            if (["play","subtype"].indexOf(name) >= 0) return true;
+            if (["play","subtype","player","comments"].indexOf(name) >= 0) return true;
             if (["item","players","subtypes"].indexOf(name) >= 0) return false;
             if (name.startsWith("@_") || name.startsWith("?")) return false;
             console.log(name);
@@ -303,11 +303,11 @@ export async function processPlayed(event: QueueInput) {
         let maxPages = 1000;
         let pageNum = 1;
         while (pageNum <= maxPages) {
-            if (pageNum > 1) await sleep(2000);
+            await sleep(2000);
             const url = baseUrl + pageNum;
             const xml = await fetchXMLFromBGG(system.playsToken, url, invocation);
             if (!xml) {
-                console.log(`didn't receive data on page ${pageNum}`);
+                console.log(`Slowdown on page ${pageNum}`);
                 await dispatchSlowDown(system);
                 return;
             }
@@ -317,6 +317,7 @@ export async function processPlayed(event: QueueInput) {
                 maxPages = Math.floor((maxEntries + 99)/100);
                 console.log(`maxEntries=${maxEntries} ${maxPages}`);
             }
+            if (maxEntries === 0) break;
             let playCount = 0;
             if (!doc.plays || !doc.plays.play) {
                 console.log(`broken on page ${pageNum}`);

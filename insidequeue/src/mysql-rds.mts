@@ -1001,7 +1001,7 @@ export async function doProcessPlayedMonths(conn: mysql.Connection, geek: string
 }
 
 export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: ProcessPlaysForPeriodResult) {
-    console.log(data.geek, data.startYmdInc, data.endYmdInc);
+    // console.log(data.geek, data.startYmdInc, data.endYmdInc);
     const gameIds = [];
     for (const play of data.plays) {
         if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
