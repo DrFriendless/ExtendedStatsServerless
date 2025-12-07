@@ -347,7 +347,6 @@ export async function processPlayed(event: QueueInput) {
             startYmdInc: invocation.startYmdInc,
             url: invocation.url
         }
-        console.log(JSON.stringify(result));
         await dispatchPlaysForPeriodResult(system, result);
 
         // ack message

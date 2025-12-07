@@ -12,6 +12,7 @@ export async function loadSystem() {
 
 export class System {
     logBucket: string;
+    cacheBucket: string;
     metadataFile: string;
     downloaderQueue: string;
     playsQueue: string;
@@ -52,6 +53,9 @@ export class System {
                         break;
                     case `${path}/playsqueue`:
                         this.playsQueue = p.Value;
+                        break;
+                    case `${path}/cache`:
+                        this.cacheBucket = p.Value;
                         break;
                 }
             }

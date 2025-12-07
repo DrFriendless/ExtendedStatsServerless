@@ -1,6 +1,7 @@
 // methods to send data to the Inside module
 
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { log } from "./logging.mjs";
 
 const INSIDE_PREFIX = "inside-dev-";
@@ -98,9 +99,29 @@ export async function dispatchProcessCleanUpCollection(system: System, params: C
     await sendToDownloaderQueue(system, { discriminator: "CleanUpCollectionMessage", params }, params.url);
 }
 
+async function saveToCache(system: System, key: string, body: string) {
+    const now = new Date();
+    now.setDate(now.getDate() + 180);
+    const client = new S3Client({ region: process.env.AWS_REGION });
+    const command = new PutObjectCommand({
+        Bucket: system.cacheBucket,
+        Key: key,
+        Body: body,
+        ContentType: "application/json",
+        Expires: now,
+    });
+    try {
+        const response = await client.send(command);
+        console.log(response);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 export async function dispatchPlaysForPeriodResult(system: System, result: ProcessPlaysForPeriodResult): Promise<void> {
     const b = JSON.stringify(result).length;
     if (b > 260000) {
+        await saveToCache(system, `${result.geek}=${result.startYmdInc}=${result.endYmdInc}.json`, JSON.stringify(result));
         // break this time period up into multiple.
         const dates: number[] = [];
         const countByDate: Record<string, number> = {};

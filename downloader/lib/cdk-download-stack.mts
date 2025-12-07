@@ -6,13 +6,21 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as sources from "aws-cdk-lib/aws-lambda-event-sources";
-import {COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS} from "./metadata.mts";
+import {COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS, CACHE_BUCKET} from "./metadata.mts";
+import {BlockPublicAccess} from "aws-cdk-lib/aws-s3";
 
 const RUNTIME = lambda.Runtime.NODEJS_22_X;
 
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 
 export class DownloadStack extends cdk.Stack {
+  defineCacheBucket(name: string): s3.Bucket {
+    return new s3.Bucket(this, "cacheBucket", {
+      bucketName: name,
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+    });
+  }
+
   defineLambda(name: string, handler: string, role: iam.IRole, duration: number, maxConcurrency: number | undefined): lambda.Function {
     const code = lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip");
     let opts: lambda.FunctionProps = {
@@ -60,6 +68,13 @@ export class DownloadStack extends cdk.Stack {
       statements: [sendToOutputQueue]
     });
 
+    const useCacheBucket = new iam.PolicyStatement();
+    useCacheBucket.addActions("s3:PutObject", "s3:DeleteObject", "s3:GetObject", "s3:ListBucket");
+    useCacheBucket.addResources(`arn:aws:s3:*:${process.env.CDK_DEFAULT_ACCOUNT}:${CACHE_BUCKET}/*`);
+    policies[`policy_cache_bucket`] = new iam.PolicyDocument({
+      statements: [useCacheBucket]
+    });
+
     const managedPolicies: iam.IManagedPolicy[] = [
       iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s", "CreateEC2sForLambda"),
       iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs", "WriteToCloudwatchLogs"),
@@ -94,6 +109,7 @@ export class DownloadStack extends cdk.Stack {
     super(scope, id, props);
     this.lookupExternalResources();
 
+    const cacheBucket = this.defineCacheBucket(CACHE_BUCKET);
     const outputQueue = this.defineOutputQueue();
     const playsQueue = this.definePlaysQueue();
 
@@ -118,6 +134,10 @@ export class DownloadStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'downloaderPlaysQueue', {
       value: playsQueue.queueUrl,
       exportName: 'downloader-PlaysQueueURL'
+    });
+    new cdk.CfnOutput(this, 'downloaderCache', {
+      value: cacheBucket.bucketArn,
+      exportName: 'downloader-cacheBucketARN'
     });
   }
 }

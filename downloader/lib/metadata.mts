@@ -1,6 +1,7 @@
 // data shared by both the CDK script and the post-stack SDK script.
 
 export const DEPLOYMENT_BUCKET = "extstats-deployment";
+export const CACHE_BUCKET = "extstats-cache";
 export const COMPONENT = "downloader";
 export const REGION = "ap-southeast-2";
 export const PROFILE = "drfriendless";

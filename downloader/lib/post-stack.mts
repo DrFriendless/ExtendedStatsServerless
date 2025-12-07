@@ -75,6 +75,17 @@ for (const e of response.Exports) {
         });
         const r3 = await lClient.send(lCmd);
         console.log(r3.$metadata.httpStatusCode);
+    } else if (e.Name === "downloader-cacheBucketARN") {
+        // turn on the plays lambda processing from the plays queue
+        console.log("Turning on plays queue");
+        const ssmCmd = new PutParameterCommand({
+            Name: "/extstats/downloader/cache",
+            Value: e.Value,
+            Overwrite: true,
+            Type: "String"
+        });
+        const r3 = await lClient.send(ssmCmd);
+        console.log(r3.$metadata.httpStatusCode);
     } else {
         console.log(e.Name);
     }
