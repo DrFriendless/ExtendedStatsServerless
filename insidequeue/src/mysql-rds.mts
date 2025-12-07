@@ -572,12 +572,12 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
 }
 
 async function doListToProcessAll(conn: mysql.Connection, count: number): Promise<ToProcessElement[]> {
-    const sql = "select * from files where (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 10) limit ?";
+    const sql = "select * from files where (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 1440) limit ?";
     return (await conn.query(sql, [count])).map((row: ToProcessElement) => row);
 }
 
 async function doListToProcessByMethod(conn: mysql.Connection, count: number, processMethods: string[]): Promise<ToProcessElement[]> {
-    const sql = "select * from files where processMethod in (?) and (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 15) limit ?";
+    const sql = "select * from files where processMethod in (?) and (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 1440) limit ?";
     return (await conn.query(sql, [processMethods, count])).map((row: ToProcessElement) => row);
 }
 
@@ -1003,6 +1003,7 @@ export async function doProcessPlayedMonths(conn: mysql.Connection, geek: string
 export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: ProcessPlaysForPeriodResult) {
     // console.log(data.geek, data.startYmdInc, data.endYmdInc);
     const gameIds = [];
+    if (data.plays.includes(null)) return;
     for (const play of data.plays) {
         if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
     }
@@ -1012,6 +1013,7 @@ export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: Proce
     const notGames = await doEnsureGames(conn, gameIds);
     const now = new Date();
     const end = parseYmd(data.endYmdInc);
+    if (!end) return;
     const daysSince = (now.getTime() - end.getTime())/1000 / 1440;
     const playsMonths: { y: number, m: number}[] = [];
     await doSetGeekPlaysForYear(conn, geekId, data.startYmdInc, data.endYmdInc, data.plays, notGames, playsMonths);

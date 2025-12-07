@@ -15,20 +15,17 @@ export async function invokeLambdaAsync(func: string, payload: object): Promise<
     }
 }
 
-export async function invokeLambdaSync(func: string, payload: object): Promise<object> {
-    const lambda = new LambdaClient({ region: process.env.REGION });
-    const command = new InvokeCommand({
-        FunctionName: func,
-        Payload: JSON.stringify(payload),
-        InvocationType: "RequestResponse"
-    });
-    try {
-        const data = await lambda.send(command);
-        console.log(data);
-        return data.Payload;
-    } catch (error) {
-        console.log(error);
-    }
+export function splitYmd(ymd: string): { y: number; m: number; d: number } {
+    const f = ymd.split("-");
+    if (f.length !== 3) return undefined;
+    const y = parseInt(f[0]);
+    const m = parseInt(f[1]);
+    const d = parseInt(f[2]);
+    return { y, m, d };
+}
+
+export function toYMDString(y: number, m: number, d: number): string {
+    return y.toString() + (m < 10 ? "0" + m : m) + (d < 10 ? "0" + d : d);
 }
 
 export function between(s: string, before: string, after: string): string {

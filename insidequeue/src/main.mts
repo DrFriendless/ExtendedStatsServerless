@@ -216,7 +216,7 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
     // make sure played games are in the database as well.
     const playeds: number[][] = processedMessages
         .filter(m => m.discriminator === "PlaysForPeriodResultMessage")
-        .map(m => (m.payload as PlaysForPeriodResultMessage).plays.plays.map(pd => pd.gameid));
+        .map(m => (m.payload as PlaysForPeriodResultMessage).plays.plays.filter(pd => !!pd).map(pd => pd.gameid));
     if (ensures.length > 0 || playeds.length > 0) {
         let ids: number[] | undefined;
         for (const e of ensures) {
