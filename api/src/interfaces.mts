@@ -164,15 +164,32 @@ export interface RawPlaysQueryResult {
     location: string;
 }
 
-export interface UsersTableRow {
-    colour: number;
-    configuration: string;
+export interface SignupTaskData {
+    type: "signup";
+}
+export interface ChangePasswordTaskData {
+    type: "changePassword";
+    password: string;
+}
+
+export type TaskData = SignupTaskData | ChangePasswordTaskData;
+
+export interface AuthTask {
+    id: number;
     created: Date;
-    icon: number;
-    identity: string;
-    lastLogin: Date;
-    loginCount: number;
     username: string;
+    code: string;
+    task: TaskData;
+}
+
+export interface AuthTableRow {
+    configuration: any;
+    created: Date;
+    status: string;
+    username: string;
+    lastLogin?: Date;
+    loginCount: number;
+    password: string;
 }
 
 export interface GeekGamesTableRow {

@@ -58,6 +58,15 @@ export class System {
             if (connection) connection.destroy();
         }
     }
+
+    async asyncWithConnection(func: (conn: mysql.Connection) => PromiseLike<void>): Promise<void> {
+        const connection = await this.getConnection();
+        try {
+            await func(connection);
+        } finally {
+            if (connection) connection.destroy();
+        }
+    }
 }
 
 export interface HttpResponse {

@@ -239,10 +239,27 @@ export class ExtstatsApi {
     async logout(): Promise<string> {
         return (await (await fetch(`${this.baseUrl}/logout`, {
             headers: {
-                "Content-Type": "application/json",
                 "Accept": "application/json",
             },
             method: "POST"
         })).json()) as string;
+    }
+
+    async getPersonalData(): Promise<any> {
+        return (await (await fetch(`${this.baseUrl}/personal`, {
+            headers: {
+                "Accept": "application/json",
+            }
+        })).json()) as string;
+    }
+
+    async updatePersonalData(data: any): Promise<void> {
+        await fetch(`${this.baseUrl}/updatePersonal`, {
+            headers: {
+                "Content-Type": "application/json",
+            },
+            "body": JSON.stringify(data),
+            method: "POST"
+        });
     }
 }

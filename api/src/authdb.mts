@@ -1,38 +1,23 @@
 import {System} from "./system.mjs";
+import {AuthTableRow, AuthTask, TaskData} from "./interfaces.mjs";
 
-export interface Auth {
-    created: Date;
-    username: string;
-    password: string;
-    status: 'CONFIRMED' | 'WAITING';
+export async function incrementLogin(system: System, username: string): Promise<void> {
+    const sql = "update auth set loginCount = loginCount + 1 where username = ?";
+    await system.asyncWithConnection(conn => conn.query(sql, [ username ]));
 }
 
-export interface SignupTaskData {
-    type: "signup";
-}
-export interface ChangePasswordTaskData {
-    type: "changePassword";
-    password: string;
+export async function doUpdateUserConfig(system: System, username: string, userConfig: any) {
+    const updateSql = "update auth set configuration = ? where username = ?";
+    await system.asyncWithConnection(conn => conn.query(updateSql, [JSON.stringify(userConfig), username]));
 }
 
-type TaskData = SignupTaskData | ChangePasswordTaskData;
-
-export interface AuthTask {
-    id: number;
-    created: Date;
-    username: string;
-    code: string;
-    task: TaskData;
-}
-
-export async function loadAuth(system: System, username: string): Promise<Auth | undefined> {
-    const sql = "select username, password, status, created from auth where username = ?";
-    console.log(`loadAuth ${username}`);
+export async function loadAuth(system: System, username: string): Promise<AuthTableRow | undefined> {
+    const sql = "select username, password, status, created, configuration, lastLogin, loginCount from auth where username = ?";
     return system.asyncReturnWithConnection(async conn => {
         const matches = await conn.query({ sql, values: [ username ] }) as object[];
         console.log(matches);
         if (matches.length === 0) return undefined;
-        return matches[0] as Auth;
+        return matches[0] as AuthTableRow;
     });
 }
 
@@ -56,8 +41,8 @@ export async function loadAuthTask(system: System, username: string, code: strin
     });
 }
 
-export async function createAuth(system: System, auth: Auth): Promise<boolean> {
-    const sql = "insert into auth (username, password, status, created) values (?, ?, ?, ?)";
+export async function createAuth(system: System, auth: AuthTableRow): Promise<boolean> {
+    const sql = "insert into auth (username, password, status, created, loginCount) values (?, ?, ?, ?, 0)";
     return system.asyncReturnWithConnection(async conn => {
         await conn.query({ sql, values: [ auth.username, auth.password, auth.status, auth.created ] });
         return true;

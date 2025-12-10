@@ -1,20 +1,20 @@
-import { Decoded, UserData, PersonalData, UserConfig } from "extstats-core";
+import { UserData } from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {getCookiesFromHeader} from "./library.mjs";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
-import {findOrCreateUser, findUser, retrieveAllData, updateUser} from "./users.mjs";
 import utf8 from 'utf8';
 import {scryptSync} from "node:crypto";
 import {
-    AuthTask, confirmChangePassword,
+    confirmChangePassword,
     confirmSignup,
     createAuth,
     createAuthTask,
-    deleteAuth, deleteAuthTask,
+    deleteAuth, deleteAuthTask, doUpdateUserConfig, incrementLogin,
     loadAuth,
     loadAuthTask,
     loadAuthTasks
 } from "./authdb.mjs";
+import {AuthTask} from "./interfaces.mjs";
 
 const COST = 4096;
 const SALT_LENGTH = 22;
@@ -70,9 +70,11 @@ export async function login(event: APIGatewayProxyEvent): Promise<HttpResponse> 
             body: JSON.stringify({ state: "WRONG_PASSWORD" })
         }
     }
+
     const cookie = makeCookie(username, event.headers.origin.includes("://localhost:"));
-    const userData = await getUserDataForID(system, username);
-    return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: JSON.stringify(userData || {}) };
+    await incrementLogin(system, username);
+    const userData = await getUserDataForUsername(system, username);
+    return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: JSON.stringify(userData) };
 }
 
 function makeid(length: number): string {
@@ -164,7 +166,7 @@ export async function signup(event: APIGatewayProxyEvent) {
         }
     }
     const hash = hashPassword(password);
-    await createAuth(system, { username, password: hash, status: "WAITING", created: new Date() });
+    await createAuth(system, { username, password: hash, status: "WAITING", created: new Date(), loginCount: 0, configuration: {} });
     const b = {
         code: makeid(12)
     }
@@ -189,15 +191,11 @@ export async function updatePersonal(event: APIGatewayProxyEvent) {
     if (isHttpResponse(system)) return system;
 
     const cookies = getCookiesFromHeader(event.headers);
-    const headers = {
-        "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
-        "Access-Control-Allow-Credentials": true
-    };
     if (cookies['extstatsid']) {
-        await updateUser(system, cookies['extstatsid'], JSON.parse(event.body) as UserConfig);
-        return { statusCode: 200, headers };
+        await doUpdateUserConfig(system, cookies['extstatsid'], JSON.parse(event.body || "{}"));
+        return { statusCode: 200 };
     } else {
-        return { statusCode: 403, headers };
+        return { statusCode: 403 };
     }
 }
 
@@ -228,35 +226,30 @@ export async function confirm(event: { Payload: {id: string, username: string, c
     return event.Payload;
 }
 
-async function getUserData(system: System, decoded: Decoded): Promise<UserData> {
-    const user = await findOrCreateUser(system, decoded.sub, decoded.nickname);
-    return { jwt: decoded, first: user.isFirstLogin(), config: user.getConfig(), userName: user.getUsername() } as UserData;
-}
-
-async function getUserDataForID(system: System, sub: string): Promise<UserData | undefined> {
-    const user = await findUser(system, sub);
+async function getUserDataForUsername(system: System, username: string): Promise<UserData | undefined> {
+    const user = await loadAuth(system, username);
     if (user) {
-        return { first: user.isFirstLogin(), config: user.getConfig(), userName: user.getUsername() } as UserData;
+        return { config: user.configuration, userName: user.username, created: user.created,
+            loginCount: user.loginCount, lastLogin: user.lastLogin } as UserData;
     } else {
         return undefined;
     }
 }
 
-async function getPersonalDataForID(system: System, sub: string): Promise<PersonalData> {
-    const userData = await getUserDataForID(system, sub);
-    const allData = await retrieveAllData(system, sub);
-    return { userData, allData, error: undefined };
-}
+export async function personal(event: APIGatewayProxyEvent): Promise<HttpResponse> {
+    console.log(event);
+    const system = await findSystem();
+    console.log(system);
+    if (isHttpResponse(system)) return system;
 
-export async function personal(system: System, event: APIGatewayProxyEvent): Promise<HttpResponse> {
     const cookies = getCookiesFromHeader(event.headers);
     if (cookies['extstatsid']) {
-        const body = JSON.stringify(await getPersonalDataForID(system, cookies['extstatsid']));
-        const headers = {
-            "Access-Control-Allow-Origin": "https://extstats.drfriendless.com",
-            "Access-Control-Allow-Credentials": true
-        };
-        return { "statusCode": 200, body, headers };
+        const user = await loadAuth(system, cookies['extstatsid']);
+        if (!user) {
+            return { "statusCode": 403, body: "{}" };
+        } else {
+            return { "statusCode": 200, body: user.configuration };
+        }
     } else {
         return { "statusCode": 403, body: "{}" };
     }
