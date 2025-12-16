@@ -1,6 +1,6 @@
 import { UserData } from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
-import {getCookiesFromHeader} from "./library.mjs";
+import {getCookiesFromEvent} from "./library.mjs";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 import utf8 from 'utf8';
 import {scryptSync} from "node:crypto";
@@ -15,6 +15,7 @@ import {
     loadAuthTasks
 } from "./authdb.mjs";
 import {AuthTask} from "./interfaces.mjs";
+import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 
 const COST = 4096;
 const SALT_LENGTH = 22;
@@ -185,12 +186,13 @@ export async function logout(event: APIGatewayProxyEvent): Promise<HttpResponse>
     return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: JSON.stringify({}) };
 }
 
-export async function updatePersonal(event: APIGatewayProxyEvent) {
+export async function updatePersonal(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
 
-    const cookies = getCookiesFromHeader(event.headers);
+    const cookies = getCookiesFromEvent(event);
+    console.log(cookies);
     if (cookies['extstatsid']) {
         await doUpdateUserConfig(system, cookies['extstatsid'], JSON.parse(event.body || "{}"));
         return { statusCode: 200 };
@@ -236,19 +238,17 @@ async function getUserDataForUsername(system: System, username: string): Promise
     }
 }
 
-export async function personal(event: APIGatewayProxyEvent): Promise<HttpResponse> {
-    console.log(event);
+export async function personal(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
     const system = await findSystem();
-    console.log(system);
     if (isHttpResponse(system)) return system;
 
-    const cookies = getCookiesFromHeader(event.headers);
+    const cookies = getCookiesFromEvent(event);
     if (cookies['extstatsid']) {
         const user = await loadAuth(system, cookies['extstatsid']);
         if (!user) {
             return { "statusCode": 403, body: "{}" };
         } else {
-            return { "statusCode": 200, body: user.configuration };
+            return { "statusCode": 200, body: user.configuration || "{}" };
         }
     } else {
         return { "statusCode": 403, body: "{}" };

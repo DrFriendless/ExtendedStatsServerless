@@ -1,4 +1,5 @@
 import * as mysql from 'promise-mysql';
+import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 
 export async function count(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
     return (await conn.query(sql, params))[0]["count(*)"];
@@ -37,20 +38,17 @@ export async function getGeekIds(conn: mysql.Connection, geeks: string[]): Promi
 /**
  * Receives an array of headers and extract the value from the cookie header
  */
-export function getCookiesFromHeader(headers: { [name: string]: string }): Record<string, string> {
-    if (!headers || !headers.Cookie) {
-        return {};
-    }
+export function getCookiesFromEvent(event: APIGatewayProxyEventV2WithRequestContext<any>): Record<string, string> {
+    if (!event || !event.cookies) return {};
     // Split a cookie string in an array (Originally found http://stackoverflow.com/a/3409200/1427439)
     const list: Record<string, string> = {};
-    const rc = headers.Cookie;
-    rc && rc.split(';').forEach(function( cookie ) {
+    for (const cookie of event.cookies) {
         const parts = cookie.split('=');
         const key = parts.shift().trim();
         const value = decodeURI(parts.join('='));
         if (key !== '') {
             list[key] = value;
         }
-    });
+    }
     return list;
 }

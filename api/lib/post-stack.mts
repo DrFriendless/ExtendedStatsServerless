@@ -1,4 +1,10 @@
-import {LambdaClient, UpdateFunctionCodeCommand} from "@aws-sdk/client-lambda";
+import {
+    DeleteFunctionCommand,
+    LambdaClient,
+    ListFunctionsCommand,
+    ListVersionsByFunctionCommand,
+    UpdateFunctionCodeCommand
+} from "@aws-sdk/client-lambda";
 import {
     CloudWatchLogsClient,
     DescribeLogGroupsCommand,
@@ -17,8 +23,9 @@ async function updateCode(client: LambdaClient, funcName: string) {
     console.log(`${r.FunctionArn} ${r.LastModified}`);
 }
 
+const CREDENTIALS = { region: REGION, profile: PROFILE };
 // poke the lambdas to tell them they may have new code
-const lClient = new LambdaClient({ region: REGION, profile: PROFILE });
+const lClient = new LambdaClient(CREDENTIALS);
 for (const spec of LAMBDA_SPECS) {
     await updateCode(lClient, spec.name);
 }
@@ -42,6 +49,16 @@ for (const g2 of gs2.logGroups) {
     console.log(r.$metadata.httpStatusCode, g2.logGroupName);
 }
 
-// Look up the log groups with DescribeLogGroups.
-//     Filter by setting logGroupNamePrefix: "/aws/codebuild/MyPipeline".
-//     Invoke PutRetentionPolicy for each log group name.
+const functionsCommand = new ListFunctionsCommand();
+const fs = await lClient.send(functionsCommand);
+for (const f of fs.Functions) {
+    const versionsCommand = new ListVersionsByFunctionCommand({ FunctionName: f.FunctionName });
+    const vs = await lClient.send(versionsCommand);
+    for (const v of vs.Versions) {
+        if (v.Version !== f.Version) {
+            const deleteCommand = new DeleteFunctionCommand({ FunctionName: v.FunctionArn });
+            const r = await lClient.send(deleteCommand);
+            console.log(r.$metadata.httpStatusCode, v.FunctionArn );
+        }
+    }
+}
