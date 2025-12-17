@@ -41,7 +41,12 @@ export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Pr
     } else {
         rows = await conn.query(sqlMany, [ids]);
     }
-    return rows.map((row: RawGameData) => extractGameData(row, expansions));
+    const index: Record<number, ExtractedGameData> = {};
+    rows.forEach((row: RawGameData) => {
+        const r = extractGameData(row, expansions);
+        index[r.bggid] = r;
+    });
+    return ids.map(id => index[id]);
 }
 
 function extractGameData(row: RawGameData, expansionData: ExpansionData): ExtractedGameData {

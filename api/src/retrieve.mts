@@ -104,6 +104,7 @@ function buildPlaysWithDateType(loaders: Loaders, gameDataType: GraphQLObjectTyp
     return new graphql.GraphQLObjectType({
         name: "PlaysWithDate",
         fields: {
+            id: { type: graphql.GraphQLInt! },
             geek: { type: graphql.GraphQLString! },
             year: { type: graphql.GraphQLInt! },
             month: { type: graphql.GraphQLInt! },
@@ -129,7 +130,8 @@ const VarBindingInputType = new GraphQLInputObjectType({
     }
 });
 
-function buildMultiGeekPlaysType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<ExtendedGeekGame>, playsWithDateType: GraphQLObjectType<PlaysWithDate>) {
+function buildMultiGeekPlaysType(gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<ExtendedGeekGame>,
+                                 playsWithDateType: GraphQLObjectType<PlaysWithDate>) {
     return new GraphQLObjectType({
         name: "MultiGeekPlays",
         fields: {
@@ -190,7 +192,8 @@ function buildMonthlyPlaysType(loaders: Loaders, gameDataType: GraphQLObjectType
     });
 }
 
-function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>, geekGameType: GraphQLObjectType<ExtendedGeekGame>) {
+function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>,
+                                        geekGameType: GraphQLObjectType<ExtendedGeekGame>) {
     return new GraphQLObjectType({
         name: "MonthlyPlaysAndCounts",
         fields: {
@@ -408,7 +411,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
                 console.log("No user found for " + row.geek);
                 continue;
             }
-            const pwd: RetrievePlay = { bggid: row.bggid, quantity: row.quantity, ymd: row.ymd, year: row.year, month: row.month,
+            const pwd: RetrievePlay = { id: row.id, bggid: row.bggid, quantity: row.quantity, ymd: row.ymd, year: row.year, month: row.month,
                 day: row.date, geek: username, expansions: [], location: row.location || "" };
             basePlays.push(pwd);
             playsById[row.id] = pwd;

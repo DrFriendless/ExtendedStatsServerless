@@ -17,6 +17,7 @@ export interface GeekGameRow {
 }
 
 export interface RetrievePlay {
+    id: number;
     bggid: number;
     quantity: number;
     ymd: number;
