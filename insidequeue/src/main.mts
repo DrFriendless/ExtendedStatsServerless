@@ -144,8 +144,9 @@ async function updatePlayedYears(system: System, geek: string, geekid: number, f
     for (const p of periods) {
         const range = `${p.start}=${p.end}=${geek}`;
         if (index.includes(range)) continue;
-        const insertSql = "insert into files (url, processMethod, geek, geekid, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?, ?)";
-        const insertParams = [range, "processYear", geek, geekid, null, null, `Plays from ${p.start} until ${p.end}`, 0];
+        const year = parseInt(p.start.substring(0, 4));
+        const insertSql = "insert into files (url, processMethod, geek, geekid, lastupdate, tillNextUpdate, description, bggid, year) values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        const insertParams = [range, "processYear", geek, geekid, null, null, `Plays from ${p.start} until ${p.end}`, 0, year];
         await system.withConnectionAsync(async conn => await conn.query(insertSql, insertParams));
     }
     const nextUpdate = new Date();
