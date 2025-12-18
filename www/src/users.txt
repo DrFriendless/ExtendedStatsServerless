@@ -93,7 +93,6 @@ SybotCB
 sborton
 Unco
 gerald
-spart02
 psychonaut
 bazik123
 seppo21
@@ -344,7 +343,6 @@ fargus9
 Blind Reality
 cggritt
 jonjac
-gamefool
 baychang
 rooboomr
 rkalajian
@@ -613,7 +611,6 @@ sleip
 Phrim
 okiedokie
 jrachfal
-SaburoChaos
 opticode
 sbass
 adam.skinner
@@ -664,7 +661,6 @@ Purple
 emike
 andreww
 sa266
-Michael Becker
 martinstever
 Ceryon
 Heather Drake
@@ -836,7 +832,6 @@ alex1326
 ber1t
 Almecho
 FrozenHoHos
-Quarashi
 nordlead
 polycrafty
 jelliot
@@ -857,7 +852,6 @@ macabee
 nogser
 kleric42
 HilkMAN
-KlydeFrog
 EuropaExpress
 Phoenix010
 jumatake
@@ -899,7 +893,6 @@ MrUnicorn
 fograsher
 Molmo
 giochi corsari
-HHarengel
 joaoespanhol
 darthnice
 timstellmach
@@ -993,7 +986,6 @@ entranced
 jgag
 Stephan Valkyser
 kneumann
-lclaudius
 Thiessi
 stormrover
 KTPrymus
@@ -1038,7 +1030,6 @@ kettch
 SaraCV
 jaiden0
 voynitsky
-mrfunk
 Pennincao
 hxbx
 ThatFedoraGuy
@@ -1118,15 +1109,12 @@ MrBaggy
 nnf1
 Oiler
 Ozludo
-Patriachakai
 Paul65
-PBrennan
 Peptis
 petegs
 Phil81
 prd1982
 psmaylott
-pusboyau
 randomninja
 regor
 revgiblet
@@ -1167,7 +1155,6 @@ Mohrlock
 Benzy311
 aih
 polychrotid
-jamesmckane
 Boromir_and_Kermit
 Spadoinkle
 Shacky22
@@ -1245,7 +1232,6 @@ hali
 rustylantern
 FinalAttack
 Sorrellbo
-consolewa
 Zwecklos
 cavanor
 topkat
@@ -1254,7 +1240,6 @@ Misfits
 louism
 ianoble
 melissalindsey
-djdano
 Deinos
 AnnaRadresa
 Rollon_Stonecrusher
@@ -1319,7 +1304,6 @@ shigadeyo
 mmccalpin
 mikolajl
 Oersted
-sufertashu
 Jk_W
 pincao
 MillertimeRC
@@ -1413,7 +1397,6 @@ chrisdr
 tumorous
 dpyoung
 Ryanmobile
-max_s
 chang1701
 saccenti
 Kempeth
@@ -1423,7 +1406,6 @@ callow
 Synnical77
 mniezgoda
 oi_you_nutter
-Typpo
 piernaslocas
 Haschim
 spritey
@@ -1433,7 +1415,6 @@ kyanna
 SimonSes
 thisaliensean
 Orca_au
-kinkykone
 Coolmew
 LtGoose
 shonagladman
@@ -1513,7 +1494,6 @@ farmeriusz
 zbajszek
 cactusse
 van00uber
-nebyeh
 kirkbauer
 Amuk
 mjdart
@@ -1530,7 +1510,6 @@ Wilco
 FortArt
 grasa_total
 lbleicher
-fagvalo
 rivaben
 igorknop
 alisonarantes
@@ -1566,7 +1545,6 @@ Ebbe
 dazeysan
 TGCRequiem
 ptm_junk
-MungSu
 Catch 22
 ychor
 bobondi
@@ -1673,7 +1651,6 @@ Recistor
 jostrand
 Spielguy
 anubis9
-jurney85
 wavedog98
 HuggableHamster
 libonati
@@ -1734,7 +1711,6 @@ tomusher
 moramis
 DarthEd
 CindyGames
-seththedog
 fdevans
 froeschli
 Arkeas
@@ -1755,7 +1731,6 @@ live4fun
 Shem_Whistler
 realnewton
 Glash
-N0Tgod
 aigimig
 Archonium
 plezercruz
@@ -1867,7 +1842,6 @@ Ruud2009
 DaveM1
 vdbmalmsteen
 UsanaChris
-mkmccarty
 deev42
 ecargo
 boplicity
@@ -1928,8 +1902,6 @@ akirmse
 JesseW
 LazyPapa
 craw-daddy
-johnkfriday
-Huabear
 mynameisfourteen
 dawue
 joeincolorado
@@ -1952,7 +1924,6 @@ leemc13
 gerambolosch
 Cyol
 kevetoile
-www_Mischraum_de
 pickboy87
 bneffer
 anto
@@ -2003,7 +1974,6 @@ cova88
 marianoth
 Benga
 LookyRo
-Phil Bordelon
 benji68
 IamJacksUsername
 MrShep
@@ -2036,7 +2006,6 @@ Lancelot42
 WhiteWalker
 KoolKow
 nicknack
-dtcarson
 Autopiloot
 Maitreya
 gnarly717
@@ -2051,7 +2020,6 @@ VernoWhitney
 ilgranderabbino
 tod_13
 tmykkanen
-HappyCerberus
 Blazur
 MrCleanOr
 cbdarden
@@ -2086,7 +2054,6 @@ Nobi
 xlloyd
 glyfair
 papagamer72
-matfr
 mawilson4
 dasboston
 Elenitza
@@ -2154,7 +2121,6 @@ beerzinjsh
 Secret Squirrel
 msoul01
 IdahoEv
-yahooseriously1
 gar0u
 Frikiguias
 enemyoftheworld
@@ -2185,22 +2151,18 @@ brbdc
 Rouks
 hugolefou
 sdschlager
-Hipshot
 SavageInOz
 raptore39
 climbon321
 crowchaser
 dschleicher
-branstonoriginal
 krspond
 peakhope
 Tyfo
 kikaytete
-Throat_Rip
 flowerus
 cpthomp
 scrotos
-Saremie
 mottchen
 MARCSS
 farchamb
@@ -2217,7 +2179,6 @@ charrrlie
 saabee
 moses88
 balijan2
-pence
 HappyHexagon
 gymclass
 lostrikis
@@ -2261,7 +2222,6 @@ BastardCafe
 stpitner
 warthogg
 Wisecow
-peasant
 ThinkingThatsAll
 garry_rice
 WBC1
@@ -2281,7 +2241,6 @@ Phil68
 bmun
 mat88
 2dtones
-Floating World
 DomaGB
 dexdouglas
 moosemcd
@@ -2338,7 +2297,6 @@ The Players Player
 Evil Doctor T
 svalladolid
 Draddict
-eckswyezed
 sdobby
 lebryant
 OscarManrique
@@ -2483,7 +2441,6 @@ shreyank
 HeirToPendragon
 clublock
 bridgetvh
-EmperorAtahualpa
 azrael85
 PlanBee
 AuditorOfReality
@@ -2577,7 +2534,6 @@ TradenMyr
 renedelagza
 pikkusiili2000
 blackgold369
-DocNickle
 Marzera
 RaspberryMeeple
 WaterZero
@@ -2585,7 +2541,6 @@ MilkyJoe241
 timepieces141
 james25182
 tsmith18256
-chbates
 pezpimp
 zakdoeken
 sigmarpriest
@@ -2602,7 +2557,6 @@ banachspacecadet
 maertenl
 Membrillo
 immmi
-Legendary
 pixatintes
 benjilb
 dianacronica
@@ -2627,11 +2581,9 @@ Chemslayer
 hgtonight
 HalfBrian
 fraserryanw
-Kid Norway
 s3kt0r
 druknoll
 bumpusth
-noahrj
 ilmion
 ohnoitsnathan
 potts_games
@@ -2764,7 +2716,6 @@ Doppelbock
 Callosum
 ravegrunt
 msangryduck
-emylovejay
 MentatYP
 Subaru77
 madster
@@ -2871,7 +2822,6 @@ PhilBobMan
 Ielmie
 Gaulamos
 Tyrkkl
-zennla
 Dragon1ord
 phankthusar
 caedium
@@ -2963,7 +2913,6 @@ MrFettuccine
 Magus Manders
 Exoow
 halogen64
-bender850
 macgruff
 Ka_el_em_O
 beefsack
@@ -3017,7 +2966,6 @@ bittamer
 anxi
 nisanchez
 heavyriffs
-birdsong703
 codinh
 ardacho
 Uzieblo
@@ -3053,7 +3001,6 @@ prrudy
 Zennla
 ted11
 wademoore
-Rexus Grim
 flashshadow69
 CheeseBecky
 Magnusson
@@ -3110,7 +3057,6 @@ maljking
 enavico
 alexandersalamander
 jb1013x
-Mikyoungen
 jldunne
 veemonroe
 yellek
@@ -3131,7 +3077,6 @@ CrassPip
 Boulderbiker
 Xaliba
 Skorpeyon
-kahless666
 sergioxavier
 stapeo
 srsmith93
@@ -3246,7 +3191,6 @@ nrgray555
 simhenk
 fuzzydice82
 Klaun86
-mjtarry
 wafflestomper
 SandmanEight
 Roninn
@@ -3303,7 +3247,6 @@ Marc_D
 thereaperexe
 Oigelb
 Krusa27
-cherneydh
 RoaringPossum
 saryrn
 iStillLikeCatan
@@ -3320,7 +3263,6 @@ patsbin
 tavlas
 mics
 Gidil
-pintocj
 goryon
 quasipedia
 yucata
@@ -3328,7 +3270,6 @@ trylor24
 jcandli
 KerPow
 neilho
-Dead_Reckoning
 natokh
 salfe
 redhuntingcap
@@ -3351,7 +3292,6 @@ JBreidfjord
 jcatroui
 Benoit63
 kiflajiq
-JanM
 snajka
 thomasdev
 Daniair
@@ -3360,7 +3300,6 @@ harzal
 Rayman1971
 vekerdy
 didiita
-Stonecrusher
 Legobrains
 LuisGomez
 evalien
@@ -3400,14 +3339,11 @@ Rotharan
 Zogjones
 Smiley7172015
 Youdan_17
-MrMeeseeks4
-CrickRock
 hanibalicious
 Spielleidenschaft
 MuttonchopMac
 Tha_Crow
 Athaldor
-plymth
 rookie2222
 marab274
 Akiramiyake

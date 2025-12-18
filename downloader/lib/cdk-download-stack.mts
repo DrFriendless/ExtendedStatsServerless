@@ -6,8 +6,11 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as sources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as events from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
 import {COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS, CACHE_BUCKET} from "./metadata.mts";
 import {BlockPublicAccess} from "aws-cdk-lib/aws-s3";
+import {Rule} from "aws-cdk-lib/aws-events";
 
 const RUNTIME = lambda.Runtime.NODEJS_22_X;
 
@@ -105,6 +108,27 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
+  defineRuleToUpdateUserList(func: lambda.IFunction): Rule {
+    const st1 = new iam.PolicyStatement();
+    st1.addActions("lambda:InvokeFunction");
+    st1.addResources(func.functionArn);
+    const policies: Record<string, iam.PolicyDocument> = {
+      "policy_invoke_update_userlist": new iam.PolicyDocument({
+        statements: [st1]
+      })
+    };
+    const ruleRole = new iam.Role(this, "role_invoke_update_userlist", {
+      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
+      inlinePolicies: policies,
+    });
+
+    return new events.Rule(this, `updateUserListRule`, {
+      schedule: events.Schedule.cron({ hour: '7', minute: '0' }),
+      targets: [ new targets.LambdaFunction(func) ],
+      role: ruleRole
+    });
+  }
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
     this.lookupExternalResources();
@@ -115,9 +139,14 @@ export class DownloadStack extends cdk.Stack {
 
     const role = this.defineDownloaderRole(outputQueue, cacheBucket);
     let playsLambda: lambda.IFunction = undefined;
+    let userListLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
       const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.maxConcurrency);
-      if (spec.name.endsWith("_processPlayed")) playsLambda = f;
+      if (spec.name.endsWith("_processPlayed")) {
+        playsLambda = f;
+      } else if (spec.name.endsWith("_processUserList")) {
+        userListLambda = f;
+      }
     }
     if (playsLambda) {
       const mapping = new sources.SqsEventSource(playsQueue, {batchSize: 1, enabled: false});
@@ -126,6 +155,9 @@ export class DownloadStack extends cdk.Stack {
         value: mapping.eventSourceMappingId,
         exportName: 'downloader-PlaysMappingUUID'
       });
+    }
+    if (userListLambda) {
+      this.defineRuleToUpdateUserList(userListLambda);
     }
     new cdk.CfnOutput(this, 'downloaderOutputQueue', {
       value: outputQueue.queueUrl,
