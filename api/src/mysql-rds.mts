@@ -383,6 +383,12 @@ async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats>
     const normalisedPlaysRows = await countTableRows(conn, "plays_normalised");
     ((await conn.query(countWaitingFileRows)) as ProcessMethodCount[]).forEach(row => patch(fileRows, "waiting", row));
     ((await conn.query(countUnprocessedFileRows)) as ProcessMethodCount[]).forEach(row => patch(fileRows, "unprocessed", row));
+    const upcoming: { type: string; count: number; }[][] = []
+    for (let days=1; days <= 7; days++) {
+        const sql = `select processMethod, count(url) from files where lastUpdate is null or nextUpdate < addtime(now(), '${days} 0:0:0') group by processMethod`;
+        const rows: { type: string; count: number; }[] = (await conn.query(sql)).map(gatherTC);
+        upcoming.push(rows);
+    }
     return {
         userRows: userRows,
         gameRows: gameRows,
@@ -397,7 +403,8 @@ async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats>
         distinctGGOwners: distinctGGOwners,
         playsRows: playsRows,
         expansionRows: expansionRows,
-        normalisedPlaysRows: normalisedPlaysRows
+        normalisedPlaysRows: normalisedPlaysRows,
+        upcoming
     } as SystemStats;
 }
 
@@ -408,6 +415,10 @@ function patch(fileRows: TypeCount[], patchKey: 'existing' | 'waiting' | 'unproc
 
 function gatherTypeCount(row: any): TypeCount {
     return { type: row.processMethod, existing: row["count(url)"], unprocessed: 0, waiting: 0 } as TypeCount;
+}
+
+function gatherTC(row: any): { type: string; count: number; } {
+    return { type: row.processMethod, count: row["count(url)"] };
 }
 
 export async function listWarTable(system: System): Promise<WarTableRow[]> {
