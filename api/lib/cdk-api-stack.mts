@@ -36,6 +36,12 @@ export class ApiStack extends cdk.Stack {
       vpc: DATABASE_VPC,
       vpcSubnets: {
         subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
+      },
+      environment: {
+        MYSQL_HOST: process.env.MYSQL_HOST,
+        MYSQL_USERNAME: process.env.MYSQL_USERNAME,
+        MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
+        MYSQL_DATABASE: process.env.MYSQL_DATABASE
       }
     });
     Tags.of(f).add("component", COMPONENT);
@@ -61,6 +67,12 @@ export class ApiStack extends cdk.Stack {
       vpc: DATABASE_VPC,
       vpcSubnets: {
         subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_A ]
+      },
+      environment: {
+        MYSQL_HOST: process.env.MYSQL_HOST,
+        MYSQL_USERNAME: process.env.MYSQL_USERNAME,
+        MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
+        MYSQL_DATABASE: process.env.MYSQL_DATABASE
       }
     });
     Tags.of(f).add("component", COMPONENT);
