@@ -214,16 +214,17 @@ function buildSchema(loaders: Loaders) {
             fields: {
                 plays: {
                     args: {
-                        geeks: { type: ListOfString },
-                        first: { type: graphql.GraphQLBoolean },
-                        startYMD: { type: graphql.GraphQLInt },
-                        endYMD: { type: graphql.GraphQLInt }
+                        geeks: {type: ListOfString},
+                        first: {type: graphql.GraphQLBoolean},
+                        startYMD: {type: graphql.GraphQLInt},
+                        endYMD: {type: graphql.GraphQLInt}
                     },
                     type: buildMultiGeekPlaysType(gameDataType, geekGameType, playsWithDateType),
-                    resolve: async (parent: unknown, args) =>
-                        await loaders.system.asyncReturnWithConnection(
+                    resolve: async (parent: unknown, args) => {
+                        return await loaders.system.asyncReturnWithConnection(
                             async conn => playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
-                        )
+                        );
+                    }
                 },
                 geekgames: {
                     args: {
@@ -378,7 +379,7 @@ function ymdToDate(ymd: number): Date {
     return new Date(y, m - 1, d);
 }
 
-async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], first: boolean, startInc: number, endExc: number): Promise<PlaysRetrieveResult> {
+async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], first: boolean, startInc: number, endInc: number): Promise<PlaysRetrieveResult> {
     const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
     if (Object.values(geekNameIds).length === 0) {
         return { geeks: [], plays: [], games: [], geekgames: [] };
@@ -389,8 +390,14 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
         where = "geek = ?";
         args[0] = parseInt(Object.keys(geekNameIds)[0]);
     }
-    if (first) where += " order by ymd asc";
-    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game bggid, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
+    if (first) {
+        where += " order by ymd asc";
+    } else if (startInc && endInc) {
+        where += " and ymd between ? and ?";
+        args.push(startInc);
+        args.push(endInc);
+    }
+    const playsSql = "select ymd, id, game bggid, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
     const playsResult = await conn.query(playsSql, args) as RawPlaysQueryResult[];
     const expPlays: RawPlaysQueryResult[] = [];
     const basePlays: RetrievePlay[] = [];
@@ -402,7 +409,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
             if (firstKeys.has(firstKey)) continue;
             firstKeys.add(firstKey);
         }
-        if (row.ymd < startInc || row.ymd >= endExc) continue;
+        if (row.ymd < startInc || row.ymd > endInc) continue;
         if (row["expansion_play"]) {
             expPlays.push(row);
         } else {

@@ -37,7 +37,7 @@ export class DownloadStack extends cdk.Stack {
     return f;
   }
 
-  defineDownloaderRole(outputQueue: sqs.IQueue): iam.IRole {
+  defineDownloaderRole(outputQueue: sqs.IQueue, cacheBucket: s3.Bucket): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
     bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
@@ -70,7 +70,7 @@ export class DownloadStack extends cdk.Stack {
 
     const useCacheBucket = new iam.PolicyStatement();
     useCacheBucket.addActions("s3:PutObject", "s3:DeleteObject", "s3:GetObject", "s3:ListBucket");
-    useCacheBucket.addResources(`arn:aws:s3:*:${process.env.CDK_DEFAULT_ACCOUNT}:${CACHE_BUCKET}/*`);
+    useCacheBucket.addResources(cacheBucket.bucketArn);
     policies[`policy_cache_bucket`] = new iam.PolicyDocument({
       statements: [useCacheBucket]
     });
@@ -113,7 +113,7 @@ export class DownloadStack extends cdk.Stack {
     const outputQueue = this.defineOutputQueue();
     const playsQueue = this.definePlaysQueue();
 
-    const role = this.defineDownloaderRole(outputQueue);
+    const role = this.defineDownloaderRole(outputQueue, cacheBucket);
     let playsLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
       const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.maxConcurrency);

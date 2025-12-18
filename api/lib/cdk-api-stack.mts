@@ -19,9 +19,6 @@ let DATABASE_VPC: ec2.IVpc = undefined;
 let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
-let PUBLIC_SUBNET_A: ec2.ISubnet = undefined;
-let PUBLIC_SUBNET_B: ec2.ISubnet = undefined;
-let PUBLIC_SUBNET_C: ec2.ISubnet = undefined;
 let API_GATEWAY: aws_apigatewayv2.IHttpApi = undefined;
 let CLOUDFRONT: cf.IDistribution = undefined;
 
@@ -38,7 +35,7 @@ export class ApiStack extends cdk.Stack {
       allowPublicSubnet: true,
       vpc: DATABASE_VPC,
       vpcSubnets: {
-        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_A ]
+        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
       }
     });
     Tags.of(f).add("component", COMPONENT);
@@ -86,9 +83,6 @@ export class ApiStack extends cdk.Stack {
     PRIVATE_SUBNET_A = ec2.Subnet.fromSubnetId(this, "private a", "subnet-f565d0bc");
     PRIVATE_SUBNET_B = ec2.Subnet.fromSubnetId(this, "private b", "subnet-a865decf");
     PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", "subnet-44646e1d");
-    PUBLIC_SUBNET_A = ec2.Subnet.fromSubnetId(this, "public a", "subnet-0822a1312816de200");
-    PUBLIC_SUBNET_B = ec2.Subnet.fromSubnetId(this, "public b", "subnet-039233503b6e31d8e");
-    PUBLIC_SUBNET_C = ec2.Subnet.fromSubnetId(this, "public c", "subnet-013589611630ac1d0");
     API_ROLE = iam.Role.fromRoleName(this, "role", "APILambdas");
     ZIP_BUCKET = s3.Bucket.fromBucketName(this, "bucket", DEPLOYMENT_BUCKET);
     API_GATEWAY = aws_apigatewayv2.HttpApi.fromHttpApiAttributes(this, "gateway", { httpApiId: "niiwhl9tva" });

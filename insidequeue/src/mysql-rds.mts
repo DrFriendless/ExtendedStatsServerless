@@ -787,9 +787,9 @@ function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
 export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: number, playsMonths: { y: number, m: number }[],
                                               expansionData: ExpansionData) {
     const selectSql = "select game, playDate, quantity, location from plays where geek = ? and month = ? and year = ?";
-    const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, location) values ?";
+    const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, ymd, expansion_play, location) values ?";
     const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
-    const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values ?";
+    const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, ymd, expansion_play, baseplay) values ?";
 
     for (const {y, m} of playsMonths) {
         const rows: PlaysRow[] = await conn.query(selectSql, [geekId, m, y]);
@@ -797,7 +797,8 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
         // insert all of the base plays
         const basePlays: any[][] = [];
         for (const np of normalised) {
-            basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, 0, np.location || ""]);
+            const ymd = np.year * 10000 + np.month * 100 + np.date;
+            basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, ymd, 0, np.location || ""]);
         }
         if (basePlays.length > 0) {
             try {
@@ -818,7 +819,8 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
                 }
                 const id = result[0].id;
                 for (const e of np.expansions) {
-                    expPlays.push([e, geekId, np.quantity, np.year, np.month, np.date, 1, id]);
+                    const ymd = np.year * 10000 + np.month * 100 + np.date;
+                    expPlays.push([e, geekId, np.quantity, np.year, np.month, np.date, ymd, 1, id]);
                 }
             }
         }
