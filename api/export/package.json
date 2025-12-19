@@ -1,6 +1,6 @@
 {
   "name": "extstats-api",
-  "version": "1.2.2",
+  "version": "1.2.4",
   "description": "ExtendedStatsServerless API SDK",
   "type": "module",
   "main": "index.mjs",
@@ -11,8 +11,5 @@
     "build": "tsc"
   },
   "author": "John Farrell <friendless.farrell@gmail.com>",
-  "license": "ISC",
-  "dependencies": {
-    "extstats-core": "file:/home/john/projects/repo/extstats-core-1.32.0.tgz"
-  }
+  "license": "ISC"
 }

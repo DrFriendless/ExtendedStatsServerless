@@ -389,6 +389,8 @@ async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats>
         const rows: { type: string; count: number; }[] = (await conn.query(sql)).map(gatherTC);
         upcoming.push(rows);
     }
+    const sql = `select processMethod, count(url) from files where lastUpdate > addtime(now(), '-1 0:0:0') group by processMethod`;
+    const last24: { type: string; count: number; }[] = (await conn.query(sql)).map(gatherTC);
     return {
         userRows: userRows,
         gameRows: gameRows,
@@ -404,7 +406,8 @@ async function doGatherSystemStats(conn: mysql.Connection): Promise<SystemStats>
         playsRows: playsRows,
         expansionRows: expansionRows,
         normalisedPlaysRows: normalisedPlaysRows,
-        upcoming
+        upcoming,
+        last24
     } as SystemStats;
 }
 
