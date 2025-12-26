@@ -8,6 +8,7 @@ import {
     ToProcessElement,
     WarTableRow
 } from "extstats-core";
+import {BlogComment} from "extstats-core/blog-interfaces.js";
 
 export type AuthResultType = "code" | "userdata" | "failure";
 
@@ -261,5 +262,49 @@ export class ExtstatsApi {
             "body": JSON.stringify(data),
             method: "POST"
         });
+    }
+
+    async retrieveCommentsForUrl(url: string): Promise<BlogComment[]> {
+        return (await (await fetch(`${this.baseUrl}/retrieveComments?url=${url}`, {
+            headers: {
+                "Accept": "application/json"
+            }
+        })).json()) as BlogComment[];
+    }
+
+    async saveComment(url: string, comment: string, replyTo: number | undefined): Promise<{ id: number | undefined, posts: BlogComment[] }> {
+        const body = { url, comment, replyTo };
+        return (await (await fetch(`${this.baseUrl}/saveComment`, {
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            "body": JSON.stringify(body),
+            method: "POST"
+        })).json()) as { id: number | undefined, posts: BlogComment[] };
+    }
+
+    async updateComment(id: number, comment: string): Promise<{ id: number, posts: BlogComment[] }> {
+        const body = { id, comment };
+        return (await (await fetch(`${this.baseUrl}/updateComment`, {
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            "body": JSON.stringify(body),
+            method: "POST"
+        })).json()) as { id: number, posts: BlogComment[] };
+    }
+
+    async deleteComment(id: number): Promise<{ posts: BlogComment[] }> {
+        const body = { id };
+        return (await (await fetch(`${this.baseUrl}/deleteComment`, {
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            "body": JSON.stringify(body),
+            method: "POST"
+        })).json()) as { posts: BlogComment[] };
     }
 }

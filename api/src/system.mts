@@ -1,7 +1,10 @@
 import * as mysql from "promise-mysql";
+import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
+import {getUserFromEvent} from "./library.mjs";
 
-export async function findSystem(): Promise<System | HttpResponse> {
+export async function findSystem(event: APIGatewayProxyEventV2WithRequestContext<any> | undefined = undefined): Promise<System | HttpResponse> {
     const sys = new System();
+    if (event) sys.user = getUserFromEvent(event);
     return await sys.loadSecrets();
 }
 
@@ -10,6 +13,7 @@ export class System {
     private mysqlUsername: string | undefined;
     private mysqlPassword: string | undefined;
     private mysqlDatabase: string | undefined;
+    user: string | undefined;
 
     async loadSecrets(): Promise<System | HttpResponse> {
         this.mysqlHost = process.env.MYSQL_HOST;

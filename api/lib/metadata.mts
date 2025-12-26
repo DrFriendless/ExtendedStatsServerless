@@ -44,6 +44,10 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_update`, handler: "functions.markForUpdate", route: "update", method: "POST" },
     { name: `${COMPONENT}_personal`, handler: "auth.personal", route: "personal", method: "GET" },
     { name: `${COMPONENT}_updatePersonal`, handler: "auth.updatePersonal", route: "updatePersonal", method: "POST" },
+    { name: `${COMPONENT}_retrieveComments`, handler: "blog.retrieveCommentsForUrl", route: "retrieveComments", method: "GET" },
+    { name: `${COMPONENT}_saveComment`, handler: "blog.saveComment", route: "saveComment", method: "POST" },
+    { name: `${COMPONENT}_updateComment`, handler: "blog.updateComment", route: "updateComment", method: "POST" },
+    { name: `${COMPONENT}_deleteComment`, handler: "blog.deleteComment", route: "deleteComment", method: "POST" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [

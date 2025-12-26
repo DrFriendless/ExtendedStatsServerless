@@ -52,3 +52,14 @@ export function getCookiesFromEvent(event: APIGatewayProxyEventV2WithRequestCont
     }
     return list;
 }
+
+export function getUserFromEvent(event: APIGatewayProxyEventV2WithRequestContext<any>): string | undefined {
+    if (!event || !event.cookies) return undefined;
+    for (const cookie of event.cookies) {
+        const parts = cookie.split('=');
+        const key = parts.shift().trim();
+        const value = decodeURI(parts.join('='));
+        if (key === 'extstatsid') return value;
+    }
+    return undefined;
+}
