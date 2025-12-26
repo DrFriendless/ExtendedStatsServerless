@@ -214,9 +214,9 @@ export class MiscStack extends cdk.Stack {
     const threadFunction = this.defineLambda("misc_auth_thread", "auththread.handler", ["bgg"], "public", 1);
     const sm = this.defineAuthStateMachine(threadFunction);
     const rule = this.defineRuleToInvokeAuth(sm, 1);
-    const reportFunction = this.defineLambda("misc_report_read", "report.handler", ["db"], "private", 2);
-    const writeFunction = this.defineLambda("misc_report_write", "report.write", ["logging"], "public", 3);
-    const sm2 = this.defineReportStateMachine(reportFunction, writeFunction);
-    const rule2 = this.defineRuleToInvokeReport(sm2, 2);
+    // const reportFunction = this.defineLambda("misc_report_read", "report.handler", ["db"], "private", 2);
+    // const writeFunction = this.defineLambda("misc_report_write", "report.write", ["logging"], "public", 3);
+    // const sm2 = this.defineReportStateMachine(reportFunction, writeFunction);
+    // const rule2 = this.defineRuleToInvokeReport(sm2, 2);
   }
 }
