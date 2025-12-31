@@ -1,12 +1,14 @@
 import { count, countTableRows, getGeekId, getGeekIds } from "./library.mjs";
 import { selectGames } from "./selector.mjs";
-import { RankingTableRow, GameData, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
+import {
+    RankingTableRow, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
     TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery,
-    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount, ToProcessElement } from "extstats-core";
+    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount, ToProcessElement, GameDataShort, GeekGame
+} from "extstats-core";
 import {
     AllPlaysQueryResult,
     ExpansionPlay,
-    ExtractedGameData, LastYearQueryResult, MonthlyCountsQueryResult, MonthlyPlaysQueryResult,
+    ExtractedGameData, GeekGameRow, LastYearQueryResult, MonthlyCountsQueryResult, MonthlyPlaysQueryResult,
     NormalisedPlay,
     PlayWithDate, ProcessMethodCount,
     RawGameData
@@ -14,6 +16,7 @@ import {
 import * as dateMath from 'date-arithmetic';
 import * as mysql from 'promise-mysql';
 import {System} from "./system.mjs";
+import {Connection} from "promise-mysql";
 
 export async function rankGames(system: System, query: object): Promise<RankingTableRow[]> {
     return await system.asyncReturnWithConnection(async conn => await doRankGames(conn, query));
@@ -30,10 +33,10 @@ async function doRankGames(conn: mysql.Connection, query: object): Promise<Ranki
     return rows;
 }
 
-export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<GameData[]> {
+export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<ExtractedGameData[]> {
     const sqlOne = "select * from games where bggid = ?";
     const sqlMany = "select * from games where bggid in (?)";
-    const expansions = await loadExpansionData(conn);
+    const expansions: ExpansionData = await loadExpansionData(conn);
     let rows;
     if (ids.length === 0) return [];
     if (ids.length === 1) {
@@ -49,10 +52,35 @@ export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Pr
     return ids.map(id => index[id]);
 }
 
+export async function doRetrieveGamesShort(conn: mysql.Connection, ids: number[]): Promise<GameDataShort[]> {
+    const sqlOne = "select * from games where bggid = ?";
+    const sqlMany = "select * from games where bggid in (?)";
+    const expansions: ExpansionData = await loadExpansionData(conn);
+    let rows;
+    if (ids.length === 0) return [];
+    if (ids.length === 1) {
+        rows = await conn.query(sqlOne, ids);
+    } else {
+        rows = await conn.query(sqlMany, [ids]);
+    }
+    const index: Record<number, GameDataShort> = {};
+    rows.forEach((row: RawGameData) => {
+        const r = extractGameDataShort(row, expansions);
+        index[r.bggid] = r;
+    });
+    return ids.map(id => index[id]);
+}
+
 function extractGameData(row: RawGameData, expansionData: ExpansionData): ExtractedGameData {
     return { bggid: row["bggid"], bggRanking: row["rank"], bggRating: row["average"], minPlayers: row["minPlayers"],
         maxPlayers: row["maxPlayers"], name: row["name"], playTime: row["playTime"], subdomain: row["subdomain"],
         weight: row["averageWeight"], yearPublished: row["yearPublished"], isExpansion: expansionData.isExpansion(row["bggid"]) };
+}
+
+function extractGameDataShort(row: RawGameData, expansionData: ExpansionData): GameDataShort {
+    return { bggid: row["bggid"], rk: row["rank"], rt: row["average"], min: row["minPlayers"],
+        max: row["maxPlayers"], n: row["name"], pt: row["playTime"], sub: row["subdomain"],
+        w: row["averageWeight"], yp: row["yearPublished"], e: expansionData.isExpansion(row["bggid"]) };
 }
 
 export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {
@@ -209,6 +237,16 @@ async function getLastYearOfPlays(conn: mysql.Connection, geek: string): Promise
 
 export async function gatherSystemStats(system: System): Promise<SystemStats> {
     return await system.asyncReturnWithConnection(doGatherSystemStats);
+}
+
+export async function getGeekGames(system: System, geek: string): Promise<{ name: string, rating: number, trade: number }[]> {
+    return await system.asyncReturnWithConnection(async conn => await doGetGeekGames(conn, geek));
+}
+
+export async function doGetGeekGames(conn: Connection, geek: string): Promise<{ name: string, rating: number, trade: number }[]> {
+    const geekId = await getGeekId(conn, geek);
+    const sql = "select games.name name, geekgames.rating rating, geekgames.trade trade from games,geekgames where geekgames.geekid = ? and geekgames.game = games.bggid and geekgames.owned = 1 order by games.name asc;"
+    return await conn.query(sql, [geekId]) as { name: string, rating: number, trade: number }[];
 }
 
 export async function gatherGeekSummary(system: System, geek: string): Promise<GeekSummary> {

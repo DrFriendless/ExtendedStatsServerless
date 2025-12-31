@@ -2,8 +2,16 @@ import * as graphql from "graphql";
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
-import {GameData, GeekGame, MonthlyPlayCount, MonthlyPlays, PlaysWithDate} from "extstats-core";
-import {doRetrieveGames, getMonthlyCounts, getMonthlyPlays} from "./mysql-rds.mjs";
+import {
+    ExtendedGeekGameShort,
+    GameData,
+    GameDataShort,
+    GeekGame,
+    MonthlyPlayCount,
+    MonthlyPlays,
+    PlaysWithDate, SelectorMetadataSet
+} from "extstats-core";
+import {doRetrieveGames, doRetrieveGamesShort, getMonthlyCounts, getMonthlyPlays} from "./mysql-rds.mjs";
 import {getGeekId, getGeekIds} from "./library.mjs";
 import { parse } from "./parser.mjs";
 import {evaluateSimple, GeekGameSelectResult, retrieveGeekGames} from "./selector.mjs";
@@ -21,12 +29,14 @@ import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 interface Loaders {
     system: System;
     games: DataLoader<number, GameData>;
+    gamesShort: DataLoader<number, GameDataShort>;
 }
 
 function createLoaders(system: System): Loaders {
     return {
         system: system,
         games: new DataLoader((ids: number[]) => batchGetGames(system, ids)),
+        gamesShort: new DataLoader((ids: number[]) => batchGetGamesShort(system, ids))
     }
 }
 
@@ -42,6 +52,7 @@ const DesignerType = new graphql.GraphQLObjectType({
         boring: { type: graphql.GraphQLBoolean! }
     }
 });
+
 function buildGameDataType(loaders: Loaders) {
     return new graphql.GraphQLObjectType({
         name: "GameData",
@@ -62,6 +73,25 @@ function buildGameDataType(loaders: Loaders) {
                 resolve:
                     async (parent: GameData) => await loaders.system.asyncReturnWithConnection(async conn => resolveDesignersForGame(conn, parent.bggid))
             }
+        }
+    });
+}
+
+function buildGameDataTypeShort(loaders: Loaders) {
+    return new graphql.GraphQLObjectType({
+        name: "GameDataShort",
+        fields: {
+            bggid: {type: graphql.GraphQLInt!},
+            rk: {type: graphql.GraphQLInt!},
+            yp: {type: graphql.GraphQLInt!},
+            min: {type: graphql.GraphQLInt!},
+            max: {type: graphql.GraphQLInt!},
+            pt: {type: graphql.GraphQLInt!},
+            n: {type: graphql.GraphQLString!},
+            sub: {type: graphql.GraphQLString!},
+            rt: {type: graphql.GraphQLFloat!},
+            w: {type: graphql.GraphQLFloat!},
+            e: {type: graphql.GraphQLBoolean!}
         }
     });
 }
@@ -100,8 +130,44 @@ function buildGeekGameType(loaders: Loaders, gameDataType: GraphQLObjectType<Gam
         }
     );
 }
+
+function buildGeekGameTypeShort(loaders: Loaders, gameDataType: GraphQLObjectType<GameDataShort>) {
+    return new GraphQLObjectType({
+            name: "GeekGameShort",
+            fields: {
+                geek: {type: graphql.GraphQLString},
+                bggid: {type: graphql.GraphQLInt!},
+                r: {type: graphql.GraphQLFloat!},
+                o: {type: graphql.GraphQLBoolean!},
+                wtb: {type: graphql.GraphQLBoolean!},
+                wtp: {type: graphql.GraphQLBoolean!},
+                pre: {type: graphql.GraphQLBoolean!},
+                prev: {type: graphql.GraphQLBoolean!},
+                last: {type: graphql.GraphQLInt!},
+                first: {type: graphql.GraphQLInt!},
+                dsp: {type: graphql.GraphQLInt!},
+                sps: {type: graphql.GraphQLFloat!},
+                p: {type: graphql.GraphQLInt!},
+                lpy: {type: graphql.GraphQLInt!},
+                ys: {type: graphql.GraphQLInt!},
+                ms: {type: graphql.GraphQLInt!},
+                lyms: {type: graphql.GraphQLInt!},
+                e: {type: graphql.GraphQLBoolean!},
+                ft: {type: graphql.GraphQLBoolean!},
+                wit: {type: graphql.GraphQLBoolean!},
+                wish: {type: graphql.GraphQLInt!},
+                n: {type: graphql.GraphQLFloat!},
+                game: {
+                    type: gameDataType,
+                    resolve: (parent: { bggid: number }) => loaders.gamesShort.load(parent.bggid)
+                }
+            }
+        }
+    );
+}
+
 function buildPlaysWithDateType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>) {
-    return new graphql.GraphQLObjectType({
+    return new graphql.GraphQLObjectType<any, any>({
         name: "PlaysWithDate",
         fields: {
             id: { type: graphql.GraphQLInt! },
@@ -116,7 +182,7 @@ function buildPlaysWithDateType(loaders: Loaders, gameDataType: GraphQLObjectTyp
             location: { type: graphql.GraphQLString! },
             game: {
                 type: gameDataType,
-                resolve: (parent: { bggid: number }) => loaders.games.load(parent.bggid)
+                resolve: p => loaders.games.load(p.bggid)
             }
         }
     });
@@ -165,6 +231,17 @@ function buildGeekGamesType(gameDataType: GraphQLObjectType<GameData>, geekGameT
     });
 }
 
+function buildGeekGamesTypeShort(gameDataType: GraphQLObjectType<GameDataShort>, geekGameType: GraphQLObjectType<ExtendedGeekGameShort>) {
+    return new GraphQLObjectType({
+        name: "GeekGamesShort",
+        fields: {
+            games: {type: new graphql.GraphQLList(gameDataType)},
+            geekGames: {type: new graphql.GraphQLList(geekGameType)},
+            metadata: {type: new graphql.GraphQLList(SelectorMetadataType!)}
+        }
+    });
+}
+
 // total plays for a geek for a month
 const MonthlyPlayCountType = new GraphQLObjectType({
     name: "MonthlyPlaysCount",
@@ -174,6 +251,15 @@ const MonthlyPlayCountType = new GraphQLObjectType({
         count: { type: graphql.GraphQLInt! }
     }
 });
+
+const MonthlyPlayCountTypeShort = new GraphQLObjectType({
+    name: "MonthlyPlaysCountShort",
+    fields: {
+        ym: { type: graphql.GraphQLInt! },
+        c: { type: graphql.GraphQLInt! }
+    }
+});
+
 // plays of a geek for a game for a month
 function buildMonthlyPlaysType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>) {
     return new GraphQLObjectType({
@@ -192,6 +278,30 @@ function buildMonthlyPlaysType(loaders: Loaders, gameDataType: GraphQLObjectType
     });
 }
 
+interface MonthlyPlaysParent {
+    year: number;
+    month: number;
+    bggid: number;
+    expansion: number;
+    quantity: number;
+}
+
+function buildMonthlyPlaysTypeShort(loaders: Loaders, gameDataType: GraphQLObjectType<GameDataShort>): GraphQLObjectType<MonthlyPlaysParent> {
+    return new GraphQLObjectType({
+        name: "MonthlyPlaysShort",
+        fields: {
+            ym: { type: graphql.GraphQLInt! },
+            e: { type: graphql.GraphQLBoolean! },
+            q: { type: graphql.GraphQLInt! },
+            bggid: {type: graphql.GraphQLInt!},
+            g: {
+                type: gameDataType,
+                resolve: (parent: MonthlyPlaysParent) => loaders.gamesShort.load(parent.bggid)
+            }
+        }
+    });
+}
+
 function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>,
                                         geekGameType: GraphQLObjectType<ExtendedGeekGame>) {
     return new GraphQLObjectType({
@@ -204,12 +314,26 @@ function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLO
     });
 }
 
+function buildShortMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLObjectType<GameDataShort>,
+                                        geekGameType: GraphQLObjectType<ExtendedGeekGameShort>) {
+    return new GraphQLObjectType({
+        name: "MonthlyPlaysAndCountsShort",
+        fields: {
+            plays: {type: new graphql.GraphQLList(buildMonthlyPlaysTypeShort(loaders, gameDataType)!)},
+            counts: {type: new graphql.GraphQLList(MonthlyPlayCountTypeShort!)},
+            geekGames: {type: new graphql.GraphQLList(geekGameType)}
+        }
+    });
+}
+
 function buildSchema(loaders: Loaders) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
+    const gameDataTypeShort: GraphQLObjectType<GameDataShort> = buildGameDataTypeShort(loaders);
     const geekGameType: GraphQLObjectType<ExtendedGeekGame> = buildGeekGameType(loaders, gameDataType);
+    const geekGameTypeShort: GraphQLObjectType<ExtendedGeekGameShort> = buildGeekGameTypeShort(loaders, gameDataTypeShort);
     const playsWithDateType: GraphQLObjectType<{ }> = buildPlaysWithDateType(loaders, gameDataType);
     return new graphql.GraphQLSchema({
-        query: new graphql.GraphQLObjectType({
+        query: new graphql.GraphQLObjectType<any, PlaysRetrieveResult>({
             name: "RetrieveQuery",
             fields: {
                 plays: {
@@ -236,6 +360,16 @@ function buildSchema(loaders: Loaders) {
                         await loaders.system.asyncReturnWithConnection(
                             async conn => geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars)))
                 },
+                geekgames2: {
+                    args: {
+                        selector: { type: graphql.GraphQLString },
+                        vars: { type: new graphql.GraphQLList(VarBindingInputType!) }
+                    },
+                    type: buildGeekGamesTypeShort(gameDataTypeShort, geekGameTypeShort),
+                    resolve: async (parent: unknown, args) =>
+                        await loaders.system.asyncReturnWithConnection(
+                            async conn => shorten2(await geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars))))
+                },
                 years: {
                     args: {
                         geek: { type: graphql.GraphQLString! }
@@ -254,10 +388,83 @@ function buildSchema(loaders: Loaders) {
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
                             async conn => monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars)))
+                },
+                monthly2: {
+                    args: {
+                        selector: { type: graphql.GraphQLString },
+                        vars: { type: new graphql.GraphQLList(VarBindingInputType!) }
+                    },
+                    type: buildShortMonthlyPlaysAndCountsType(loaders, gameDataTypeShort, geekGameTypeShort),
+                    resolve: async (parent: unknown, args) =>
+                        await loaders.system.asyncReturnWithConnection(
+                            async conn => shorten(await monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars))))
                 }
             }
         })
     });
+}
+
+function shortenCoreMonthlyPlay(src: CoreMonthlyPlays): CoreMonthlyPlaysShort {
+    return {
+        bggid: src.bggid,
+        e: src.expansion,
+        ym: src.year * 100 + src.month,
+        q: src.quantity
+    }
+}
+
+function shortenMonthlyPlayCount(src: MonthlyPlayCount): MonthlyPlayCountShort {
+    return {
+        ym: src.year * 100 + src.month,
+        c: src.count
+    }
+}
+
+function shortenExtendedGeekGame(src: ExtendedGeekGame): ExtendedGeekGameShort {
+    return {
+        bggid: src.bggid,
+        pre: src.preordered,
+        prev: src.prevOwned,
+        n: src.normRating,
+        wtb: src.wantToBuy,
+        wtp: src.wantToPlay,
+        o: src.owned,
+        r: src.rating
+    };
+}
+
+function shortenGameData(src: GameData): GameDataShort {
+    return {
+        bggid: src.bggid,
+        e: src.isExpansion,
+        min: src.minPlayers,
+        max: src.maxPlayers,
+        n: src.name,
+        sub: src.subdomain,
+        rk: src.bggRanking,
+        rt: src.bggRating,
+        yp: src.yearPublished,
+        w: src.weight,
+        pt: src.playTime
+    }
+}
+
+function shorten(src: MonthlyPlaysAndCounts): MonthlyPlaysAndCountsShort {
+    console.log(JSON.stringify(src));
+    return {
+        plays: src.plays.map(p => shortenCoreMonthlyPlay(p)),
+        counts: src.counts.map(c => shortenMonthlyPlayCount(c)),
+        geekGames: src.geekGames.map(g => shortenExtendedGeekGame(g))
+    };
+}
+
+function shorten2(src: GeekGameSelectWithGames): GeekGameSelectWithGamesShort {
+    console.log(JSON.stringify(src));
+    return {
+        games: src.games.map(g => shortenGameData(g)),
+        metadata: src.metadata,
+        geekGames: src.geekGames.map(g => shortenExtendedGeekGame(g))
+    };
 }
 
 interface CoreMonthlyPlays {
@@ -267,12 +474,27 @@ interface CoreMonthlyPlays {
     quantity: number;
     bggid: number;
 }
+interface CoreMonthlyPlaysShort {
+    ym: number;
+    e: boolean;
+    q: number;
+    bggid: number;
+}
+interface MonthlyPlayCountShort {
+    ym: number;
+    c: number;
+}
 
 interface ExtendedGeekGame extends GeekGame {
     normRating: number;
 }
 
 type GeekGameSelectWithGames = GeekGameSelectResult & { games: GameData[] };
+interface GeekGameSelectWithGamesShort {
+    metadata: SelectorMetadataSet;
+    geekGames: ExtendedGeekGameShort[];
+    games: GameDataShort[]
+}
 interface DesignerData {
     bggid: number;
     name: string;
@@ -283,6 +505,11 @@ interface MonthlyPlaysAndCounts {
     plays: CoreMonthlyPlays[],
     counts: MonthlyPlayCount[],
     geekGames: ExtendedGeekGame[]
+}
+interface MonthlyPlaysAndCountsShort {
+    plays: CoreMonthlyPlaysShort[],
+    counts: MonthlyPlayCountShort[],
+    geekGames: ExtendedGeekGameShort[]
 }
 
 async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBindings): Promise<MonthlyPlaysAndCounts> {
@@ -439,7 +666,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
             if (gameIds.indexOf(e) < 0) gameIds.push(e);
         }
     }
-    const games = await doRetrieveGames(conn, gameIds);
+    const games: GameData[] = await doRetrieveGames(conn, gameIds);
     const geekgames: GeekGameRow[] = [];
     for (const geek of Object.values<string>(geekNameIds)) {
         const ggs: GeekGameRow[] = await retrieveGeekGames(conn, gameIds, geek);
@@ -468,4 +695,8 @@ export async function retrieve(event: APIGatewayProxyEvent): Promise<HttpRespons
 
 async function batchGetGames(system: System, gameIds: number[]): Promise<GameData[]> {
     return system.asyncReturnWithConnection(async conn => doRetrieveGames(conn, gameIds));
+}
+
+async function batchGetGamesShort(system: System, gameIds: number[]): Promise<GameDataShort[]> {
+    return system.asyncReturnWithConnection(async conn => doRetrieveGamesShort(conn, gameIds));
 }

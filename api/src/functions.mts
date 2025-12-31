@@ -11,7 +11,7 @@ import {
     updateFAQCount,
     markUrlForUpdate,
     markGeekForUpdate,
-    gatherSystemUpdates
+    gatherSystemUpdates, getGeekGames
 } from "./mysql-rds.mjs";
 import {
     Collection, CollectionWithMonthlyPlays, CollectionWithPlays,
@@ -72,6 +72,43 @@ export async function getUserList(ignored: APIGatewayProxyEvent): Promise<HttpRe
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
     return await listUsers(system);
+}
+
+export async function getUserCheckList(event: APIGatewayProxyEvent): Promise<HttpResponse> {
+    const system = await findSystem();
+    if (isHttpResponse(system)) return system;
+
+    const geek = event.queryStringParameters.geek;
+    if (!geek) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify("You must specify a 'geek' parameter")
+        }
+    }
+
+    const games = await getGeekGames(system, geek);
+    const lines: string[] = [];
+    lines.push('<html xmlns="http://www.w3.org/1999/xhtml" lang="en">');
+    lines.push('<head><link rel="stylesheet" href="/css/checklist.css"></head>');
+    lines.push("<body>");
+    lines.push("<table>");
+    lines.push("<thead><th class='found'>Found</th><th class='name'>Game</th><th class='rating'>Rating</th><th class='wtt'>WTT</th><th class='notes'>Notes</th>");
+    lines.push("</thead>");
+    lines.push("<tbody>");
+    for (const game of games) {
+        const r = game.rating <= 0 ? "" : game.rating.toString();
+        const wtt = game.trade ? "X" : "";
+        lines.push(`<tr><td>&nbsp;</td><td>${game.name}</td><td>${r}</td><td>${wtt}</td><td></td></tr>`);
+    }
+    lines.push("</tbody>");
+    lines.push("</table>");
+    lines.push("</body>");
+    const html = lines.join("\n");
+    return {
+        statusCode: 200,
+        body: html,
+        headers: { "content-type": "text/html; charset=UTF-8" }
+    }
 }
 
 // Lambda to retrieve the data for the war table.
