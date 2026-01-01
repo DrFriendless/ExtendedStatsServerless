@@ -22,9 +22,9 @@ const SALT_LENGTH = 22;
 
 function makeCookie(id: string, test: boolean) {
     if (test) {
-        return "extstatsid=" + id + "; Domain=localhost; Path=/; Max-Age=36000; SameSite=Lax";
+        return "extstatsid=" + id + "; Domain=localhost; Path=/; Max-Age=360000; SameSite=Lax";
     } else {
-        return "extstatsid=" + id + "; Domain=drfriendless.com; Path=/; Max-Age=36000; SameSite=Lax";
+        return "extstatsid=" + id + "; Domain=drfriendless.com; Path=/; Max-Age=360000; SameSite=Lax";
     }
 }
 
