@@ -57,4 +57,5 @@ export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [
 
 export const EXPRESS_SPECS: ExpressSpec[] = [
     { key: "findgeeks", route: "findgeeks",  method: "GET" },
+    { key: "count", route: "count",  method: "POST" },
 ];

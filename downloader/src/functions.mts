@@ -25,8 +25,7 @@ import {
     CleanUpCollectionResult,
     FileToProcess,
     METADATA_RULE_BASEGAME,
-    MetadataRule, PlayData, PlaysToProcess,
-    ProcessCollectionResult, ProcessPlaysForPeriodResult,
+    MetadataRule, PlayData, ProcessCollectionResult, ProcessPlaysForPeriodResult,
     SeriesMetadata, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
 } from "extstats-core";
 import {isHttpResponse, loadSystem, System} from "./system.mjs";

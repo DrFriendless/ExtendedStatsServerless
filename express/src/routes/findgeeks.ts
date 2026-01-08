@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { returnWithConnectionAsync } from "./library";
+import { incrementExpressCounter, returnWithConnectionAsync } from "./library";
 
 /**
  *
@@ -16,5 +16,6 @@ export const findgeeks = async (req: Request, res: Response) => {
         if (ms.length == 0) ms = await conn.query(sql, "%" + name + "%");
         return ms.map((row: { [key: string]: any }) => row["username"]);
     });
+    await incrementExpressCounter();
     res.send(matches);
 };

@@ -11,6 +11,10 @@ export async function withConnectionAsync(func: (conn: mysql.Connection) => Prom
     }
 }
 
+export async function incrementExpressCounter() {
+    await withConnectionAsync(async conn => conn.query("update counters set express_calls = express_calls + 1"));
+}
+
 export async function asyncReturnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
     const connection = await getConnection();
     try {

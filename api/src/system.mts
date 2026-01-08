@@ -50,6 +50,10 @@ export class System {
             if (connection) connection.destroy();
         }
     }
+
+    async incrementApiCounter() {
+        await this.asyncWithConnection(async conn => conn.query("update counters set api_calls = api_calls + 1"));
+    }
 }
 
 export interface HttpResponse {

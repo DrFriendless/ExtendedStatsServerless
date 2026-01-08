@@ -24,7 +24,7 @@
     "errorhandler": "^1.5.1",
     "express": "^5.1.0",
     "express-basic-auth": "^1.2.1",
-    "extstats-core": "file:/home/john/projects/repo/extstats-core-1.32.0.tgz",
+    "extstats-core": "file:/home/john/projects/repo/extstats-core-1.33.2.tgz",
     "http-errors": "~1.6.2",
     "morgan": "^1.10.1",
     "mysql": "^2.18.1",

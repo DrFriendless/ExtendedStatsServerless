@@ -450,7 +450,6 @@ function shortenGameData(src: GameData): GameDataShort {
 }
 
 function shorten(src: MonthlyPlaysAndCounts): MonthlyPlaysAndCountsShort {
-    console.log(JSON.stringify(src));
     return {
         plays: src.plays.map(p => shortenCoreMonthlyPlay(p)),
         counts: src.counts.map(c => shortenMonthlyPlayCount(c)),
@@ -459,7 +458,6 @@ function shorten(src: MonthlyPlaysAndCounts): MonthlyPlaysAndCountsShort {
 }
 
 function shorten2(src: GeekGameSelectWithGames): GeekGameSelectWithGamesShort {
-    console.log(JSON.stringify(src));
     return {
         games: src.games.map(g => shortenGameData(g)),
         metadata: src.metadata,
