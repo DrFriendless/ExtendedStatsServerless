@@ -98,7 +98,7 @@ async function scheduleProcessing(system: System, element: ToProcessElement) {
         console.log(`scheduling processCollection ${element.geek}`);
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
     } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
-        console.log(`* updating played years for ${element.geek}`);
+        console.log(`* updating played years for ${element.geek} ${element.geekid}`);
         await updatePlayedYears(system, element.geek, element.geekid, element.id);
     } else if (element.processMethod === METHOD_PROCESS_GAME) {
         console.log(`scheduling processGame ${element.bggid}`);
@@ -137,13 +137,13 @@ async function updatePlayedYears(system: System, geek: string, geekid: number, f
         periods.push({ start: `${y}-0-0`, end: `${y}-12-31` });
         y++;
     }
-    const q = "select url from files where processMethod = 'processYear' and geekid = ?";
-    const index = await system.returnWithConnection(async conn => {
-        return [...await conn.query(q, [geekid])];
-    });
+    const q = "select url from files where processMethod = 'processYear' and geek = ?";
+    const index = (await system.returnWithConnection(async conn => {
+        return [...await conn.query(q, [geek])] as { url: string }[];
+    })).map(row => row.url);
     for (const p of periods) {
         const range = `${p.start}=${p.end}=${geek}`;
-        if (index.includes(range)) continue;
+        if (index.indexOf(range) >= 0) continue;
         const year = parseInt(p.start.substring(0, 4));
         const insertSql = "insert into files (url, processMethod, geek, geekid, lastupdate, tillNextUpdate, description, bggid, year) values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         const insertParams = [range, "processYear", geek, geekid, null, null, `Plays from ${p.start} until ${p.end}`, 0, year];
@@ -241,13 +241,26 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
     for (const message of processedMessages.filter(m => m.isSlowdown || m.discriminator === "EnsureGamesMessage")) {
         await sqsClient.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: message.receiptHandle }));
     }
+    const ensureCount = processedMessages.filter(m =>  m.discriminator === "EnsureGamesMessage").length;
+    await system.withConnectionAsync(async conn => {
+        const sql = 'update counters set slowdowns = slowdowns + ?, downloader_processed = downloader_processed + ?';
+        await conn.query(sql, [ slowdowns, ensureCount ]);
+    });
     // process everything else one by one
     for (const message of processedMessages.filter(m => !m.isSlowdown && m.discriminator !== "EnsureGamesMessage")) {
         if (message.payload) {
             await handleQueueMessage(system, message.payload);
+            await system.withConnectionAsync(async conn => {
+                const sql = 'update counters set downloader_processed = downloader_processed + 1';
+                await conn.query(sql);
+            });
         } else {
             console.log("What is this?");
             console.log(JSON.stringify(message));
+            await system.withConnectionAsync(async conn => {
+                const sql = 'update counters set downloader_unknown = downloader_unknown + 1';
+                await conn.query(sql);
+            });
         }
         await sqsClient.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: message.receiptHandle }));
     }
