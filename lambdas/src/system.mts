@@ -23,28 +23,10 @@ export class System {
     private mysqlDatabase: string | undefined;
 
     async loadDatabaseSecrets(): Promise<HttpResponse | void> {
-        console.log("loadDatabaseSecrets");
-        const secretName = "/extstats/database";
-        const client = new SecretsManagerClient({
-            region: process.env.AWS_REGION
-        });
-        try {
-            const response = await client.send(
-                new GetSecretValueCommand({
-                    SecretId: secretName
-                })
-            );
-            const secret = response.SecretString;
-            const obj = JSON.parse(secret);
-            console.log(JSON.stringify(obj));
-            this.mysqlHost = obj.mysqlHost;
-            this.mysqlUsername = obj.mysqlUsername;
-            this.mysqlPassword = obj.mysqlPassword;
-            this.mysqlDatabase = obj.mysqlDatabase;
-        } catch (error) {
-            console.log(error);
-            return { "statusCode": 500, "body": JSON.stringify({ error: `Can't find secret ${secretName} - make sure it exists in AWS.` })}
-        }
+        this.mysqlHost = process.env.MYSQL_HOST;
+        this.mysqlUsername = process.env.MYSQL_USERNAME;
+        this.mysqlPassword = process.env.MYSQL_PASSWORD;
+        this.mysqlDatabase = process.env.MYSQL_DATABASE;
     }
 
     async loadLoggingSecrets(): Promise<HttpResponse | void> {
@@ -128,6 +110,15 @@ export class System {
         const connection = await this.getConnection();
         try {
             return await func(connection);
+        } finally {
+            if (connection) connection.destroy();
+        }
+    }
+
+    async asyncWithConnection(func: (conn: mysql.Connection) => PromiseLike<void>): Promise<void> {
+        const connection = await this.getConnection();
+        try {
+            await func(connection);
         } finally {
             if (connection) connection.destroy();
         }

@@ -114,24 +114,35 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
+  defineRuleToInvokeCounts(func: lambda.Function, n: number): Rule {
+    const st1 = new iam.PolicyStatement();
+    st1.addActions("lambda:InvokeFunction");
+    st1.addResources(func.functionArn);
+    const policies: Record<string, iam.PolicyDocument> = {
+      "policy_invoke_counts": new iam.PolicyDocument({
+        statements: [st1]
+      })
+    };
+    const ruleRole = new iam.Role(this, "role_invoke_counts", {
+      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
+      inlinePolicies: policies,
+    });
+    return new events.Rule(this, `funcRule${n}`, {
+      schedule: events.Schedule.rate(Duration.minutes(10)),
+      targets: [ new targets.LambdaFunction(func) ],
+      role: ruleRole
+    });
+  }
+
   defineLambda(name: string, handler: string, opts: OptsType[], subnetType: "public" | "private", n: number): lambda.Function {
     const role = this.defineRole(opts, name, n);
     const vpcOpts: Partial<lambda.FunctionProps> = {
       vpc: DATABASE_VPC,
       vpcSubnets: {
-        subnets: []
+        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
       }
     };
-    if (subnetType === "public") {
-      vpcOpts.vpcSubnets.subnets.push(PUBLIC_SUBNET_A);
-      vpcOpts.vpcSubnets.subnets.push(PUBLIC_SUBNET_B);
-      vpcOpts.vpcSubnets.subnets.push(PUBLIC_SUBNET_C);
-    } else {
-      vpcOpts.vpcSubnets.subnets.push(PRIVATE_SUBNET_A);
-      vpcOpts.vpcSubnets.subnets.push(PRIVATE_SUBNET_B);
-      vpcOpts.vpcSubnets.subnets.push(PRIVATE_SUBNET_C);
-    }
-    const f = new lambda.Function(this, name, {
+    const fProps: lambda.FunctionProps = {
       functionName: name,
       runtime: RUNTIME,
       handler,
@@ -140,10 +151,19 @@ export class MiscStack extends cdk.Stack {
       timeout: Duration.seconds(60),
       allowPublicSubnet: true,
       environment: {
-        "opts": JSON.stringify(opts)
+        "opts": JSON.stringify(opts),
+        "type": subnetType
       },
       ...(subnetType === "public" ? {} : vpcOpts)
-    });
+    };
+    if (opts.indexOf("db") >= 0 && subnetType === "private") {
+      // would need a VPC endpoint to get to secrets manager, and we don't want to pay for that
+      fProps.environment.MYSQL_HOST = process.env.MYSQL_HOST;
+      fProps.environment.MYSQL_USERNAME = process.env.MYSQL_USERNAME;
+      fProps.environment.MYSQL_PASSWORD = process.env.MYSQL_PASSWORD;
+      fProps.environment.MYSQL_DATABASE = process.env.MYSQL_DATABASE;
+    }
+    const f = new lambda.Function(this, name, fProps);
     Tags.of(f).add("component", COMPONENT);
     return f;
   }
@@ -218,5 +238,7 @@ export class MiscStack extends cdk.Stack {
     // const writeFunction = this.defineLambda("misc_report_write", "report.write", ["logging"], "public", 3);
     // const sm2 = this.defineReportStateMachine(reportFunction, writeFunction);
     // const rule2 = this.defineRuleToInvokeReport(sm2, 2);
+    const countFunction = this.defineLambda("misc_counts", "counts.handler", ["db"], "private", 4);
+    const rule3 = this.defineRuleToInvokeCounts(countFunction, 3);
   }
 }
