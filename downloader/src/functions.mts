@@ -312,11 +312,15 @@ export async function processPlayed(event: QueueInput) {
             }
             const doc = parser.parse(xml);
             if (maxEntries === undefined) {
-                maxEntries = parseInt(doc.plays['@_total']);
-                maxPages = Math.floor((maxEntries + 99)/100);
-                console.log(`maxEntries=${maxEntries} ${maxPages}`);
+                if (!doc.plays) {
+                    console.log(JSON.stringify(doc));
+                } else {
+                    maxEntries = parseInt(doc.plays['@_total']);
+                    maxPages = Math.floor((maxEntries + 99)/100);
+                    console.log(`maxEntries=${maxEntries} ${maxPages}`);
+                }
             }
-            if (maxEntries === 0) break;
+            if (!maxEntries) break;
             let playCount = 0;
             if (!doc.plays || !doc.plays.play) {
                 console.log(`broken on page ${pageNum}`);

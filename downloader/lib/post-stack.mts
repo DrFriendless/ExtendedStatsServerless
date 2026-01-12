@@ -84,7 +84,7 @@ for (const e of response.Exports) {
             Overwrite: true,
             Type: "String"
         });
-        const r3 = await lClient.send(ssmCmd);
+        const r3 = await ssmClient.send(ssmCmd);
         console.log(r3.$metadata.httpStatusCode);
     } else {
         console.log(e.Name);
