@@ -93,7 +93,7 @@ export async function processMetadata(_: UpdateMetadataMessage) {
         }
         if (!handled) log(`Did not understand metadata: ${line}`);
     }
-    await dispatchUpdateMetadata({ series, rules });
+    await dispatchUpdateMetadata(system, { series, rules });
     await flushLogging();
 }
 

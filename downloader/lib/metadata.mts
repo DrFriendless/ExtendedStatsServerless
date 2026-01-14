@@ -19,5 +19,6 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_processCollection`, handler: "functions.processCollection", duration: 60, maxConcurrency: undefined },
     { name: `${COMPONENT}_processGame`, handler: "functions.processGame", duration: 60, maxConcurrency: undefined },
     { name: `${COMPONENT}_processPlayed`, handler: "functions.processPlayed", duration: 900, maxConcurrency: 1 },
+    { name: `${COMPONENT}_processMetadata`, handler: "functions.processMetadata", duration: 900, maxConcurrency: 1 },
 ];
 

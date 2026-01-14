@@ -108,6 +108,27 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
+  defineRuleToUpdateMetadata(func: lambda.IFunction): Rule {
+    const st1 = new iam.PolicyStatement();
+    st1.addActions("lambda:InvokeFunction");
+    st1.addResources(func.functionArn);
+    const policies: Record<string, iam.PolicyDocument> = {
+      "policy_invoke_update_metadata": new iam.PolicyDocument({
+        statements: [st1]
+      })
+    };
+    const ruleRole = new iam.Role(this, "role_invoke_update_metadata", {
+      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
+      inlinePolicies: policies,
+    });
+
+    return new events.Rule(this, `updateMetadataRule`, {
+      schedule: events.Schedule.cron({ hour: '19', minute: '0' }),
+      targets: [ new targets.LambdaFunction(func) ],
+      role: ruleRole
+    });
+  }
+
   defineRuleToUpdateUserList(func: lambda.IFunction): Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("lambda:InvokeFunction");
@@ -140,12 +161,15 @@ export class DownloadStack extends cdk.Stack {
     const role = this.defineDownloaderRole(outputQueue, cacheBucket);
     let playsLambda: lambda.IFunction = undefined;
     let userListLambda: lambda.IFunction = undefined;
+    let metadataLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
       const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.maxConcurrency);
       if (spec.name.endsWith("_processPlayed")) {
         playsLambda = f;
       } else if (spec.name.endsWith("_processUserList")) {
         userListLambda = f;
+      } else if (spec.name.endsWith("_processMetadata")) {
+        metadataLambda = f;
       }
     }
     if (playsLambda) {
@@ -155,9 +179,18 @@ export class DownloadStack extends cdk.Stack {
         value: mapping.eventSourceMappingId,
         exportName: 'downloader-PlaysMappingUUID'
       });
+    } else {
+      console.log("There isn't any plays lambda");
     }
     if (userListLambda) {
       this.defineRuleToUpdateUserList(userListLambda);
+    } else {
+      console.log("There isn't any user list lambda");
+    }
+    if (metadataLambda) {
+      this.defineRuleToUpdateMetadata(metadataLambda);
+    } else {
+      console.log("There isn't any metadata lambda");
     }
     new cdk.CfnOutput(this, 'downloaderOutputQueue', {
       value: outputQueue.queueUrl,

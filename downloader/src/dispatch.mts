@@ -7,7 +7,6 @@ import { log } from "./logging.mjs";
 const INSIDE_PREFIX = "inside-dev-";
 
 // lambda names we expect to see
-const FUNCTION_UPDATE_METADATA = "updateMetadata";
 const FUNCTION_UPDATE_TOP50 = "updateBGGTop50";
 
 import {invokeLambdaAsync, splitYmd} from "./library.mjs";
@@ -49,9 +48,8 @@ export async function dispatchEnsureGames(system: System, gameIds: number[]): Pr
     await sendToDownloaderQueue(system, { discriminator: "EnsureGamesMessage", gameIds });
 }
 
-export function dispatchUpdateMetadata(metadata: Metadata): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_UPDATE_METADATA, metadata);
+export function dispatchUpdateMetadata(system: System, metadata: Metadata): Promise<void> {
+    return sendToDownloaderQueue(system, { discriminator: "UpdateMetadataMessage", metadata });
 }
 
 export function dispatchUpdateTop50(top50: number[]): Promise<void> {
