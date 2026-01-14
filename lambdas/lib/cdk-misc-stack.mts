@@ -19,13 +19,14 @@ let DATABASE_VPC: ec2.IVpc = undefined;
 let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
-let PUBLIC_SUBNET_A: ec2.ISubnet = undefined;
-let PUBLIC_SUBNET_B: ec2.ISubnet = undefined;
-let PUBLIC_SUBNET_C: ec2.ISubnet = undefined;
 let CONFIRM_LAMBDA: lambda.IFunction = undefined;
 
 export const RUNTIME = lambda.Runtime.NODEJS_22_X;
-type OptsType = "bgg" | "db" | "logging";
+// bgg - access BoardGameGeek, needs to be public
+// db - access to the database, needs to be private
+// logging - ability to write to CloudWatch logs
+// cw - ability to read CloudWatch metrics, needs to be public
+type OptsType = "bgg" | "db" | "logging" | "cw";
 
 export class MiscStack extends cdk.Stack {
   // don't do this, it costs too much.
@@ -52,6 +53,22 @@ export class MiscStack extends cdk.Stack {
                 lambdaFunction: CONFIRM_LAMBDA,
               }).next(
                   new sfn.Succeed(this, "Thread processed")
+              )
+          )
+      ),
+    });
+  }
+
+  defineCountsStateMachine(cwFunction: lambda.Function, countFunction: lambda.Function) {
+    return new sfn.StateMachine(this, 'countsStateMachine', {
+      definitionBody: sfn.DefinitionBody.fromChainable(
+          new tasks.LambdaInvoke(this, "cwCountTask", {
+            lambdaFunction: cwFunction,
+          }).next(
+              new tasks.LambdaInvoke(this, "dbCountTask", {
+                lambdaFunction: countFunction,
+              }).next(
+                  new sfn.Succeed(this, "Counts processed")
               )
           )
       ),
@@ -94,6 +111,26 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
+  defineRuleToInvokeCounts(machine: sfn.IStateMachine, n: number): Rule {
+    const st1 = new iam.PolicyStatement();
+    st1.addActions("states:StartExecution");
+    st1.addResources(machine.stateMachineArn);
+    const policies: Record<string, iam.PolicyDocument> = {
+      "policy_invoke_counts_thread": new iam.PolicyDocument({
+        statements: [st1]
+      })
+    };
+    const ruleRole = new iam.Role(this, "role_invoke_counts_thread", {
+      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
+      inlinePolicies: policies,
+    });
+    return new events.Rule(this, `machineRule${n}`, {
+      schedule: events.Schedule.rate(Duration.minutes(10)),
+      targets: [ new targets.SfnStateMachine(machine) ],
+      role: ruleRole
+    });
+  }
+
   defineRuleToInvokeReport(machine: sfn.IStateMachine, n: number): Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("states:StartExecution");
@@ -114,26 +151,14 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
-  defineRuleToInvokeCounts(func: lambda.Function, n: number): Rule {
-    const st1 = new iam.PolicyStatement();
-    st1.addActions("lambda:InvokeFunction");
-    st1.addResources(func.functionArn);
-    const policies: Record<string, iam.PolicyDocument> = {
-      "policy_invoke_counts": new iam.PolicyDocument({
-        statements: [st1]
-      })
-    };
-    const ruleRole = new iam.Role(this, "role_invoke_counts", {
-      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
-      inlinePolicies: policies,
-    });
-    return new events.Rule(this, `funcRule${n}`, {
-      schedule: events.Schedule.rate(Duration.minutes(10)),
-      targets: [ new targets.LambdaFunction(func) ],
-      role: ruleRole
-    });
-  }
-
+  /**
+   *
+   * @param name
+   * @param handler
+   * @param opts
+   * @param subnetType - public means outside VPC, private means private subnet inside VPC.
+   * @param n - a unique number for every function, used to generate unique names
+   */
   defineLambda(name: string, handler: string, opts: OptsType[], subnetType: "public" | "private", n: number): lambda.Function {
     const role = this.defineRole(opts, name, n);
     const vpcOpts: Partial<lambda.FunctionProps> = {
@@ -205,6 +230,15 @@ export class MiscStack extends cdk.Stack {
         statements: [loggingCloudWatch]
       });
     }
+    if (opts.includes("cw")) {
+      const cwPolicy = new iam.PolicyStatement();
+      cwPolicy.addActions("cloudwatch:ListEntitiesForMetric", "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics",
+          "cloudwatch:GetMetricStream", "cloudwatch:ListMetricStreams", "cloudwatch:ListMetrics");
+      cwPolicy.addResources("*");
+      policies[`policy_${name}_cw`] = new iam.PolicyDocument({
+        statements: [cwPolicy]
+      });
+    }
     return new iam.Role(this, `role_${name}`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       inlinePolicies: policies,
@@ -218,9 +252,6 @@ export class MiscStack extends cdk.Stack {
     PRIVATE_SUBNET_A = ec2.Subnet.fromSubnetId(this, "private a", "subnet-f565d0bc");
     PRIVATE_SUBNET_B = ec2.Subnet.fromSubnetId(this, "private b", "subnet-a865decf");
     PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", "subnet-44646e1d");
-    PUBLIC_SUBNET_A = ec2.Subnet.fromSubnetId(this, "public a", "subnet-0822a1312816de200");
-    PUBLIC_SUBNET_B = ec2.Subnet.fromSubnetId(this, "public b", "subnet-039233503b6e31d8e");
-    PUBLIC_SUBNET_C = ec2.Subnet.fromSubnetId(this, "public c", "subnet-013589611630ac1d0");
     ZIP_BUCKET = s3.Bucket.fromBucketName(this, "bucket", DEPLOYMENT_BUCKET);
     CONFIRM_LAMBDA = lambda.Function.fromFunctionName(this, "confirmFunc", "auth_confirm");
   }
@@ -239,6 +270,8 @@ export class MiscStack extends cdk.Stack {
     // const sm2 = this.defineReportStateMachine(reportFunction, writeFunction);
     // const rule2 = this.defineRuleToInvokeReport(sm2, 2);
     const countFunction = this.defineLambda("misc_counts", "counts.handler", ["db"], "private", 4);
-    const rule3 = this.defineRuleToInvokeCounts(countFunction, 3);
+    const cwFunction = this.defineLambda("misc_cw", "cloudwatch.handler", ["cw"], "public", 5);
+    const sm2 = this.defineCountsStateMachine(cwFunction, countFunction);
+    const rule6 = this.defineRuleToInvokeCounts(sm2, 6);
   }
 }

@@ -21,6 +21,7 @@ async function updateCode(client: LambdaClient, funcName: string) {
 const lClient = new LambdaClient({ region: REGION, profile: PROFILE });
 await updateCode(lClient, "misc_auth_thread");
 await updateCode(lClient, "misc_counts");
+await updateCode(lClient, "misc_cw");
 // await updateCode(lClient, "misc_report_read");
 // await updateCode(lClient, "misc_report_write");
 // set the retention period on the log groups
