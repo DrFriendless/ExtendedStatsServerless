@@ -160,6 +160,15 @@ function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: Expansi
     return undefined;
 }
 
+/**
+ * Say we have an expansion X, which has multiple basegames. We write A -> X to mean "X expands A".
+ * We can have A -> X, B -> X, in which case we don't know anything they played.
+ * But we could have A -> C -> X, A -> B -> X in which case we know they played A but we don't know whether they played B or C.
+ * This method, given X, returns all games they must have played.
+ *
+ * @param game
+ * @param ed
+ */
 function getProvableBasegames(game: number, ed: ExpansionData): number[] {
     const chains = ed.getPossibleBasegameChains(game);
     if (chains.length === 0) return [];

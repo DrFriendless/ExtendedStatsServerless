@@ -189,17 +189,15 @@ export async function processCollection(invocation: FileToProcess) {
             await markTryAgainTomorrow(system, invocation);
         } else if (code === 400) {
             log(`No such geek: ${invocation.geek}`)
+            await dispatchNoSuchUser(system, invocation.geek);
+        } else if (code === 429) {
+            log(`Rate limit exceeded processing collection for ${invocation.geek}`);
+            await dispatchSlowDown(system);
         }
     } catch (e) {
+        console.log(e);
         console.log(invocation);
-        if (e.toString().includes("Collection exceeds maximum export size")) {
-            console.log("try again tomorrow");
-            await markTryAgainTomorrow(system, invocation);
-        } else {
-            await markAsUnprocessed(system, invocation);
-        }
     }
-
     console.log(`processCollection ${invocation.geek} done`);
     await flushLogging();
 }
@@ -207,25 +205,19 @@ export async function processCollection(invocation: FileToProcess) {
 // return success
 async function tryToProcessCollection(system: System, invocation: FileToProcess): Promise<number> {
     const data = await fetchXMLFromBGG(system.collectionToken, invocation.url, invocation);
-    if (!data) {
-        log(`Rate limit exceeded processing collection for ${invocation.geek}`);
-        await dispatchSlowDown(system);
-        return 429;
-    }
-    const collection = await extractUserCollectionFromPage(invocation.geek, data, invocation.url);
+    const collection = await extractUserCollectionFromPage(system, invocation.geek, data, invocation.url);
     if (collection === "InvalidUsername") {
-        log(`It looks like ${invocation.geek} no longer exists.`);
-        await dispatchNoSuchUser(system, invocation.geek);
+        return 400;
     } else if (collection === "RateLimitExceeded") {
-        log(`Rate limit exceeded processing collection for ${invocation.geek}`);
-        await dispatchSlowDown(system);
         return 429;
     } else if (collection === "IncorrectDOM") {
         log(`Incorrect DOM for URL ${invocation.url}`);
+        await system.publishError(`Incorrect DOM for URL ${invocation.url}`, "processCollection");
     } else if (collection === "ComeBackLater") {
-        // TODO
+        return 202;
     } else if (collection === "TooBig") {
         log(`Collection exceeds maximum export size for ${invocation.geek}`);
+        await system.publishError(`Collection exceeds maximum export size for ${invocation.geek}`, "processCollection");
         // TODO
     } else {
         const ids = collection.items.map(item => item.gameId);

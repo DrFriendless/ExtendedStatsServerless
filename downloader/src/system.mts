@@ -1,4 +1,5 @@
 import {GetParameterCommand, GetParametersByPathCommand, SSMClient} from "@aws-sdk/client-ssm";
+import {PublishCommand, SNSClient} from "@aws-sdk/client-sns";
 import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
 
 const BGG_SECRETS = "extstats/bgg";
@@ -13,6 +14,7 @@ export async function loadSystem() {
 export class System {
     logBucket: string;
     cacheBucket: string;
+    snsTopic: string;
     metadataFile: string;
     downloaderQueue: string;
     playsQueue: string;
@@ -57,6 +59,9 @@ export class System {
                     case `${path}/cache`:
                         this.cacheBucket = p.Value;
                         break;
+                    case `${path}/topic`:
+                        this.snsTopic = p.Value;
+                        break;
                 }
             }
             this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
@@ -97,7 +102,6 @@ export class System {
         return this;
     }
 
-
     async getParameter(key: string): Promise<string> {
         const ssmClient = new SSMClient({
             apiVersion: '2014-11-06',
@@ -109,6 +113,21 @@ export class System {
             })
         );
         return response.Parameter.Value;
+    }
+
+    async publishError(message: string, component: string): Promise<void> {
+        const snsClient = new SNSClient({
+            apiVersion: '2014-11-06',
+            region: process.env.AWS_REGION
+        });
+        const response = await snsClient.send(
+            new PublishCommand({
+                Message: message,
+                Subject: `Alert from Extstats Downloader ${component}`,
+                TopicArn: this.snsTopic
+            })
+        );
+        console.log(JSON.stringify(response));
     }
 }
 

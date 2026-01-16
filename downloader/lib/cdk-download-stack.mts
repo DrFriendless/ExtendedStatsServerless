@@ -3,14 +3,16 @@ import {Duration, Tags} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import {BlockPublicAccess} from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as sqs from "aws-cdk-lib/aws-sqs";
+import * as sns from "aws-cdk-lib/aws-sns";
+import {SubscriptionProtocol} from "aws-cdk-lib/aws-sns";
 import * as sources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as events from "aws-cdk-lib/aws-events";
-import * as targets from "aws-cdk-lib/aws-events-targets";
-import {COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS, CACHE_BUCKET} from "./metadata.mts";
-import {BlockPublicAccess} from "aws-cdk-lib/aws-s3";
 import {Rule} from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
+import {CACHE_BUCKET, COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS} from "./metadata.mts";
 
 const RUNTIME = lambda.Runtime.NODEJS_22_X;
 
@@ -40,7 +42,22 @@ export class DownloadStack extends cdk.Stack {
     return f;
   }
 
-  defineDownloaderRole(outputQueue: sqs.IQueue, cacheBucket: s3.Bucket): iam.IRole {
+  defineSnsTopic(name: string, email: string) {
+    const topic = new sns.Topic(this, "downloader_topic", {
+      topicName: name,
+      fifo: false
+    });
+    const sub = new sns.Subscription(this, "downloader_topic_sub", {
+      topic: topic,
+      protocol: SubscriptionProtocol.EMAIL,
+      endpoint: email
+    });
+    Tags.of(sub).add("component", COMPONENT);
+    Tags.of(topic).add("component", COMPONENT);
+    return topic;
+  }
+
+  defineDownloaderRole(outputQueue: sqs.IQueue, cacheBucket: s3.Bucket, topic: sns.Topic): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
     bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
@@ -71,11 +88,21 @@ export class DownloadStack extends cdk.Stack {
       statements: [sendToOutputQueue]
     });
 
-    const useCacheBucket = new iam.PolicyStatement();
-    useCacheBucket.addActions("s3:PutObject", "s3:DeleteObject", "s3:GetObject", "s3:ListBucket");
-    useCacheBucket.addResources(cacheBucket.bucketArn);
+    const sendToSNS = new iam.PolicyStatement();
+    sendToSNS.addActions("sns:Publish");
+    sendToSNS.addResources(topic.topicArn);
+    policies[`policy_downloader_sns`] = new iam.PolicyDocument({
+      statements: [sendToSNS]
+    });
+
+    const useCacheBucket1 = new iam.PolicyStatement();
+    useCacheBucket1.addActions("s3:ListBucket");
+    useCacheBucket1.addResources(cacheBucket.bucketArn);
+    const useCacheBucket2 = new iam.PolicyStatement();
+    useCacheBucket2.addActions("s3:*Object");
+    useCacheBucket2.addResources(cacheBucket.bucketArn + "/*");
     policies[`policy_cache_bucket`] = new iam.PolicyDocument({
-      statements: [useCacheBucket]
+      statements: [useCacheBucket1, useCacheBucket2]
     });
 
     const managedPolicies: iam.IManagedPolicy[] = [
@@ -158,7 +185,8 @@ export class DownloadStack extends cdk.Stack {
     const outputQueue = this.defineOutputQueue();
     const playsQueue = this.definePlaysQueue();
 
-    const role = this.defineDownloaderRole(outputQueue, cacheBucket);
+    const snsTopic = this.defineSnsTopic(process.env.SNS_TOPIC, process.env.SNS_EMAIL);
+    const role = this.defineDownloaderRole(outputQueue, cacheBucket, snsTopic);
     let playsLambda: lambda.IFunction = undefined;
     let userListLambda: lambda.IFunction = undefined;
     let metadataLambda: lambda.IFunction = undefined;
@@ -203,6 +231,10 @@ export class DownloadStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'downloaderCache', {
       value: cacheBucket.bucketArn,
       exportName: 'downloader-cacheBucketARN'
+    });
+    new cdk.CfnOutput(this, 'downloaderTopic', {
+      value: snsTopic.topicArn,
+      exportName: 'downloader-topicARN'
     });
   }
 }

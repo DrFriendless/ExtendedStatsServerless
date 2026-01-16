@@ -308,7 +308,7 @@ export async function doMarkUrlUnprocessed(conn: mysql.Connection, processMethod
 }
 
 export async function doMarkUrlTryTomorrow(conn: mysql.Connection, processMethod: string, url: string) {
-    const sqlSet = "update files set last_scheduled = addtime(now(), '24:00:00') where url = ? and processMethod = ?";
+    const sqlSet = "update files set nextUpdate = addtime(now(), '24:00:00') where url = ? and processMethod = ?";
     await conn.query(sqlSet, [url, processMethod]);
 }
 
@@ -547,6 +547,7 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
     let risk = 0;
     let good = 0;
     for (const q of query) {
+        console.log(`${q.url} last scheduked at ${q.last_scheduled}`);
         if (q.processMethod === 'processYear') {
             risk += 7;
         } else if (q.processMethod === 'processCollection') {

@@ -4,7 +4,7 @@ import {
     DescribeLogGroupsCommand,
     PutRetentionPolicyCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
-import {COMPONENT, DEPLOYMENT_BUCKET, REGION, PROFILE, LAMBDA_SPECS} from "./metadata.mts";
+import {COMPONENT, DEPLOYMENT_BUCKET, REGION, PROFILE, LAMBDA_SPECS, CACHE_BUCKET} from "./metadata.mts";
 import {CloudFormationClient, ListExportsCommand} from "@aws-sdk/client-cloudformation";
 import {PutParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 
@@ -75,18 +75,27 @@ for (const e of response.Exports) {
         });
         const r3 = await lClient.send(lCmd);
         console.log(r3.$metadata.httpStatusCode);
-    } else if (e.Name === "downloader-cacheBucketARN") {
-        // turn on the plays lambda processing from the plays queue
-        console.log("Turning on plays queue");
+    } else if (e.Name === "downloader-topicARN") {
+        console.log("Updating SNS topic URL in Parameter Store");
         const ssmCmd = new PutParameterCommand({
-            Name: "/extstats/downloader/cache",
+            Name: "/extstats/downloader/topic",
             Value: e.Value,
             Overwrite: true,
             Type: "String"
         });
-        const r3 = await ssmClient.send(ssmCmd);
-        console.log(r3.$metadata.httpStatusCode);
+        const r = await ssmClient.send(ssmCmd);
+        console.log(r.$metadata.httpStatusCode);
     } else {
         console.log(e.Name);
     }
+    // turn on the plays lambda processing from the plays queue
+    console.log("Set plays cache bucket");
+    const ssmCmd = new PutParameterCommand({
+        Name: "/extstats/downloader/cache",
+        Value: CACHE_BUCKET,
+        Overwrite: true,
+        Type: "String"
+    });
+    const r3 = await ssmClient.send(ssmCmd);
+    console.log(r3.$metadata.httpStatusCode);
 }

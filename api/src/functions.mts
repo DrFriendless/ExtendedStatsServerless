@@ -11,7 +11,7 @@ import {
     updateFAQCount,
     markUrlForUpdate,
     markGeekForUpdate,
-    gatherSystemUpdates, getGeekGames
+    gatherSystemUpdates, getGeekGames, getAmbiguousGames
 } from "./mysql-rds.mjs";
 import {
     Collection, CollectionWithMonthlyPlays, CollectionWithPlays,
@@ -26,6 +26,7 @@ import {
 } from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
+import {DisambiguationData} from "./interfaces.mjs";
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
     const system = await findSystem();
@@ -178,4 +179,22 @@ export async function getRankings(event: any): Promise<RankingTableRow[] | HttpR
     } else {
         return [];
     }
+}
+
+
+
+export async function getDisambiguationData(event: APIGatewayProxyEvent): Promise<DisambiguationData | HttpResponse> {
+    const system = await findSystem();
+    if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter();
+
+    const geek = event.queryStringParameters.geek;
+    if (!geek) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify("You must specify a 'geek' parameter")
+        }
+    }
+    const ambiguous = await system.asyncReturnWithConnection(conn => getAmbiguousGames(conn, geek));
+
 }

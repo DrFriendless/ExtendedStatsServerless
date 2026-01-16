@@ -112,6 +112,7 @@ async function saveToCache(system: System, key: string, body: string) {
         const response = await client.send(command);
         console.log(response);
     } catch (error) {
+        await system.publishError(`Failure writing ${key} to S3 bucket ${system.cacheBucket}`, "processYear");
         console.error(error);
     }
 }

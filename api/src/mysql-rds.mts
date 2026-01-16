@@ -3,12 +3,12 @@ import { selectGames } from "./selector.mjs";
 import {
     RankingTableRow, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
     TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery,
-    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount, ToProcessElement, GameDataShort, GeekGame
+    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount, ToProcessElement, GameDataShort
 } from "extstats-core";
 import {
-    AllPlaysQueryResult,
+    AllPlaysQueryResult, AmbiguousPlay, DisambiguationGame,
     ExpansionPlay,
-    ExtractedGameData, GeekGameRow, LastYearQueryResult, MonthlyCountsQueryResult, MonthlyPlaysQueryResult,
+    ExtractedGameData, LastYearQueryResult, MonthlyCountsQueryResult, MonthlyPlaysQueryResult,
     NormalisedPlay,
     PlayWithDate, ProcessMethodCount,
     RawGameData
@@ -247,6 +247,17 @@ export async function doGetGeekGames(conn: Connection, geek: string): Promise<{ 
     const geekId = await getGeekId(conn, geek);
     const sql = "select games.name name, geekgames.rating rating, geekgames.trade trade from games,geekgames where geekgames.geekid = ? and geekgames.game = games.bggid and geekgames.owned = 1 order by games.name asc;"
     return await conn.query(sql, [geekId]) as { name: string, rating: number, trade: number }[];
+}
+
+export async function getAmbiguousGames(conn: Connection, geek: string): Promise<{games: DisambiguationGame[], plays: AmbiguousPlay[]}> {
+    const geekId = await getGeekId(conn, geek);
+    // all ambiguous games they have played
+    const sql = "select distinct plays.game bggid, games.name name from plays,games where geek = ? and plays.game in (select expansion from (select expansion, count(basegame) c from expansions group by expansion) bob where c > 1) and plays.game = games.bggid";
+    const games = await conn.query(sql, [geekId]) as DisambiguationGame[];
+    // all plays which remain ambiguous
+    const sql2 = "select distinct year, bggid, name from plays_normalised, games where game in (select distinct expansion from expansions) and baseplay is null and geek = ? and games.bggid = plays_normalised.game";
+    const plays = await conn.query(sql2, [geekId]) as AmbiguousPlay[];
+    return { games, plays };
 }
 
 export async function gatherGeekSummary(system: System, geek: string): Promise<GeekSummary> {
