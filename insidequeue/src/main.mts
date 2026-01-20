@@ -36,6 +36,7 @@ import {
 import {invokeLambdaAsync, listAdd, sendToQueue, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
+import {identity} from "lodash";
 
 const OUTSIDE_PREFIX = "downloader_";
 
@@ -137,10 +138,9 @@ async function updatePlayedYears(system: System, geek: string, geekid: number, f
         periods.push({ start: `${y}-0-0`, end: `${y}-12-31` });
         y++;
     }
-    const q = "select url from files where processMethod = 'processYear' and geek = ?";
     const index = (await system.returnWithConnection(async conn => {
-        return [...await conn.query(q, [geek])] as { url: string }[];
-    })).map(row => row.url);
+        return [...await conn.query("select trim(url) u from files where processMethod = 'processYear' and geek = ?", [geek])] as { u: string }[];
+    })).map(row => row.u);
     for (const p of periods) {
         const range = `${p.start}=${p.end}=${geek}`;
         if (index.indexOf(range) >= 0) continue;
