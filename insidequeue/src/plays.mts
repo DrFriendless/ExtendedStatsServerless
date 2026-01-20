@@ -57,7 +57,7 @@ export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: 
     let current = initialPlays.map(play => toWorkingPlay(expansionData, play));
     current = coalescePlays(current);
     let iterations = 0;
-    while (iterations < 10) {
+    while (iterations < 100) {
         iterations++;
         const newPlays = inferNewPlays(current, expansionData);
         if (!newPlays) return current;
