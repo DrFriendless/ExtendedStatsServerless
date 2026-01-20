@@ -24,7 +24,6 @@ import {
     doMarkGameDoesNotExist,
     doMarkUrlProcessed,
     doMarkUrlTryTomorrow,
-    doMarkUrlUnprocessed,
     doProcessCollectionCleanup,
     doProcessGameResult,
     doUpdateBGGTop50,
@@ -32,7 +31,7 @@ import {
     doUpdateMetadata,
     doUpdateProcessUserResult,
     doMarkGeekDoesNotExist,
-    getGeeksThatDontExist, doUpdatePlaysForPeriod
+    getGeeksThatDontExist, doUpdatePlaysForPeriod, doMarkPlaysUrlProcessed
 } from "./mysql-rds.mjs";
 import {invokeLambdaAsync, listAdd, sendToQueue, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
@@ -67,12 +66,13 @@ async function main() {
     const system = await loadSystem();
     await initLogging(system, "InsideQueue");
     let slowdowns = 0;
+    const sqsClient = new SQSClient({ region: REGION });
     while (true) {
-        console.log(`Waiting for queue ${system.downloaderQueue} with ${slowdowns} slowdowns.`);
+        console.log(`... waiting for queue with ${slowdowns} slowdowns.`);
         // Credentials are granted to the EC2 hosting this so we don't need to add them here.
-        const sqsClient = new SQSClient({ region: REGION });
-        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 3, MaxNumberOfMessages: 10 };
+        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 5, MaxNumberOfMessages: 10 };
         const command = new ReceiveMessageCommand(input);
+        await flushLogging();
         const response = await sqsClient.send(command);
         if (response.Messages) {
             slowdowns += await handleMessages(system, sqsClient, response.Messages, system.downloaderQueue);
@@ -308,6 +308,10 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
                 console.log(`Will retry collection for ${fd.geek} in 60 seconds.`);
                 setTimeout(() => scheduleProcessing(system, toProcess, true), 60000);
             }
+            break;
+        case "MarkPlaysForPeriodProcessed":
+            console.log(`MarkPlaysForPeriodProcessed ${message.url}`);
+            await system.withConnectionAsync(conn => doMarkPlaysUrlProcessed(conn, message.url))
             break;
         case "NoSuchGameMessage":
             console.log(JSON.stringify(message));

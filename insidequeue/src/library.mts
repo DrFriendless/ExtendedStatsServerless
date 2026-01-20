@@ -108,11 +108,9 @@ export async function invokeLambdaAsync(func: string, payload: object): Promise<
 }
 
 export function parseYmd(ymd: string): Date | undefined {
-    const f = ymd.split("-");
-    if (f.length !== 3) return undefined;
-    const y = parseInt(f[0]);
-    const m = parseInt(f[1]);
-    const d = parseInt(f[2]);
+    const s = splitYmd(ymd);
+    if (!s) return undefined;
+    const { y, m, d } = s;
     const result = new Date();
     result.setFullYear(y);
     result.setMonth(m-1);
@@ -122,10 +120,21 @@ export function parseYmd(ymd: string): Date | undefined {
 
 export function splitYmd(ymd: string): { y: number; m: number; d: number } {
     const f = ymd.split("-");
-    if (f.length !== 3) return undefined;
-    const y = parseInt(f[0]);
-    const m = parseInt(f[1]);
-    const d = parseInt(f[2]);
+    let y: number;
+    let m: number;
+    let d: number;
+    if (f.length === 1) {
+        const i = parseInt(ymd);
+        y = Math.floor(i/10000);
+        m = Math.floor(i/100) % 100;
+        d = i % 100;
+    } else if (f.length === 3) {
+        y = parseInt(f[0]);
+        m = parseInt(f[1]);
+        d = parseInt(f[2]);
+    } else {
+        return undefined;
+    }
     return { y, m, d };
 }
 

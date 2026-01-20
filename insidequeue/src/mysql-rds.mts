@@ -7,7 +7,7 @@ import mysql = require('promise-mysql');
 import {
     CollectionGame,
     ExpansionData,
-    MetadataRule, MonthPlayed, PlayData, ProcessPlaysForPeriodResult,
+    MetadataRule, PlayData, ProcessPlaysForPeriodResult,
     ProcessGameResult, ProcessMethod,
     RankingTableRow,
     SeriesMetadata, ToProcessElement,
@@ -16,14 +16,6 @@ import {
 import {count, eqSet, listIntersect, listMinus, parseYmd, splitYmd} from "./library.mjs";
 import { PlaysRow } from "./library.mjs";
 import {normalise} from "./plays.mjs";
-
-interface ProcessPlaysResult {
-    geek: string;
-    month: number;
-    year: number;
-    plays: PlayData[];
-    url: string;
-}
 
 export async function doUpdateBGGTop50(conn: mysql.Connection, games: number[]) {
     await doUpdateSeries(conn, [ { name: "BGG Top 50", games } ]);
@@ -426,34 +418,6 @@ async function doUpdateGeekgame(conn: mysql.Connection, geekId: number, game: Co
     }
 }
 
-export async function doEnsureProcessPlaysFiles(conn: mysql.Connection, geek: string, months: MonthPlayed[]) {
-    const playsUrl = "https://boardgamegeek.com/xmlapi2/plays?username=%s&mindate=%d-%d-01&maxdate=%d-%d-31&subtype=boardgame".replace("%s", encodeURIComponent(geek));
-    const timelessPlaysUrl = "https://boardgamegeek.com/xmlapi2/plays?username=%s&mindate=0000-00-00&maxdate=0000-00-00&subtype=boardgame".replace("%s", encodeURIComponent(geek));
-    const geekId = await getGeekId(conn, geek);
-    for (const month of months) {
-        let url = playsUrl
-            .replace("%d", month.year.toString())
-            .replace("%d", month.month.toString())
-            .replace("%d", month.year.toString())
-            .replace("%d", month.month.toString());
-        if (month.month === 0 && month.year === 0) url = timelessPlaysUrl;
-        await doRecordFile(conn, url, "processPlays", geek, "Plays for " + geek + " for " + month.month + "/" + month.year,
-            undefined, month.month, month.year, geekId);
-    }
-}
-
-export async function doEnsureMonthsPlayed(conn: mysql.Connection, geek: string, months: MonthPlayed[]) {
-    const geekId = await getGeekId(conn, geek);
-    const insertSql = "insert into months_played (geek, month, year) values (?, ?, ?)";
-    for (const month of months) {
-        try {
-            await conn.query(insertSql, [geekId, month.month, month.year]);
-        } catch (e) {
-            // ignore insert duplicate row
-        }
-    }
-}
-
 // ensure that these games have a row in the database.
 // can't trust that the IDs are actually numbers, TYVM TypeScript.
 export async function doEnsureGames(conn: mysql.Connection, anyIds: any[]): Promise<number[]> {
@@ -547,7 +511,7 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
     let risk = 0;
     let good = 0;
     for (const q of query) {
-        console.log(`${q.url} last scheduked at ${q.last_scheduled}`);
+        console.log(`${q.url} last scheduled at ${q.last_scheduled}`);
         if (q.processMethod === 'processYear') {
             risk += 7;
         } else if (q.processMethod === 'processCollection') {
@@ -836,54 +800,6 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
     }
 }
 
-export async function doNormalisePlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number,
-                                               expansionData: ExpansionData) {
-    const selectSql = "select game, playDate, quantity, location from plays where geek = ? and month = ? and year = ?";
-    const deleteSql = "delete from plays_normalised where geek = ? and month = ? and year = ?";
-    const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play) values ?";
-    const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
-    const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, expansion_play, baseplay) values ?";
-    const rows: PlaysRow[] = await conn.query(selectSql, [geekId, month, year]);
-    const normalised = normalise(rows, geekId, month, year, expansionData);
-    await conn.query(deleteSql, [geekId, month, year]);
-    // insert all of the base plays
-    const basePlays: any[][] = [];
-    for (const np of normalised) {
-        basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, 0]);
-    }
-    if (basePlays.length > 0) {
-        try {
-            await conn.query(insertBasePlaySql, [basePlays]);
-        } catch (ex) {
-            console.log(ex);
-            throw ex;
-        }
-    }
-    // construct the expansion plays with references to the base plays
-    const expPlays = [];
-    for (const np of normalised) {
-        if (np.expansions.length > 0) {
-            const args = [np.game, geekId, np.quantity, np.year, np.month, np.date];
-            const result = await conn.query(getIdSql, args);
-            if (!result || result.length === 0 || !result[0]) {
-                continue;
-            }
-            const id = result[0].id;
-            for (const e of np.expansions) {
-                expPlays.push([e, geekId, np.quantity, np.year, np.month, np.date, 1, id]);
-            }
-        }
-    }
-    if (expPlays.length > 0) {
-        try {
-            await conn.query(insertExpansionPlaySql, [expPlays]);
-        } catch (ex) {
-            console.log(ex);
-            throw ex;
-        }
-    }
-}
-
 export async function doSetGeekPlaysForYear(conn: mysql.Connection, geekId: number, startYmdInc: string, endYmdInc: string,
                                              plays: PlayData[], notGames: number[], playsMonths: { y: number, m: number }[]) {
     const s = splitYmd(startYmdInc);
@@ -908,26 +824,6 @@ export async function doSetGeekPlaysForYear(conn: mysql.Connection, geekId: numb
             yms.add(key);
             playsMonths.push({ y: p.y, m: p.m });
         }
-    }
-    if (values.length > 0) {
-        await conn.query(insertSql, [values]);
-    }
-}
-
-export async function doSetGeekPlaysForMonth(conn: mysql.Connection, geekId: number, month: number, year: number,
-                                             plays: PlayData[], notGames: number[]) {
-    const deleteSql = "delete from plays where geek = ? and month = ? and year = ?";
-    const insertSql = "insert into plays (game, geek, playDate, quantity, location, month, year) values ?";
-    const playsAlready = await countWhere(conn, "plays where geek = ? and month = ? and year = ?", [geekId, month, year]);
-    if (playsAlready > 0 && plays.length === 0) {
-        console.log("Not updating plays for " + geekId + " " + month + "/" + year + " because there are existing plays and none to replace them.");
-        return;
-    }
-    await conn.query(deleteSql, [geekId, month, year]);
-    const values = [];
-    for (const play of plays) {
-        if (notGames.indexOf(play.gameid) >= 0) continue;
-        values.push([play.gameid, geekId, play.date, play.quantity, play.location, month, year]);
     }
     if (values.length > 0) {
         await conn.query(insertSql, [values]);
@@ -997,12 +893,6 @@ async function loadExpansionData(conn: mysql.Connection): Promise<ExpansionData>
     return new ExpansionData(await conn.query("select basegame, expansion from expansions"));
 }
 
-export async function doProcessPlayedMonths(conn: mysql.Connection, geek: string, months: MonthPlayed[], url: string) {
-    await doEnsureMonthsPlayed(conn, geek, months);
-    await doEnsureProcessPlaysFiles(conn, geek, months);
-    await doMarkUrlProcessed(conn, "processPlayed", url);
-}
-
 export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: ProcessPlaysForPeriodResult) {
     // console.log(data.geek, data.startYmdInc, data.endYmdInc);
     const gameIds = [];
@@ -1014,44 +904,29 @@ export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: Proce
     if (geekId === undefined) return;
     const expansionData = await loadExpansionData(conn); // 2.1 sec
     const notGames = await doEnsureGames(conn, gameIds);
-    const now = new Date();
+
     const end = parseYmd(data.endYmdInc);
     if (!end) return;
-    const daysSince = (now.getTime() - end.getTime())/1000 / 1440;
+
     const playsMonths: { y: number, m: number}[] = [];
     await doSetGeekPlaysForYear(conn, geekId, data.startYmdInc, data.endYmdInc, data.plays, notGames, playsMonths);
     await doNormalisePlaysForYear(conn, geekId, playsMonths, expansionData);
-    if (daysSince < 14) {
-        await doMarkUrlProcessedWithUpdate(conn, data.processMethod, data.url, "72:00:00");
-    } else if (daysSince < 30) {
-        await doMarkUrlProcessedWithUpdate(conn, data.processMethod, data.url, "168:00:00");
-    } else {
-        await doMarkUrlProcessedNoUpdate(conn, data.processMethod, data.url);
-    }
+    await doMarkPlaysUrlProcessed(conn, data.url);
     await doUpdateFrontPageGeek(conn, data.geek);
 }
 
-export async function doProcessPlaysResult(conn: mysql.Connection, data: ProcessPlaysResult) {
-    const gameIds = [];
-    for (const play of data.plays) {
-        if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
-    }
-    const geekId = await getGeekId(conn, data.geek);
-    const expansionData = await loadExpansionData(conn); // 2.1 sec
-    const notGames = await doEnsureGames(conn, gameIds);
-    await doSetGeekPlaysForMonth(conn, geekId, data.month, data.year, data.plays, notGames);
-    await doNormalisePlaysForMonth(conn, geekId, data.month, data.year, expansionData);
+export async function doMarkPlaysUrlProcessed(conn: mysql.Connection, url: string): Promise<void> {
+    const processMethod = "processYear";
     const now = new Date();
-    const nowMonth = now.getFullYear() * 12 + now.getMonth();
-    const thenMonth = data.year * 12 + data.month;
-    let delta;
-    if (nowMonth - thenMonth > 6) {
-        delta = "838:00:00";
-    } else if (nowMonth - thenMonth > 2) {
-        delta = "168:00:00";
+    const endYmd = url.split("=")[1];
+    const end = parseYmd(endYmd);
+    if (!end) return;
+    const daysSince = (now.getTime() - end.getTime())/1000 / 1440;
+    if (daysSince < 14) {
+        await doMarkUrlProcessedWithUpdate(conn, processMethod, url, "72:00:00");
+    } else if (daysSince < 30) {
+        await doMarkUrlProcessedWithUpdate(conn, processMethod, url, "168:00:00");
     } else {
-        delta = "72:00:00";
+        await doMarkUrlProcessedNoUpdate(conn, processMethod, url);
     }
-    await doMarkUrlProcessedWithUpdate(conn, "processPlays", data.url, delta);
-    await doUpdateFrontPageGeek(conn, data.geek);
 }
