@@ -343,6 +343,7 @@ export async function processPlayed(event: QueueInput) {
             url: invocation.url
         }
         await dispatchPlaysForPeriodResult(system, result);
+        await dispatchPlaysForPeriodResult(system, result);
 
         // ack message
         const sqsClient = new SQSClient({ region: record.awsRegion });
@@ -351,7 +352,10 @@ export async function processPlayed(event: QueueInput) {
             ReceiptHandle: record.receiptHandle
         });
         const response = await sqsClient.send(command);
-        console.log(response);
+        console.log(JSON.stringify(response));
+        if (response.$metadata.httpStatusCode !== 200) {
+            await system.publishError(JSON.stringify(response), "processPlayed");
+        }
     }
     await flushLogging();
 }

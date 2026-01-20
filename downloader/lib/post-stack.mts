@@ -88,14 +88,14 @@ for (const e of response.Exports) {
     } else {
         console.log(e.Name);
     }
-    // turn on the plays lambda processing from the plays queue
-    console.log("Set plays cache bucket");
-    const ssmCmd = new PutParameterCommand({
-        Name: "/extstats/downloader/cache",
-        Value: CACHE_BUCKET,
-        Overwrite: true,
-        Type: "String"
-    });
-    const r3 = await ssmClient.send(ssmCmd);
-    console.log(r3.$metadata.httpStatusCode);
 }
+// turn on the plays lambda processing from the plays queue
+console.log("Set plays cache bucket");
+const ssmCmd = new PutParameterCommand({
+    Name: "/extstats/downloader/cache",
+    Value: CACHE_BUCKET,
+    Overwrite: true,
+    Type: "String"
+});
+const r3 = await ssmClient.send(ssmCmd);
+console.log(r3.$metadata.httpStatusCode);

@@ -16,7 +16,7 @@
     "@aws-sdk/client-sqs": "^3.943.0",
     "@aws-sdk/client-ssm": "^3.943.0",
     "@aws-sdk/client-cloudformation": "^3.943.0",
-    "extstats-core": "file:../../repo/extstats-core-1.31.0.tgz",
+    "extstats-core": "file:../../repo/extstats-core-1.33.6.tgz",
     "fast-xml-parser": "^5.3.2",
     "lodash-es": "^4.17.21",
     "xml2js": "^0.6.2",

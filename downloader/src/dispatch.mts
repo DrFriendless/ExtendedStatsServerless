@@ -1,6 +1,6 @@
 // methods to send data to the Inside module
 
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { SQSClient, SendMessageCommand, SendMessageCommandOutput } from "@aws-sdk/client-sqs";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { log } from "./logging.mjs";
 
@@ -37,7 +37,10 @@ async function sendToDownloaderQueue(system: System, body: QueueMessage, details
         QueueUrl: system.downloaderQueue,
         MessageBody: b,
     });
-    await sqsClient.send(command);
+    const dispatchResult: SendMessageCommandOutput = await sqsClient.send(command);
+    if (dispatchResult.$metadata.httpStatusCode !== 200) {
+        await system.publishError(JSON.stringify(dispatchResult), "sendToDownloaderQueue");
+    }
 }
 
 export async function dispatchUpdateUserList(system: System, users: string[]): Promise<void> {
@@ -173,6 +176,8 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
         if (chunkPlays.length > 0) {
             await emit(result.processMethod, chunkStart, result.endYmdInc, result.geek, chunkPlays);
         }
+        // the inside queue has not seen a result for the whole year, so it doesn't know to mark the URL as processed
+        await sendToDownloaderQueue(system, { discriminator: "MarkPlaysForPeriodProcessed", url: result.url });
     } else {
         await sendToDownloaderQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: result }, result.url);
     }

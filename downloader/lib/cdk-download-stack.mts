@@ -26,7 +26,7 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-  defineLambda(name: string, handler: string, role: iam.IRole, duration: number, maxConcurrency: number | undefined): lambda.Function {
+  defineLambda(name: string, handler: string, role: iam.IRole, duration: number, mem: number = 128, maxConcurrency: number | undefined): lambda.Function {
     const code = lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip");
     let opts: lambda.FunctionProps = {
       functionName: name,
@@ -35,7 +35,8 @@ export class DownloadStack extends cdk.Stack {
       role: role,
       code: code,
       timeout: Duration.seconds(duration),
-      reservedConcurrentExecutions: maxConcurrency
+      reservedConcurrentExecutions: maxConcurrency,
+      memorySize: mem
     }
     const f = new lambda.Function(this, name, opts);
     Tags.of(f).add("component", COMPONENT);
@@ -191,7 +192,7 @@ export class DownloadStack extends cdk.Stack {
     let userListLambda: lambda.IFunction = undefined;
     let metadataLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
-      const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.maxConcurrency);
+      const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency);
       if (spec.name.endsWith("_processPlayed")) {
         playsLambda = f;
       } else if (spec.name.endsWith("_processUserList")) {
