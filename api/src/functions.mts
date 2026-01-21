@@ -11,10 +11,10 @@ import {
     updateFAQCount,
     markUrlForUpdate,
     markGeekForUpdate,
-    gatherSystemUpdates, getGeekGames, getAmbiguousGames
+    gatherSystemUpdates, getGeekGames, getAmbiguousGames, loadExpansionData, doRetrieveGameNames
 } from "./mysql-rds.mjs";
 import {
-    Collection, CollectionWithMonthlyPlays, CollectionWithPlays,
+    Collection, CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationData, ExpansionData,
     FAQCount,
     GeekGameQuery,
     GeekSummary, MultiGeekPlays,
@@ -26,7 +26,6 @@ import {
 } from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
-import {DisambiguationData} from "./interfaces.mjs";
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
     const system = await findSystem();
@@ -181,8 +180,6 @@ export async function getRankings(event: any): Promise<RankingTableRow[] | HttpR
     }
 }
 
-
-
 export async function getDisambiguationData(event: APIGatewayProxyEvent): Promise<DisambiguationData | HttpResponse> {
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
@@ -195,6 +192,25 @@ export async function getDisambiguationData(event: APIGatewayProxyEvent): Promis
             body: JSON.stringify("You must specify a 'geek' parameter")
         }
     }
-    const ambiguous = await system.asyncReturnWithConnection(conn => getAmbiguousGames(conn, geek));
+    return await system.asyncReturnWithConnection(async conn => {
+        const expansions: ExpansionData = await loadExpansionData(conn);
+        const ambiguous = await getAmbiguousGames(conn, geek);
+        const { games, plays } = ambiguous;
+        // find all the distinct basegames
+        const basegames: number[] = [];
+        for (const g of games) {
+            for (const e of expansions.getBasegames(g.bggid)) {
+                if (!basegames.includes(e)) basegames.push(e);
+            }
+        }
+        const gameNames = await doRetrieveGameNames(conn, basegames);
+        const items = games.map(g => {
+            const bgs = expansions.getBasegames(g.bggid);
+            return { expansion: g, basegames: bgs.map(id => {
+                    return { bggid: id, name: gameNames[id] || "?" };
+                }) };
+        });
+        return { geek, plays, items };
+    });
 
 }

@@ -43,6 +43,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_changePassword`, handler: "auth.changePassword", route: "changePassword", method: "POST" },
     { name: `${COMPONENT}_update`, handler: "functions.markForUpdate", route: "update", method: "POST" },
     { name: `${COMPONENT}_checklist`, handler: "functions.getUserCheckList", route: "checklist", method: "GET" },
+    { name: `${COMPONENT}_disambiguation`, handler: "functions.getDisambiguationData", route: "disambiguation", method: "GET" },
     { name: `${COMPONENT}_personal`, handler: "auth.personal", route: "personal", method: "GET" },
     { name: `${COMPONENT}_updatePersonal`, handler: "auth.updatePersonal", route: "updatePersonal", method: "POST" },
     { name: `${COMPONENT}_retrieveComments`, handler: "blog.retrieveCommentsForUrl", route: "retrieveComments", method: "GET" },

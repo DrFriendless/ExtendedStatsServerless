@@ -1,5 +1,5 @@
 import {
-    Collection, CollectionWithMonthlyPlays, CollectionWithPlays,
+    Collection, CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationData,
     FAQCount, GeekGameQuery,
     GeekSummary, MultiGeekPlays,
     NewsItem, PlaysQuery,
@@ -306,5 +306,13 @@ export class ExtstatsApi {
             "body": JSON.stringify(body),
             method: "POST"
         })).json()) as { posts: BlogComment[] };
+    }
+
+    async getDisambiguationData(geek: string): Promise<DisambiguationData> {
+        return (await (await fetch(`${this.baseUrl}/disambiguation?geek=${geek}`, {
+            headers: {
+                "Content-Type": "application/json"
+            }
+        })).json()) as DisambiguationData;
     }
 }

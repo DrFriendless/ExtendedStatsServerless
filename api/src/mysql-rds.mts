@@ -3,10 +3,10 @@ import { selectGames } from "./selector.mjs";
 import {
     RankingTableRow, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
     TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery,
-    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount, ToProcessElement, GameDataShort
+    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount, ToProcessElement, GameDataShort, DisambiguationGame, AmbiguousPlay
 } from "extstats-core";
 import {
-    AllPlaysQueryResult, AmbiguousPlay, DisambiguationGame,
+    AllPlaysQueryResult,
     ExpansionPlay,
     ExtractedGameData, LastYearQueryResult, MonthlyCountsQueryResult, MonthlyPlaysQueryResult,
     NormalisedPlay,
@@ -31,6 +31,23 @@ async function doRankGames(conn: mysql.Connection, query: object): Promise<Ranki
         ranking++;
     });
     return rows;
+}
+
+export async function doRetrieveGameNames(conn: mysql.Connection, ids: number[]): Promise<Record<number, string>> {
+    const sqlOne = "select bggid,name from games where bggid = ?";
+    const sqlMany = "select bggid,name from games where bggid in (?)";
+    let rows: { bggid: number, name: string }[];
+    if (ids.length === 0) return {};
+    if (ids.length === 1) {
+        rows = await conn.query(sqlOne, ids);
+    } else {
+        rows = await conn.query(sqlMany, [ids]);
+    }
+    const result: Record<number, string> = {};
+    rows.forEach(row => {
+        result[row.bggid] = row.name;
+    });
+    return result;
 }
 
 export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<ExtractedGameData[]> {
