@@ -53,18 +53,20 @@ export function coalescePlays(initial: WorkingNormalisedPlays[]): WorkingNormali
 }
 
 // figure out the canonical list of plays for a single geek on a single date
-export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: ExpansionData): WorkingNormalisedPlays[] {
+export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: ExpansionData, baseGameDefaults: Record<string, number>):
+    WorkingNormalisedPlays[] {
     let current = initialPlays.map(play => toWorkingPlay(expansionData, play));
     current = coalescePlays(current);
     let iterations = 0;
     while (iterations < 100) {
         iterations++;
-        const newPlays = inferNewPlays(current, expansionData);
+        const newPlays = inferNewPlays(current, expansionData, baseGameDefaults);
         if (!newPlays) return current;
         current = newPlays;
     }
     console.log("Too many iterations");
     console.log(JSON.stringify(initialPlays));
+    console.log(JSON.stringify(current));
     return current;
 }
 
@@ -78,13 +80,14 @@ export function splitPlaysByDateAndLocation(plays: NormalisedPlays[]): Normalise
 }
 
 export function normalise(rows: PlaysRow[], geekId: number, month: number, year: number,
-                          expansionData: ExpansionData): WorkingNormalisedPlays[] {
+                          expansionData: ExpansionData, baseGameDefaults: Record<string, number>): WorkingNormalisedPlays[] {
     const rawData: NormalisedPlays[] = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
     const byDate: NormalisedPlays[][] = splitPlaysByDateAndLocation(rawData);
-    return lodash.flatMap(byDate.map((plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData)));
+    return lodash.flatMap(byDate.map((plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData, baseGameDefaults)));
 }
 
-function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: ExpansionData): WorkingNormalisedPlays[] | undefined {
+function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: ExpansionData, baseGameDefaults: Record<string, number>):
+    WorkingNormalisedPlays[] | undefined {
     const expansionPlays = current.filter(play => play.isExpansion);
     for (const expansionPlay of expansionPlays) {
         for (const basegamePlay of current) {
@@ -115,7 +118,8 @@ function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: Expansi
             }
         }
         // we couldn't find a play which might be a basegame play - can we guess one?
-        const basegame = expansionData.getUniqueBasegame(expansionPlay.game);
+        let basegame = expansionData.getUniqueBasegame(expansionPlay.game);
+        if (!basegame) basegame = baseGameDefaults[expansionPlay.game.toString()];
         if (basegame) {
             const expansions = expansionPlay.expansions.slice();
             expansions.push(expansionPlay.game);

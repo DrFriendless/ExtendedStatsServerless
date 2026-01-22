@@ -308,8 +308,8 @@ export class ExtstatsApi {
         })).json()) as { posts: BlogComment[] };
     }
 
-    async getDisambiguationData(geek: string): Promise<DisambiguationData> {
-        return (await (await fetch(`${this.baseUrl}/disambiguation?geek=${geek}`, {
+    async getDisambiguationData(): Promise<DisambiguationData> {
+        return (await (await fetch(`${this.baseUrl}/disambiguation`, {
             headers: {
                 "Content-Type": "application/json"
             }

@@ -26,6 +26,8 @@ import {
 } from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
+import {getCookiesFromEvent} from "./library.mjs";
+import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
     const system = await findSystem();
@@ -180,12 +182,14 @@ export async function getRankings(event: any): Promise<RankingTableRow[] | HttpR
     }
 }
 
-export async function getDisambiguationData(event: APIGatewayProxyEvent): Promise<DisambiguationData | HttpResponse> {
+export async function getDisambiguationData(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<DisambiguationData | HttpResponse> {
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
 
-    const geek = event.queryStringParameters.geek;
+    const cookies = getCookiesFromEvent(event);
+    console.log(cookies);
+    const geek = cookies['extstatsid'];
     if (!geek) {
         return {
             statusCode: 400,

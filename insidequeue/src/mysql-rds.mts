@@ -11,7 +11,7 @@ import {
     ProcessGameResult, ProcessMethod,
     RankingTableRow,
     SeriesMetadata, ToProcessElement,
-    WarTableRow
+    WarTableRow, UserConfig
 } from "extstats-core";
 import {count, eqSet, listIntersect, listMinus, parseYmd, splitYmd} from "./library.mjs";
 import { PlaysRow } from "./library.mjs";
@@ -749,16 +749,20 @@ function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
     return { utilisation, cfm, friendless };
 }
 
-export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: number, playsMonths: { y: number, m: number }[],
+export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: number, geek: string, playsMonths: { y: number, m: number }[],
                                               expansionData: ExpansionData) {
     const selectSql = "select game, playDate, quantity, location from plays where geek = ? and month = ? and year = ?";
     const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, ymd, expansion_play, location) values ?";
     const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
     const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, ymd, expansion_play, baseplay) values ?";
+    const userConfigData = await conn.query("select configuration from auth where username = ?", [geek]);
+    const userConfigRaw = userConfigData ? userConfigData[0].configuration : "{}";
+    const userConfig = typeof userConfigRaw === typeof "" ? JSON.parse(userConfigRaw) : userConfigRaw;
+    const baseGameDefaults: Record<string, number> = new UserConfig(userConfig).get("disambiguation.defaults", {}) || {};
 
     for (const {y, m} of playsMonths) {
         const rows: PlaysRow[] = await conn.query(selectSql, [geekId, m, y]);
-        const normalised = normalise(rows, geekId, m, y, expansionData);
+        const normalised = normalise(rows, geekId, m, y, expansionData, baseGameDefaults);
         // insert all of the base plays
         const basePlays: any[][] = [];
         for (const np of normalised) {
@@ -910,7 +914,7 @@ export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: Proce
 
     const playsMonths: { y: number, m: number}[] = [];
     await doSetGeekPlaysForYear(conn, geekId, data.startYmdInc, data.endYmdInc, data.plays, notGames, playsMonths);
-    await doNormalisePlaysForYear(conn, geekId, playsMonths, expansionData);
+    await doNormalisePlaysForYear(conn, geekId, data.geek, playsMonths, expansionData);
     await doMarkPlaysUrlProcessed(conn, data.url);
     await doUpdateFrontPageGeek(conn, data.geek);
 }
