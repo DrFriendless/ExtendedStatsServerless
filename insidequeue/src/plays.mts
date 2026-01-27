@@ -52,116 +52,162 @@ export function coalescePlays(initial: WorkingNormalisedPlays[]): WorkingNormali
     return lodash.flatten(byGame.map(plays => splitBy(plays, ps => ps.location))).map(sumQuantities);
 }
 
-// figure out the canonical list of plays for a single geek on a single date
-export function inferExtraPlays(initialPlays: NormalisedPlays[], expansionData: ExpansionData, baseGameDefaults: Record<string, number>):
-    WorkingNormalisedPlays[] {
-    let current = initialPlays.map(play => toWorkingPlay(expansionData, play));
-    current = coalescePlays(current);
+/**
+ * Figure out the canonical list of plays for a single geek on a single date.
+ *
+ * @param initialPlays - plays for the date grouped by known location.
+ * Empty location is wild.
+ * @param expansionData
+ * @param baseGameDefaults
+ */
+export function inferExtraPlays(initialPlays: Record<string, NormalisedPlays[]>, expansionData: ExpansionData, baseGameDefaults: Record<string, number>): WorkingNormalisedPlays[] {
+    // turn the value of initialPlays into coalesced working plays
+    const current: Record<string, WorkingNormalisedPlays[]> = lodash.mapValues(lodash.mapValues(initialPlays,
+        plays => plays.map(p => toWorkingPlay(expansionData,p))), coalescePlays);
+    let wildcards = current[""] || [];
+    delete current[""];
+
+    let result: WorkingNormalisedPlays[] = [];
+    Object.values(current).forEach(forLoc => {
+            const { plays, wildcardRemainder } = inferExtraPlaysForLocation(forLoc, wildcards, expansionData, baseGameDefaults);
+            result = result.concat(plays);
+            wildcards = wildcardRemainder;
+        }
+    );
+    const { plays, wildcardRemainder } = inferExtraPlaysForLocation(wildcards, [], expansionData, baseGameDefaults)
+    result = result.concat(plays);
+    // wildcardRemainder will be empty anyway
+    return result;
+}
+
+/**
+ *
+ * @param input - plays which say they are at the location
+ * @param wildcards - plays which do not specify a location
+ * @param expansionData
+ * @param baseGameDefaults
+ */
+function inferExtraPlaysForLocation(input: WorkingNormalisedPlays[], wildcards: WorkingNormalisedPlays[], expansionData: ExpansionData, baseGameDefaults: Record<string, number>):
+    { plays: WorkingNormalisedPlays[], wildcardRemainder: WorkingNormalisedPlays[] } {
+    let current = input;
+    let wildcardRemainder = wildcards;
     let iterations = 0;
-    while (iterations < 100) {
+    while (iterations < 10) {
         iterations++;
-        const newPlays = inferNewPlays(current, expansionData, baseGameDefaults);
-        if (!newPlays) return current;
-        current = newPlays;
+        const { playsAtLocation, remainingWildcards, anyModification } = inferNewPlaysAtLocation(current, wildcardRemainder, expansionData);
+        if (!anyModification) break;
+        current = playsAtLocation;
+        wildcardRemainder = remainingWildcards;
     }
-    console.log("Too many iterations");
-    console.log(JSON.stringify(initialPlays));
-    console.log(JSON.stringify(current));
-    return current;
-}
-
-
-export function splitPlaysByDateAndLocation(plays: NormalisedPlays[]): NormalisedPlays[][] {
-    const splitByDate: NormalisedPlays[][] = Object.values(groupBy(plays, playDate));
-    return lodash.flatMap(
-        splitByDate.map(
-            (ps: NormalisedPlays[]) => Object.values(groupBy(ps,
-                (p: NormalisedPlays) => p.location))));
-}
-
-export function normalise(rows: PlaysRow[], geekId: number, month: number, year: number,
-                          expansionData: ExpansionData, baseGameDefaults: Record<string, number>): WorkingNormalisedPlays[] {
-    const rawData: NormalisedPlays[] = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
-    const byDate: NormalisedPlays[][] = splitPlaysByDateAndLocation(rawData);
-    return lodash.flatMap(byDate.map((plays: NormalisedPlays[]) => inferExtraPlays(plays, expansionData, baseGameDefaults)));
-}
-
-function inferNewPlays(current: WorkingNormalisedPlays[], expansionData: ExpansionData, baseGameDefaults: Record<string, number>):
-    WorkingNormalisedPlays[] | undefined {
-    const expansionPlays = current.filter(play => play.isExpansion);
-    for (const expansionPlay of expansionPlays) {
-        for (const basegamePlay of current) {
-            if (Object.is(expansionPlay, basegamePlay)) continue;
-            const couldExpand = expansionData.isBasegameOf(basegamePlay.game, expansionPlay.game) ||
-                expansionData.isAnyBasegameOf(basegamePlay.expansions, expansionPlay.game);
-            if (couldExpand && basegamePlay.expansions.indexOf(expansionPlay.game) < 0) {
-                // basegamePlay could have included expansionPlay as an expansion, so we're going to say that it did
-                const newQuantity = Math.min(expansionPlay.quantity, basegamePlay.quantity);
-                expansionPlay.quantity -= newQuantity;
-                basegamePlay.quantity -= newQuantity;
-                const newPlay: WorkingNormalisedPlays = {
-                    quantity: newQuantity,
-                    game: basegamePlay.game,
-                    geek: basegamePlay.geek,
-                    date: basegamePlay.date,
-                    month: basegamePlay.month,
-                    year: basegamePlay.year,
-                    location: basegamePlay.location,
-                    isExpansion: basegamePlay.isExpansion,
-                    expansions: lodash.flatten([expansionPlay.game, expansionPlay.expansions, basegamePlay.expansions])
-                };
-                const newPlays = current.filter(p => !Object.is(p, basegamePlay) && !Object.is(p, expansionPlay));
-                newPlays.push(newPlay);
-                if (expansionPlay.quantity > 0) newPlays.push(expansionPlay);
-                if (basegamePlay.quantity > 0) newPlays.push(basegamePlay);
-                return newPlays;
+    // try to invent base game plays for the other expansion plays
+    const expansionPlaysAtLocation = current.filter(play => play.isExpansion);
+    current = current.filter(play => !play.isExpansion);
+    const unresolvableExpansionPlays: WorkingNormalisedPlays[] = [];
+    while (expansionPlaysAtLocation.length > 0) {
+        const ep = expansionPlaysAtLocation[0];
+        let uniqueBaseGame = expansionData.getUniqueBasegame(ep.game);
+        if (uniqueBaseGame === undefined) uniqueBaseGame = baseGameDefaults[ep.game];
+        if (uniqueBaseGame !== undefined) {
+            const newBgp: WorkingNormalisedPlays = { ...ep, game: uniqueBaseGame, isExpansion: false, expansions: [ep.game] };
+            iterations = 0;
+            let newPlays = [ newBgp ];
+            while (iterations < 10) {
+                iterations++;
+                const { playsAtLocation, remainingWildcards, anyModification } = inferNewPlaysAtLocation(newPlays, wildcardRemainder, expansionData);
+                if (!anyModification) break;
+                newPlays = playsAtLocation;
+                wildcardRemainder = remainingWildcards;
             }
-        }
-        // we couldn't find a play which might be a basegame play - can we guess one?
-        let basegame = expansionData.getUniqueBasegame(expansionPlay.game);
-        if (!basegame) basegame = baseGameDefaults[expansionPlay.game.toString()];
-        if (basegame) {
-            const expansions = expansionPlay.expansions.slice();
-            expansions.push(expansionPlay.game);
-            const newPlay: WorkingNormalisedPlays = {
-                quantity: expansionPlay.quantity,
-                game: basegame,
-                geek: expansionPlay.geek,
-                date: expansionPlay.date,
-                month: expansionPlay.month,
-                year: expansionPlay.year,
-                location: expansionPlay.location,
-                isExpansion: expansionData.isExpansion(basegame),
-                expansions
-            };
-            const newPlays = current.filter(p => !Object.is(p, expansionPlay));
-            newPlays.push(newPlay);
-            return newPlays;
+            current = current.concat(newPlays);
         } else {
-            const provable = getProvableBasegames(expansionPlay.game, expansionData);
-            if (provable.length > 0) {
-                const basegame = provable[0];
-                const expansions = expansionPlay.expansions.slice();
-                expansions.push(expansionPlay.game);
-                expansions.push(...provable.slice(1));
-                const newPlay: WorkingNormalisedPlays = {
-                    quantity: expansionPlay.quantity,
-                    game: basegame,
-                    geek: expansionPlay.geek,
-                    date: expansionPlay.date,
-                    month: expansionPlay.month,
-                    year: expansionPlay.year,
-                    location: expansionPlay.location,
-                    isExpansion: expansionData.isExpansion(basegame),
-                    expansions
-                };
-                const newPlays = current.filter(p => !Object.is(p, expansionPlay));
-                newPlays.push(newPlay);
-                return newPlays;
+            unresolvableExpansionPlays.push(ep);
+        }
+        expansionPlaysAtLocation.splice(0, 1);
+    }
+    return { plays: current.concat(unresolvableExpansionPlays), wildcardRemainder };
+}
+
+function inferNewPlaysAtLocation(current: WorkingNormalisedPlays[], wildcards: WorkingNormalisedPlays[], expansionData: ExpansionData):
+    { playsAtLocation: WorkingNormalisedPlays[], remainingWildcards: WorkingNormalisedPlays[], anyModification: boolean } {
+    let baseGameWildcards = wildcards.filter(play => !play.isExpansion);
+    let expansionWildcards = wildcards.filter(play => play.isExpansion);
+    let expansionPlays = current.filter(play => play.isExpansion);
+    const baseGamePlays = current.filter(play => !play.isExpansion);
+
+    let anyModification = false;
+    // allocate expansions to base game plays at the location
+    let modified = true;
+    while (modified) {
+        modified = false;
+        if (expansionWildcards.length === 0 && expansionPlays.length === 0) break;
+        for (const bgp of baseGamePlays) {
+            // look for expansion plays at the same location
+            const eps = expansionPlays.filter(ep => couldExpand(expansionData, bgp, ep));
+            // expansions for which we have found an expansion play
+            const addedExpansions = eps.map(ep => ep.game);
+            const weps = expansionWildcards
+                .filter(wep => couldExpand(expansionData, bgp, wep))
+                .filter(wep => addedExpansions.indexOf(wep.game) < 0);
+            const min = Math.min(bgp.quantity, ...eps.map(ep => ep.quantity), ...weps.map(wep => wep.quantity));
+            if ((eps.length > 0 || weps.length > 0) && min > 0) {
+                modified = true;
+                anyModification = true;
+                let newBgp: WorkingNormalisedPlays | undefined = undefined;
+                if (min < bgp.quantity) {
+                    newBgp = {...bgp};
+                    newBgp.quantity -= min;
+                    bgp.quantity = min;
+                }
+                // update bgp in-situ
+                eps.forEach(ep => bgp.expansions.push(ep.game));
+                weps.forEach(wep => bgp.expansions.push(wep.game));
+                expansionPlays = subtractPlays(expansionPlays, eps.map(ep => ep.game), min);
+                expansionWildcards = subtractPlays(expansionWildcards, weps.map(wep => wep.game), min);
+                if (newBgp) baseGamePlays.push(newBgp);
+                break;
             }
         }
     }
-    return undefined;
+    // allocate expansion plays at the location to wildcard base game plays
+    modified = true;
+    while (modified) {
+        modified = false;
+        if (expansionPlays.length === 0) break;
+        for (const bgp of baseGameWildcards) {
+            const eps = expansionPlays.filter(ep => couldExpand(expansionData, bgp, ep));
+            if (eps.length > 0) {
+                // expansions for which we have found an expansion play
+                const addedExpansions = eps.map(ep => ep.game);
+                const weps = expansionWildcards
+                    .filter(wep => couldExpand(expansionData, bgp, wep))
+                    .filter(wep => addedExpansions.indexOf(wep.game) < 0);
+                const min = Math.min(bgp.quantity, ...eps.map(ep => ep.quantity), ...weps.map(wep => wep.quantity));
+                if (min > 0) {
+                    modified = true;
+                    anyModification = true;
+                    let newBgp: WorkingNormalisedPlays | undefined = undefined;
+                    if (min < bgp.quantity) {
+                        newBgp = {...bgp};
+                        newBgp.quantity -= min;
+                        bgp.quantity = min;
+                    }
+                    // update bgp in-situ
+                    bgp.location = eps[0].location;
+                    baseGamePlays.push(bgp);
+                    baseGameWildcards = baseGameWildcards.filter(p => !p.location);
+                    eps.forEach(ep => bgp.expansions.push(ep.game));
+                    weps.forEach(wep => bgp.expansions.push(wep.game));
+                    expansionPlays = subtractPlays(expansionPlays, eps.map(ep => ep.game), min);
+                    expansionWildcards = subtractPlays(expansionWildcards, weps.map(wep => wep.game), min);
+                    if (newBgp) baseGameWildcards.push(newBgp);
+                    break;
+                } else {
+                    console.log("Sometjing went wrong");
+                }
+            }
+        }
+    }
+    return { playsAtLocation: baseGamePlays.concat(expansionPlays), remainingWildcards: baseGameWildcards.concat(expansionWildcards), anyModification}
 }
 
 /**
@@ -184,4 +230,27 @@ function getProvableBasegames(game: number, ed: ExpansionData): number[] {
     return result;
 }
 
+export function splitPlaysByDateAndLocation(plays: NormalisedPlays[]): Record<string, NormalisedPlays[]>[] {
+    const splitByDate: NormalisedPlays[][] = Object.values(groupBy(plays, playDate));
+    return splitByDate.map(plays => groupBy(plays, p => (p.location || "").trim()))
+}
 
+export function normalise(rows: PlaysRow[], geekId: number, month: number, year: number,
+                          expansionData: ExpansionData, baseGameDefaults: Record<string, number>): WorkingNormalisedPlays[] {
+    const rawData: NormalisedPlays[] = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
+    const byDate: Record<string, NormalisedPlays[]>[] = splitPlaysByDateAndLocation(rawData);
+    return lodash.flatMap(byDate.map((plays: Record<string, NormalisedPlays[]>) => inferExtraPlays(plays, expansionData, baseGameDefaults)));
+}
+
+// src gets modified during this operation
+function subtractPlays(src: WorkingNormalisedPlays[], played: number[], quantity: number) {
+    src.forEach(p => {
+        if (played.indexOf(p.game) >= 0)  p.quantity -= quantity;
+    });
+    return src.filter(p => p.quantity > 0);
+}
+
+function couldExpand(expansionData: ExpansionData, bgp: WorkingNormalisedPlays, e: WorkingNormalisedPlays): boolean {
+    return (expansionData.isBasegameOf(bgp.game, e.game) || expansionData.isAnyBasegameOf(bgp.expansions, e.game)) &&
+        bgp.expansions.indexOf(e.game) < 0;
+}

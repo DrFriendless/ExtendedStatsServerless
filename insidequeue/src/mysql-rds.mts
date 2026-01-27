@@ -756,7 +756,7 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
     const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
     const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, ymd, expansion_play, baseplay) values ?";
     const userConfigData = await conn.query("select configuration from auth where username = ?", [geek]);
-    const userConfigRaw = userConfigData ? userConfigData[0].configuration : "{}";
+    const userConfigRaw = (userConfigData && userConfigData[0] && userConfigData[0].configuration) ? userConfigData[0].configuration : "{}";
     const userConfig = typeof userConfigRaw === typeof "" ? JSON.parse(userConfigRaw) : userConfigRaw;
     const baseGameDefaults: Record<string, number> = new UserConfig(userConfig).get("disambiguation.defaults", {}) || {};
 
