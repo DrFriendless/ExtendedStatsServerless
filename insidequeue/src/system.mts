@@ -11,6 +11,7 @@ export class System {
     downloaderQueue: string;
     systemLogGroup: string;
     playsQueue: string;
+    retryQueue: string;
     ok: boolean;
 
     constructor() {
@@ -21,6 +22,7 @@ export class System {
         this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
         this.downloaderQueue = await this.getParameter("/extstats/downloader/queue");
         this.playsQueue = await this.getParameter("/extstats/downloader/playsqueue");
+        this.retryQueue = await this.getParameter("/extstats/downloader/retryqueue");
         this.ok = true;
         return this;
     }

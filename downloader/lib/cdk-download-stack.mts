@@ -136,6 +136,13 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
+  defineRetryQueue(): sqs.IQueue {
+    return new sqs.Queue(this, "retryQueue", {
+      queueName: "downloaderRetryQueue",
+      visibilityTimeout: Duration.seconds(120),
+    });
+  }
+
   defineRuleToUpdateMetadata(func: lambda.IFunction): Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("lambda:InvokeFunction");
@@ -185,6 +192,7 @@ export class DownloadStack extends cdk.Stack {
     const cacheBucket = this.defineCacheBucket(CACHE_BUCKET);
     const outputQueue = this.defineOutputQueue();
     const playsQueue = this.definePlaysQueue();
+    const retryQueue = this.defineRetryQueue();
 
     const snsTopic = this.defineSnsTopic(process.env.SNS_TOPIC, process.env.SNS_EMAIL);
     const role = this.defineDownloaderRole(outputQueue, cacheBucket, snsTopic);
@@ -228,6 +236,10 @@ export class DownloadStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'downloaderPlaysQueue', {
       value: playsQueue.queueUrl,
       exportName: 'downloader-PlaysQueueURL'
+    });
+    new cdk.CfnOutput(this, 'downloaderRetryQueue', {
+      value: retryQueue.queueUrl,
+      exportName: 'downloader-RetryQueueURL'
     });
     new cdk.CfnOutput(this, 'downloaderCache', {
       value: cacheBucket.bucketArn,

@@ -93,6 +93,20 @@ export async function sendToQueue(queueUrl: string, payload: any): Promise<void>
     }
 }
 
+export async function sendToQueueWithDelay(queueUrl: string, payload: any, delay: number): Promise<void> {
+    const sqs = new SQSClient({ region: process.env.REGION });
+    const command = new SendMessageCommand({
+        QueueUrl: queueUrl,
+        DelaySeconds: delay,
+        MessageBody: JSON.stringify(payload)
+    });
+    try {
+        const resp = await sqs.send(command);
+    } catch (error) {
+        console.log(error);
+    }
+}
+
 export async function invokeLambdaAsync(func: string, payload: object): Promise<void> {
     const lambda = new LambdaClient({ region: process.env.REGION });
     const command = new InvokeCommand({

@@ -50,6 +50,12 @@ export async function handler(ignored: any): Promise<Record<string, number> | Ht
             Namespace: "AWS/SQS",
             ...maximum
         },
+        "dl_retry_length": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderRetryQueue"}],
+            MetricName: "ApproximateNumberOfMessagesVisible",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
         "db_cpu": {
             Dimensions: [{Name: "DBInstanceIdentifier", Value: "extended-mysql"}],
             MetricName: "CPUUtilization",

@@ -33,10 +33,9 @@ import {
     doMarkGeekDoesNotExist,
     getGeeksThatDontExist, doUpdatePlaysForPeriod, doMarkPlaysUrlProcessed
 } from "./mysql-rds.mjs";
-import {invokeLambdaAsync, listAdd, sendToQueue, sleep} from "./library.mjs";
+import {invokeLambdaAsync, listAdd, sendToQueue, sendToQueueWithDelay, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
-import {identity} from "lodash";
 
 const OUTSIDE_PREFIX = "downloader_";
 
@@ -158,6 +157,25 @@ async function updatePlayedYears(system: System, geek: string, geekid: number, f
     await system.withConnectionAsync(async conn => await conn.query(updateSql, updateParams));
 }
 
+async function getRetries(system: System): Promise<ToProcessElement[]> {
+    const sqsClient = new SQSClient({ region: REGION });
+    const input: ReceiveMessageCommandInput = { QueueUrl: system.retryQueue, WaitTimeSeconds: 1, MaxNumberOfMessages: 1 };
+    const command = new ReceiveMessageCommand(input);
+    const response = await sqsClient.send(command);
+    const result: ToProcessElement[] = [];
+    if (response.Messages) {
+        console.log(`Found ${response.Messages.length} retries`);
+        for (const m of response.Messages) {
+            const payload: ToProcessElement | undefined = m.Body ? JSON.parse(m.Body) : undefined;
+            if (payload) result.push(payload);
+            await sqsClient.send(new DeleteMessageCommand({ QueueUrl: system.retryQueue, ReceiptHandle: m.ReceiptHandle }));
+        }
+        return result;
+    } else {
+        return [];
+    }
+}
+
 // return how many slowdowns we ate up
 async function noMessages(system: System, howManyToDo: number, slowDowns: number): Promise<number> {
     let eaten = 0;
@@ -169,6 +187,14 @@ async function noMessages(system: System, howManyToDo: number, slowDowns: number
         await sleep(toDo * 3000);
     }
     if (slowDowns >= howManyToDo) return (eaten + howManyToDo);
+    const retries = await getRetries(system);
+    if (retries.length > 0) {
+        for (const element of retries) {
+            console.log(`Processing retry ${element.url}`);
+            await scheduleProcessing(system, element, true);
+        }
+        return eaten;
+    }
     howManyToDo -= slowDowns;
     eaten += slowDowns;
     const geeksThatDontExist = await system.returnWithConnection(getGeeksThatDontExist);
@@ -195,7 +221,7 @@ interface SQSMessage {
 }
 
 function processSQSMessage(message: Message): SQSMessage {
-    const payload: QueueMessage | undefined = message.Body ? JSON.parse(message.Body) : undefined
+    const payload: QueueMessage | undefined = message.Body ? JSON.parse(message.Body) : undefined;
     return {
         receiptHandle: message.ReceiptHandle,
         payload,
@@ -305,8 +331,7 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
                     month: null,
                     year: null
                 };
-                console.log(`Will retry collection for ${fd.geek} in 60 seconds.`);
-                setTimeout(() => scheduleProcessing(system, toProcess, true), 60000);
+                await sendToQueueWithDelay(system.retryQueue, toProcess, 45);
             }
             break;
         case "MarkPlaysForPeriodProcessed":
