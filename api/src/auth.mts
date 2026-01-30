@@ -72,7 +72,8 @@ export async function login(event: APIGatewayProxyEvent): Promise<HttpResponse> 
         }
     }
 
-    const cookie = makeCookie(username, event.headers.origin.includes("://localhost:"));
+    const test = event.headers.origin && event.headers.origin.indexOf("://localhost:") >= 0;
+    const cookie = makeCookie(username, test);
     await incrementLogin(system, username);
     const userData = await getUserDataForUsername(system, username);
     return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: JSON.stringify(userData) };
@@ -248,7 +249,10 @@ export async function personal(event: APIGatewayProxyEventV2WithRequestContext<a
         if (!user) {
             return { "statusCode": 403, body: "{}" };
         } else {
-            return { "statusCode": 200, body: user.configuration || "{}" };
+            console.log(event.headers);
+            const test = event.headers.origin && event.headers.origin.indexOf("://localhost:") >= 0;
+            const cookie = makeCookie(cookies['extstatsid'], test);
+            return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: user.configuration || "{}" };
         }
     } else {
         return { "statusCode": 403, body: "{}" };

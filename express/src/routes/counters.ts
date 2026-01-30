@@ -19,4 +19,5 @@ export async function count(req: Request, res: Response): Promise<void> {
         }
     }
     await incrementExpressCounter();
+    res.status(200);
 }
