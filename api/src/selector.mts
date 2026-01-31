@@ -205,6 +205,14 @@ export async function evaluateSimple(conn: mysql.Connection, expr: Expression, v
     return { geekGames: await retrieveGeekGames(conn, ids, vars.lookup("ME")), metadata } as GeekGameSelectResult;
 }
 
+export async function evaluateSimpleGames(conn: mysql.Connection, expr: Expression, vars: VarBindings): Promise<number[]> {
+    const metadata = new SelectorMetadataSet();
+    const ids1 = await evaluateExpression(conn, expr, vars, metadata);
+    const ids = await getValidIds(conn, ids1);
+    metadata.restrictTo(ids);
+    return ids;
+}
+
 async function getValidIds(conn: mysql.Connection, ids: number[]): Promise<number[]> {
     const sqlOne = "select bggid from games where bggid = ?";
     const sqlMany = "select bggid from games where bggid in (?)";

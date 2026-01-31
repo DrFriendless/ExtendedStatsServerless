@@ -14,10 +14,11 @@ import {
 import {doRetrieveGames, doRetrieveGamesShort, getMonthlyCounts, getMonthlyPlays} from "./mysql-rds.mjs";
 import {getGeekId, getGeekIds} from "./library.mjs";
 import { parse } from "./parser.mjs";
-import {evaluateSimple, GeekGameSelectResult, retrieveGeekGames} from "./selector.mjs";
+import {evaluateSimple, evaluateSimpleGames, GeekGameSelectResult, retrieveGeekGames} from "./selector.mjs";
 import {VarBindings} from "./varbindings.mjs";
 import DataLoader from "dataloader";
 import {
+    ExtractedGameData,
     GeekGameRow,
     LastYearPlaysQueryResult,
     NormalisedPlaysQueryResult,
@@ -315,7 +316,7 @@ function buildMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLO
 }
 
 function buildShortMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: GraphQLObjectType<GameDataShort>,
-                                        geekGameType: GraphQLObjectType<ExtendedGeekGameShort>) {
+                                             geekGameType: GraphQLObjectType<ExtendedGeekGameShort>) {
     return new GraphQLObjectType({
         name: "MonthlyPlaysAndCountsShort",
         fields: {
@@ -338,15 +339,41 @@ function buildSchema(loaders: Loaders) {
             fields: {
                 plays: {
                     args: {
-                        geeks: {type: ListOfString},
-                        first: {type: graphql.GraphQLBoolean},
-                        startYMD: {type: graphql.GraphQLInt},
-                        endYMD: {type: graphql.GraphQLInt}
+                        geeks: { type: ListOfString },
+                        first: { type: graphql.GraphQLBoolean },
+                        startYMD: { type: graphql.GraphQLInt },
+                        endYMD: { type: graphql.GraphQLInt }
                     },
                     type: buildMultiGeekPlaysType(gameDataType, geekGameType, playsWithDateType),
                     resolve: async (parent: unknown, args) => {
                         return await loaders.system.asyncReturnWithConnection(
                             async conn => playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
+                        );
+                    }
+                },
+                mostplayedunplayed: {
+                    args: {
+                        geek: { type: graphql.GraphQLString },
+                        count: { type: graphql.GraphQLInt }
+                    },
+                    type: new graphql.GraphQLList(gameDataType!),
+                    resolve: async (parent: unknown, args) => {
+                        return await loaders.system.asyncReturnWithConnection(
+                            async conn => {
+                                return await doRetrieveGames(conn, await mostPlayedUnplayed(conn, args.geek, args.count));
+                            }
+                        );
+                    }
+                },
+                games: {
+                    args: {
+                        selector: { type: graphql.GraphQLString },
+                        vars: { type: new graphql.GraphQLList(VarBindingInputType!) }
+                    },
+                    type: new graphql.GraphQLList(gameDataType!),
+                    resolve: async (parent: unknown, args) => {
+                        return await loaders.system.asyncReturnWithConnection(
+                            async conn => gamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars))
                         );
                     }
                 },
@@ -533,6 +560,10 @@ function extractDesignerData(dbRow: any): DesignerData {
     return { bggid: dbRow['bggid'] as number, name: dbRow['name'], url: dbRow['url'], boring: dbRow['boring'] };
 }
 
+async function selectGamesOnly(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<number[]> {
+    return evaluateSimpleGames(conn, parse(selector), vars);
+}
+
 async function selectGames(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<GeekGameSelectResult> {
     return evaluateSimple(conn, parse(selector), vars);
 }
@@ -543,6 +574,11 @@ async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: strin
     const gids = evalResult.geekGames.map(gg => gg.bggid);
     const games = await doRetrieveGames(conn, gids);
     return { ...evalResult, games };
+}
+
+async function gamesQueryForRetrieve(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<ExtractedGameData[]> {
+    const evalResult = await selectGamesOnly(conn, selector, vars);
+    return await doRetrieveGames(conn, evalResult);
 }
 
 async function geekYearsQueryForRetrieve(conn: mysql.Connection, geek: string): Promise<number[]> {
@@ -602,6 +638,12 @@ function ymdToDate(ymd: number): Date {
     const d = ymd % 100;
     const m = Math.floor(ymd / 100) % 100;
     return new Date(y, m - 1, d);
+}
+
+async function mostPlayedUnplayed(conn: mysql.Connection, geek: string, count: number): Promise<number[]> {
+    const geekId = await getGeekId(conn, geek);
+    const sql = `select game, sum(quantity) from plays_normalised where game not in (select distinct game from plays_normalised where geek = ?) group by game order by 2 desc limit ${count}`;
+    return (await conn.query(sql, [geekId])).map((row: { game: number }) => row.game);
 }
 
 async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], first: boolean, startInc: number, endInc: number): Promise<PlaysRetrieveResult> {
