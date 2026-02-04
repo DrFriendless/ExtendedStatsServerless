@@ -12,7 +12,7 @@
     "bluebird": "^3.7.2",
     "dataloader": "^2.2.3",
     "date-arithmetic": "^4.1.0",
-    "extstats-core": "file:/home/john/projects/repo/extstats-core-1.34.1.tgz",
+    "extstats-core": "file:/home/john/projects/repo/extstats-core-1.34.2.tgz",
     "graphql": "^16.11.0",
     "lodash-es": "^4.17.21",
     "moo": "^0.5.2",

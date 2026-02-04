@@ -90,7 +90,7 @@ export async function doRetrieveGamesShort(conn: mysql.Connection, ids: number[]
 
 function extractGameData(row: RawGameData, expansionData: ExpansionData): ExtractedGameData {
     return { bggid: row["bggid"], bggRanking: row["rank"], bggRating: row["average"], minPlayers: row["minPlayers"],
-        maxPlayers: row["maxPlayers"], name: row["name"], playTime: row["playTime"], subdomain: row["subdomain"],
+        maxPlayers: row["maxPlayers"], name: row["name"], playTime: row["playTime"], subdomain: row["subdomain"], usersOwned: row["usersOwned"],
         weight: row["averageWeight"], yearPublished: row["yearPublished"], isExpansion: expansionData.isExpansion(row["bggid"]) };
 }
 

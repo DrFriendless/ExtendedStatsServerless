@@ -43,6 +43,7 @@ export interface RawGameData {
     subdomain: string;
     averageWeight: number;
     isExpansion: boolean;
+    usersOwned: number;
 }
 
 export interface NormalisedPlay {

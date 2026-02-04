@@ -66,6 +66,7 @@ function buildGameDataType(loaders: Loaders) {
             playTime: {type: graphql.GraphQLInt!},
             name: {type: graphql.GraphQLString!},
             subdomain: {type: graphql.GraphQLString!},
+            usersOwned: {type: graphql.GraphQLInt!},
             bggRating: {type: graphql.GraphQLFloat!},
             weight: {type: graphql.GraphQLFloat!},
             isExpansion: {type: graphql.GraphQLBoolean!},
@@ -365,6 +366,20 @@ function buildSchema(loaders: Loaders) {
                         );
                     }
                 },
+                mostunusual: {
+                    args: {
+                        geek: { type: graphql.GraphQLString },
+                        count: { type: graphql.GraphQLInt }
+                    },
+                    type: new graphql.GraphQLList(gameDataType!),
+                    resolve: async (parent: unknown, args) => {
+                        return await loaders.system.asyncReturnWithConnection(
+                            async conn => {
+                                return await doRetrieveGames(conn, await mostUnusualOwned(conn, args.geek, args.count));
+                            }
+                        );
+                    }
+                },
                 games: {
                     args: {
                         selector: { type: graphql.GraphQLString },
@@ -643,6 +658,12 @@ function ymdToDate(ymd: number): Date {
 async function mostPlayedUnplayed(conn: mysql.Connection, geek: string, count: number): Promise<number[]> {
     const geekId = await getGeekId(conn, geek);
     const sql = `select game, sum(quantity) from plays_normalised where game not in (select distinct game from plays_normalised where geek = ?) group by game order by 2 desc limit ${count}`;
+    return (await conn.query(sql, [geekId])).map((row: { game: number }) => row.game);
+}
+
+async function mostUnusualOwned(conn: mysql.Connection, geek: string, count: number): Promise<number[]> {
+    const geekId = await getGeekId(conn, geek);
+    const sql = `select game, usersOwned from geekgames,games where game in (select game from geekgames where owned = 1 and geekid = ?) and games.bggid = geekgames.game group by game order by 2 asc limit ${count}`;
     return (await conn.query(sql, [geekId])).map((row: { game: number }) => row.game);
 }
 
