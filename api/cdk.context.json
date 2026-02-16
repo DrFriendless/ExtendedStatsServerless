@@ -51,5 +51,9 @@
   },
   "acknowledged-issue-numbers": [
     34892
-  ]
+  ],
+  "hosted-zone:account=067508173724:domainName=drfriendless.com:region=ap-southeast-2": {
+    "Id": "/hostedzone/Z36N1TOMQ3HDGR",
+    "Name": "drfriendless.com."
+  }
 }

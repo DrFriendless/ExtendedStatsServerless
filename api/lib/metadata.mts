@@ -56,6 +56,10 @@ export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [
     { name: `auth_confirm`, handler: "auth.confirm" }
 ];
 
+export const OTHER_LAMBDA_NAMES: string[] = [
+    "socks_connect", "socks_disconnect", "socks_default"
+];
+
 export const EXPRESS_SPECS: ExpressSpec[] = [
     { key: "findgeeks", route: "findgeeks",  method: "GET" },
     { key: "count", route: "count",  method: "POST" },
