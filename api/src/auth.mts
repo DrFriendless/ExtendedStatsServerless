@@ -16,15 +16,25 @@ import {
 } from "./authdb.mjs";
 import {AuthTask} from "./interfaces.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
+import {getChatterCode} from "./socks.mjs";
 
 const COST = 4096;
 const SALT_LENGTH = 22;
 
-function makeCookie(id: string, test: boolean) {
+function makeIdCookie(id: string, test: boolean) {
     if (test) {
         return "extstatsid=" + id + "; Domain=localhost; Path=/; Max-Age=360000; SameSite=Lax";
     } else {
         return "extstatsid=" + id + "; Domain=drfriendless.com; Path=/; Max-Age=360000; SameSite=Lax";
+    }
+}
+
+async function makeChatterCookie(geek: string, test: boolean) {
+    const chatterId = await getChatterCode(geek);
+    if (test) {
+        return "extstatschatter=" + chatterId + "; Domain=localhost; Path=/; Max-Age=360000; SameSite=Lax";
+    } else {
+        return "extstatschatter=" + chatterId + "; Domain=drfriendless.com; Path=/; Max-Age=360000; SameSite=Lax";
     }
 }
 
@@ -49,7 +59,6 @@ export async function login(event: APIGatewayProxyEvent): Promise<HttpResponse> 
     const password = body['password'] || "";
 
     const existing = await loadAuth(system, username);
-    console.log(existing);
     if (!existing) {
         return {
             statusCode: 401,
@@ -73,10 +82,12 @@ export async function login(event: APIGatewayProxyEvent): Promise<HttpResponse> 
     }
 
     const test = event.headers.origin && event.headers.origin.indexOf("://localhost:") >= 0;
-    const cookie = makeCookie(username, test);
+    const cookie = makeIdCookie(username, test);
+    const chatterCookie = await makeChatterCookie(username, test);
     await incrementLogin(system, username);
     const userData = await getUserDataForUsername(system, username);
-    return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: JSON.stringify(userData) };
+    console.log([ cookie, chatterCookie ]);
+    return { "statusCode": 200, cookies: [cookie, chatterCookie], body: JSON.stringify(userData) };
 }
 
 function makeid(length: number): string {
@@ -243,16 +254,18 @@ export async function personal(event: APIGatewayProxyEventV2WithRequestContext<a
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
 
-    const cookies = getCookiesFromEvent(event);
+    const cookies: Record<string, string> = getCookiesFromEvent(event);
     if (cookies['extstatsid']) {
         const user = await loadAuth(system, cookies['extstatsid']);
         if (!user) {
             return { "statusCode": 403, body: "{}" };
         } else {
-            console.log(event.headers);
             const test = event.headers.origin && event.headers.origin.indexOf("://localhost:") >= 0;
-            const cookie = makeCookie(cookies['extstatsid'], test);
-            return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: user.configuration || "{}" };
+            const idCookie = makeIdCookie(cookies['extstatsid'], test);
+            const chatterCookie = await makeChatterCookie(cookies['extstatsid'], test);
+            console.log([ idCookie, chatterCookie ]);
+            // to set multiple cookies, use a string[] rather than a string.
+            return { "statusCode": 200, cookies: [ idCookie, chatterCookie ], body: user.configuration || "{}" };
         }
     } else {
         return { "statusCode": 403, body: "{}" };

@@ -60,6 +60,7 @@ export interface HttpResponse {
     statusCode: number;
     body?: string;
     headers?: Record<string, any>;
+    cookies?: string[];
 }
 
 export function isHttpResponse(object: any): object is HttpResponse {

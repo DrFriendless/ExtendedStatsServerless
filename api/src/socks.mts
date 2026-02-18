@@ -4,20 +4,50 @@ import {
     DeleteItemCommandOutput,
     DynamoDBClient,
     PutItemCommand,
-    PutItemCommandOutput, ScanCommand, ScanCommandOutput
+    PutItemCommandOutput, ScanCommand, ScanCommandOutput,
+    QueryCommand
 } from "@aws-sdk/client-dynamodb";
 import {
     ApiGatewayManagementApi,
 } from "@aws-sdk/client-apigatewaymanagementapi";
+import crypto from "crypto";
 
 const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION });
+const GEEK_TABLE = "geek_connections";
+const CONNECTION_TABLE = "websocket_connections";
+
+export async function getChatterCode(geek: string): Promise<string> {
+    const queryCommand = new QueryCommand({
+        TableName: GEEK_TABLE,
+        KeyConditionExpression: "geek = :geek",
+        ExpressionAttributeValues: { ":geek": { S: geek } }
+    });
+    console.log(JSON.stringify(queryCommand));
+    const queryResult = await ddbClient.send(queryCommand);
+    console.log(JSON.stringify(queryResult));
+    if (queryResult.Items.length > 0) {
+        // TODO - update accessed time
+        return queryResult.Items[0].uuid.S;
+    }
+
+    let uuid = crypto.randomUUID();
+    const now = (new Date()).getTime().toString();
+    const putCommand = new PutItemCommand({
+        TableName: GEEK_TABLE,
+        Item: {
+            geek: { S: geek },
+            uuid: { S: uuid },
+            created: { N: now },
+            accessed: { N: now }
+        },
+    });
+    const putResult = await ddbClient.send(putCommand);
+    return uuid;
+}
 
 export async function connectHandler(event: APIGatewayProxyEvent) {
     console.log(JSON.stringify(event));
-    const tableName = process.env.TABLE_NAME;
-    if (!tableName) {
-        throw new Error('tableName not specified in process.env.TABLE_NAME');
-    }
+    const tableName = CONNECTION_TABLE;
     // TODO - look for cookie
     const cmd = new PutItemCommand({
         TableName: tableName,
@@ -38,10 +68,7 @@ export async function connectHandler(event: APIGatewayProxyEvent) {
 
 export async function disconnectHandler(event: APIGatewayProxyEvent) {
     console.log(JSON.stringify(event));
-    const tableName = process.env.TABLE_NAME;
-    if (!tableName) {
-        throw new Error('tableName not specified in process.env.TABLE_NAME');
-    }
+    const tableName = CONNECTION_TABLE;
     const cmd = new DeleteItemCommand({
         TableName: tableName,
         Key: {
@@ -59,10 +86,7 @@ export async function disconnectHandler(event: APIGatewayProxyEvent) {
 
 export async function messageHandler(event: APIGatewayProxyEvent) {
     console.log(JSON.stringify(event));
-    const tableName = process.env.TABLE_NAME;
-    if (!tableName) {
-        throw new Error('tableName not specified in process.env.TABLE_NAME');
-    }
+    const tableName = CONNECTION_TABLE;
     if (!event.body) {
         throw new Error('event body is missing');
     }
