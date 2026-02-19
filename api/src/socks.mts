@@ -5,7 +5,7 @@ import {
     DynamoDBClient,
     PutItemCommand,
     PutItemCommandOutput, ScanCommand, ScanCommandOutput,
-    QueryCommand
+    QueryCommand, UpdateItemCommand, GetItemCommand, GetItemCommandOutput
 } from "@aws-sdk/client-dynamodb";
 import {
     ApiGatewayManagementApi,
@@ -16,20 +16,82 @@ const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION });
 const GEEK_TABLE = "geek_connections";
 const CONNECTION_TABLE = "websocket_connections";
 
-export async function getChatterCode(geek: string): Promise<string> {
+async function verifyChatterCode(geek: string, chatterCode: string): Promise<boolean> {
+    const queryCommand = new GetItemCommand({
+        TableName: GEEK_TABLE,
+        Key: {
+            geek: { S: geek },
+            uuid: { S: chatterCode }
+        },
+    });
+    console.log(JSON.stringify(queryCommand));
+    const queryResult: GetItemCommandOutput = await ddbClient.send(queryCommand);
+    console.log(JSON.stringify(queryResult));
+    if (queryResult.Item) {
+        await updateAccessTime(geek, chatterCode);
+        return true;
+    }
+    return false;
+}
+
+async function updateAccessTime(geek: string, chatterCode: string): Promise<void> {
+    const updateCommand = new UpdateItemCommand({
+        TableName: GEEK_TABLE,
+        Key: {
+            geek: { S: geek },
+            uuid: { S: chatterCode }
+        },
+        ExpressionAttributeValues: { ":accessed": { N: (new Date()).getTime().toString() } },
+        UpdateExpression: "SET accessed = :accessed",
+    });
+    try {
+        const resp = await ddbClient.send(updateCommand);
+        console.log(JSON.stringify(resp));
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+export async function getExistingChatterCode(geek: string): Promise<string | undefined> {
+    const now = new Date();
+    const old = now.getTime() - 3600000;
     const queryCommand = new QueryCommand({
         TableName: GEEK_TABLE,
         KeyConditionExpression: "geek = :geek",
         ExpressionAttributeValues: { ":geek": { S: geek } }
     });
-    console.log(JSON.stringify(queryCommand));
     const queryResult = await ddbClient.send(queryCommand);
     console.log(JSON.stringify(queryResult));
-    if (queryResult.Items.length > 0) {
-        // TODO - update accessed time
-        return queryResult.Items[0].uuid.S;
+    for (const item of queryResult.Items) {
+        const deleteCommand = new DeleteItemCommand({
+            TableName: GEEK_TABLE,
+            Key: {
+                geek: item.geek,
+                uuid: item.uuid
+            },
+            ConditionExpression: "accessed < :old",
+            ExpressionAttributeValues: { ":old": { N: old.toString() } }
+        });
+        try {
+            const resp: DeleteItemCommandOutput = await ddbClient.send(deleteCommand);
+            console.log(JSON.stringify(resp));
+        } catch (err) {
+            // ignore CondtionalCheckFailed
+        }
     }
+    const queryResult2 = await ddbClient.send(queryCommand);
+    if (queryResult2.Items.length > 0) {
+        const item = queryResult2.Items[0];
+        const result = item.uuid.S;
+        await updateAccessTime(item.geek.S, result);
+        return result;
+    }
+    return undefined;
+}
 
+export async function getChatterCode(geek: string): Promise<string> {
+    const existing = await getExistingChatterCode(geek);
+    if (existing) return existing;
     let uuid = crypto.randomUUID();
     const now = (new Date()).getTime().toString();
     const putCommand = new PutItemCommand({
@@ -42,15 +104,26 @@ export async function getChatterCode(geek: string): Promise<string> {
         },
     });
     const putResult = await ddbClient.send(putCommand);
+    console.log(JSON.stringify(putResult))
     return uuid;
 }
 
 export async function connectHandler(event: APIGatewayProxyEvent) {
     console.log(JSON.stringify(event));
-    const tableName = CONNECTION_TABLE;
-    // TODO - look for cookie
+    // TODO - check authority to connect
+    const geek = event.queryStringParameters["geek"];
+    const id = event.queryStringParameters["id"];
+    if (!geek || !id) {
+        return { statusCode: 403 };
+    }
+    // check that the code is correct
+    if (!await verifyChatterCode(geek, id)) {
+        console.log("verification failed");
+        return { statusCode: 403 };
+    }
+    //
     const cmd = new PutItemCommand({
-        TableName: tableName,
+        TableName: CONNECTION_TABLE,
         Item: {
             connectionId: { S: event.requestContext.connectionId },
             domainName: { S: event.requestContext.domainName },
@@ -61,6 +134,7 @@ export async function connectHandler(event: APIGatewayProxyEvent) {
         const resp: PutItemCommandOutput = await ddbClient.send(cmd);
         console.log(JSON.stringify(resp));
     } catch (err) {
+        console.log(JSON.stringify(err));
         return { statusCode: 500, body: 'Failed to connect: ' + JSON.stringify(err) };
     }
     return { statusCode: 200, body: 'Connected.' };
@@ -68,9 +142,8 @@ export async function connectHandler(event: APIGatewayProxyEvent) {
 
 export async function disconnectHandler(event: APIGatewayProxyEvent) {
     console.log(JSON.stringify(event));
-    const tableName = CONNECTION_TABLE;
     const cmd = new DeleteItemCommand({
-        TableName: tableName,
+        TableName: CONNECTION_TABLE,
         Key: {
             connectionId: { S: event.requestContext.connectionId },
         },
@@ -86,14 +159,13 @@ export async function disconnectHandler(event: APIGatewayProxyEvent) {
 
 export async function messageHandler(event: APIGatewayProxyEvent) {
     console.log(JSON.stringify(event));
-    const tableName = CONNECTION_TABLE;
     if (!event.body) {
         throw new Error('event body is missing');
     }
 
     let connectionData;
     const cmd = new ScanCommand({
-        TableName: tableName,
+        TableName: CONNECTION_TABLE,
         ProjectionExpression: 'connectionId'
     });
     try {
@@ -122,7 +194,7 @@ export async function messageHandler(event: APIGatewayProxyEvent) {
             console.log(e);
             if (e.statusCode === 410) {
                 console.log(`Found stale connection, deleting ${connectionId}`);
-                const delCmd = new DeleteItemCommand({ TableName: tableName, Key: { connectionId} });
+                const delCmd = new DeleteItemCommand({ TableName: CONNECTION_TABLE, Key: { connectionId} });
                 const delResp = await ddbClient.send(delCmd);
                 console.log(delResp);
             } else {

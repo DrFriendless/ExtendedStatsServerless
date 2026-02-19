@@ -17,7 +17,7 @@ import {ApiGatewayv2DomainProperties} from "aws-cdk-lib/aws-route53-targets";
 
 const RUNTIME = lambda.Runtime.NODEJS_22_X;
 
-const EXPRESS_BASE = "http://eb2.drfriendless.com";
+const EXPRESS_BASE = "https://eb2.drfriendless.com";
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 let DATABASE_VPC: ec2.IVpc = undefined;
 let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
@@ -27,6 +27,7 @@ let API_GATEWAY: aws_apigatewayv2.IHttpApi = undefined;
 let STAR_CERT: acm.ICertificate = undefined;
 let DRFRIENDLESS_ZONE: route53.IHostedZone = undefined;
 let CREATE_EC2S: iam.IManagedPolicy = undefined;
+let ACCESS_DYNAMO: iam.PolicyDocument = undefined;
 
 export class ApiStack extends cdk.Stack {
   lookupExternalResources() {
@@ -42,9 +43,7 @@ export class ApiStack extends cdk.Stack {
     CREATE_EC2S = iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s", "CreateEC2sForLambda");
   }
 
-  defineApiRole(): iam.IRole {
-    const policies: Record<string, iam.PolicyDocument> = {};
-
+  defineAccessDynamoPolicy(): iam.PolicyDocument {
     const accessDynamo = new iam.PolicyStatement();
     accessDynamo.addActions(
         "dynamodb:BatchGetItem",
@@ -63,10 +62,14 @@ export class ApiStack extends cdk.Stack {
         "arn:aws:dynamodb:ap-southeast-2:067508173724:table/websocket_connections",
         "arn:aws:dynamodb:ap-southeast-2:067508173724:table/geek_connections"
     );
-    policies[`policy_access_dynamo`] = new iam.PolicyDocument({
+    return new iam.PolicyDocument({
       statements: [accessDynamo]
     });
+  }
 
+  defineApiRole(): iam.IRole {
+    const policies: Record<string, iam.PolicyDocument> = {};
+    policies[`policy_access_dynamo`] = ACCESS_DYNAMO;
     const managedPolicies: iam.IManagedPolicy[] = [
       CREATE_EC2S,
       iam.ManagedPolicy.fromManagedPolicyName(this, "accessDB", "AccessDatabaseSecrets"),
@@ -147,12 +150,11 @@ export class ApiStack extends cdk.Stack {
 
   defineSocksRole(): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
+    policies[`policy_access_dynamo`] = ACCESS_DYNAMO;
 
     const loggingCloudWatch = new iam.PolicyStatement();
     loggingCloudWatch.addActions("logs:PutLogEvents", "logs:CreateLogStream", "logs:CreateLogGroup");
     loggingCloudWatch.addResources("*");
-
-
     policies[`policy_downloader_logging`] = new iam.PolicyDocument({
       statements: [loggingCloudWatch]
     });
@@ -174,16 +176,12 @@ export class ApiStack extends cdk.Stack {
     Tags.of(ep).add("component", COMPONENT);
   }
 
-  defineSockHandlerLambdas(socksRole, table) {
+  defineSockHandlerLambdas(socksRole: iam.IRole, table: ddb.ITable) {
     const funcProps = {
       runtime: RUNTIME,
       role: socksRole,
       code: lambda.Code.fromBucketV2(ZIP_BUCKET,  COMPONENT + ".zip"),
       allowPublicSubnet: true,
-      // vpc: DATABASE_VPC,
-      // vpcSubnets: {
-      //   subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
-      // },
       environment: {
         TABLE_NAME: table.tableName
       }
@@ -233,7 +231,7 @@ export class ApiStack extends cdk.Stack {
     });
 
     const { connHandler, discoHandler, defaultHandler } = this.defineSockHandlerLambdas(socksRole, table);
-    const gw: apigw.IWebSocketApi = new apigw.WebSocketApi(this, "socksgw", {
+    const gw: apigw.WebSocketApi = new apigw.WebSocketApi(this, "socksgw", {
       apiName: "socks",
       description: "Websocket API for Extended Stats",
       connectRouteOptions: {
@@ -254,16 +252,11 @@ export class ApiStack extends cdk.Stack {
       domainMapping: { domainName: socksDomainName }
     });
     Tags.of(gw).add("component", COMPONENT);
+    console.log(gw.apiEndpoint);
     Tags.of(apiStage).add("component", COMPONENT);
-    const connectionsArn2 = this.formatArn({
-      service: 'execute-api',
-      resourceName: `/POST/*`,
-      resource: "socks.drfriendless.com",
-    });
-    const manageConnection = new iam.PolicyStatement();
-    manageConnection.addActions('execute-api:*');
-    manageConnection.addResources(connectionsArn2);
-    socksRole.attachInlinePolicy(new iam.Policy(this, "mcPolicy", { statements: [manageConnection]}));
+    gw.grantManageConnections(connHandler);
+    gw.grantManageConnections(discoHandler);
+    gw.grantManageConnections(defaultHandler);
 
     new route53.RecordSet(this, 'socksRecordSetA', {
       zone: DRFRIENDLESS_ZONE,
@@ -295,6 +288,7 @@ export class ApiStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
     this.lookupExternalResources();
+    ACCESS_DYNAMO = this.defineAccessDynamoPolicy();
 
     this.createWebSocketsInfrastructure("socks.drfriendless.com", "websocket_connections", "live");
 

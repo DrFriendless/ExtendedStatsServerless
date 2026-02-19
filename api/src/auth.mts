@@ -81,12 +81,12 @@ export async function login(event: APIGatewayProxyEvent): Promise<HttpResponse> 
         }
     }
 
-    const test = event.headers.origin && event.headers.origin.indexOf("://localhost:") >= 0;
+    const test = !!event.headers.referer && event.headers.referer.indexOf("://localhost:") >= 0;
     const cookie = makeIdCookie(username, test);
     const chatterCookie = await makeChatterCookie(username, test);
     await incrementLogin(system, username);
     const userData = await getUserDataForUsername(system, username);
-    console.log([ cookie, chatterCookie ]);
+    console.log([ test, cookie, chatterCookie ]);
     return { "statusCode": 200, cookies: [cookie, chatterCookie], body: JSON.stringify(userData) };
 }
 
@@ -251,6 +251,7 @@ async function getUserDataForUsername(system: System, username: string): Promise
 }
 
 export async function personal(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
+    console.log(JSON.stringify(event));
     const system = await findSystem();
     if (isHttpResponse(system)) return system;
 
@@ -260,10 +261,10 @@ export async function personal(event: APIGatewayProxyEventV2WithRequestContext<a
         if (!user) {
             return { "statusCode": 403, body: "{}" };
         } else {
-            const test = event.headers.origin && event.headers.origin.indexOf("://localhost:") >= 0;
+            const test = !!event.headers.referer && event.headers.referer.indexOf("://localhost:") >= 0;
             const idCookie = makeIdCookie(cookies['extstatsid'], test);
             const chatterCookie = await makeChatterCookie(cookies['extstatsid'], test);
-            console.log([ idCookie, chatterCookie ]);
+            console.log([ test, idCookie, chatterCookie ]);
             // to set multiple cookies, use a string[] rather than a string.
             return { "statusCode": 200, cookies: [ idCookie, chatterCookie ], body: user.configuration || "{}" };
         }
