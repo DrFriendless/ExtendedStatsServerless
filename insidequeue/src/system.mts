@@ -11,6 +11,7 @@ export class System {
     downloaderQueue: string;
     systemLogGroup: string;
     playsQueue: string;
+    messageQueue: string;
     retryQueue: string;
     ok: boolean;
 
@@ -23,6 +24,7 @@ export class System {
         this.downloaderQueue = await this.getParameter("/extstats/downloader/queue");
         this.playsQueue = await this.getParameter("/extstats/downloader/playsqueue");
         this.retryQueue = await this.getParameter("/extstats/downloader/retryqueue");
+        this.messageQueue = await this.getParameter("/extstats/misc/messages");
         this.ok = true;
         return this;
     }

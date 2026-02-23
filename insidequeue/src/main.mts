@@ -33,7 +33,7 @@ import {
     doMarkGeekDoesNotExist,
     getGeeksThatDontExist, doUpdatePlaysForPeriod, doMarkPlaysUrlProcessed
 } from "./mysql-rds.mjs";
-import {invokeLambdaAsync, listAdd, sendToQueue, sendToQueueWithDelay, sleep} from "./library.mjs";
+import {invokeLambdaAsync, listAdd, sendMessage, sendToQueue, sendToQueueWithDelay, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
@@ -155,6 +155,7 @@ async function updatePlayedYears(system: System, geek: string, geekid: number, f
     const updateSql = "update files set nextUpdate = ?, lastUpdate = ? where id = ?";
     const updateParams = [ nextUpdate, new Date(), fileId ];
     await system.withConnectionAsync(async conn => await conn.query(updateSql, updateParams));
+    await sendMessage(system, [geek], ["updates"], { message: "Updated your years played."});
 }
 
 async function getRetries(system: System): Promise<ToProcessElement[]> {
@@ -298,6 +299,7 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
         case "CleanUpCollectionMessage":
             console.log(`CleanUpCollectionMessage ${message.params.geek} ${message.params.items.length}`);
             await system.withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
+            await sendMessage(system, [message.params.geek], ["updates"], { message: "Finished updating your collection."});
             break;
         case "CollectionResultMessage":
             console.log(`CollectionResultMessage ${message.result.geek} ${message.result.items.length}`);
@@ -349,6 +351,7 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
         case "PlaysForPeriodResultMessage":
             console.log(`PlaysForPeriodResultMessage ${message.plays.geek} ${message.plays.startYmdInc} ${message.plays.endYmdInc} ${message.plays.plays.length}`);
             await system.withConnectionAsync(conn => doUpdatePlaysForPeriod(conn, message.plays));
+            await sendMessage(system, [message.plays.geek], ["updates"], { message: `Updated your plays for ${message.plays.startYmdInc}-${message.plays.endYmdInc}`});
             break;
         case "UpdateMetadataMessage":
             console.log(JSON.stringify(message));
@@ -366,6 +369,7 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             console.log(`UserResultMessage ${message.result.geek}`);
             await system.withConnectionAsync(conn =>
                 doUpdateProcessUserResult(conn, message.result.geek, message.result.bggid, message.result.country, message.result.url));
+            await sendMessage(system, [message.result.geek], ["updates"], { message: `Updated your geek info.`});
             break;
         default:
             // this should not happen

@@ -8,3 +8,10 @@ export interface NormalisedPlays {
     expansionPlay: boolean;
     location: string;
 }
+
+// this is what the message broker is expecting
+export interface WebsockMessage {
+    users: string[];
+    topics: string[];
+    body: any;
+}
