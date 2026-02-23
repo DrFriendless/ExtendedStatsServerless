@@ -9,9 +9,9 @@ import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
+import * as sqs from "aws-cdk-lib/aws-sqs";
 import {COMPONENT, DEPLOYMENT_BUCKET} from "./metadata.mts";
-import {Rule} from "aws-cdk-lib/aws-events";
-import {Role} from "aws-cdk-lib/aws-iam";
+import * as sources from "aws-cdk-lib/aws-lambda-event-sources";
 // import {VpcEndpointIpAddressType} from "aws-cdk-lib/aws-ec2";
 
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
@@ -20,13 +20,16 @@ let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
 let CONFIRM_LAMBDA: lambda.IFunction = undefined;
+let ACCESS_DYNAMO: iam.PolicyDocument = undefined;
 
 export const RUNTIME = lambda.Runtime.NODEJS_22_X;
 // bgg - access BoardGameGeek, needs to be public
 // db - access to the database, needs to be private
 // logging - ability to write to CloudWatch logs
 // cw - ability to read CloudWatch metrics, needs to be public
-type OptsType = "bgg" | "db" | "logging" | "cw";
+// dynamo - access DynamoDB
+// single - max concurrency 1
+type OptsType = "bgg" | "db" | "logging" | "cw" | "dynamo" | "single" | "sqs" | "ssm" | "message";
 
 export class MiscStack extends cdk.Stack {
   // don't do this, it costs too much.
@@ -42,6 +45,30 @@ export class MiscStack extends cdk.Stack {
   //     ipAddressType: VpcEndpointIpAddressType.IPV4
   //   })
   // }
+
+  defineAccessDynamoPolicy(): iam.PolicyDocument {
+    const accessDynamo = new iam.PolicyStatement();
+    accessDynamo.addActions(
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem",
+        "dynamodb:ConditionCheckItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:DescribeTable",
+        "dynamodb:GetItem",
+        "dynamodb:GetRecords",
+        "dynamodb:GetShardIterator",
+        "dynamodb:PutItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:UpdateItem");
+    accessDynamo.addResources(
+        "arn:aws:dynamodb:ap-southeast-2:067508173724:table/websocket_connections",
+        "arn:aws:dynamodb:ap-southeast-2:067508173724:table/geek_connections"
+    );
+    return new iam.PolicyDocument({
+      statements: [accessDynamo]
+    });
+  }
 
   defineAuthStateMachine(threadFunc: lambda.Function): sfn.StateMachine {
     return new sfn.StateMachine(this, 'authStateMachine', {
@@ -91,7 +118,7 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
-  defineRuleToInvokeAuth(machine: sfn.IStateMachine, n: number): Rule {
+  defineRuleToInvokeAuth(machine: sfn.IStateMachine, n: number): events.Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("states:StartExecution");
     st1.addResources(machine.stateMachineArn);
@@ -111,7 +138,7 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
-  defineRuleToInvokeCounts(machine: sfn.IStateMachine, n: number): Rule {
+  defineRuleToInvokeCounts(machine: sfn.IStateMachine, n: number): events.Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("states:StartExecution");
     st1.addResources(machine.stateMachineArn);
@@ -131,7 +158,7 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
-  defineRuleToInvokeReport(machine: sfn.IStateMachine, n: number): Rule {
+  defineRuleToInvokeReport(machine: sfn.IStateMachine, n: number): events.Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("states:StartExecution");
     st1.addResources(machine.stateMachineArn);
@@ -167,6 +194,9 @@ export class MiscStack extends cdk.Stack {
         subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
       }
     };
+    const limitConcurrency: Partial<lambda.FunctionProps> = {
+      reservedConcurrentExecutions: 1
+    }
     const fProps: lambda.FunctionProps = {
       functionName: name,
       runtime: RUNTIME,
@@ -179,7 +209,8 @@ export class MiscStack extends cdk.Stack {
         "opts": JSON.stringify(opts),
         "type": subnetType
       },
-      ...(subnetType === "public" ? {} : vpcOpts)
+      ...(subnetType === "public" ? {} : vpcOpts),
+      ...((opts.indexOf("single") >= 0) ? limitConcurrency : {})
     };
     if (opts.indexOf("db") >= 0 && subnetType === "private") {
       // would need a VPC endpoint to get to secrets manager, and we don't want to pay for that
@@ -204,8 +235,24 @@ export class MiscStack extends cdk.Stack {
     return managedPolicies;
   }
 
-  private defineRole(opts: OptsType[], name: string, n: number): Role {
+  private defineRole(opts: OptsType[], name: string, n: number): iam.Role {
     const policies: Record<string, iam.PolicyDocument> = {};
+    if (opts.indexOf("message") >= 0) {
+      const parameters = new iam.PolicyStatement();
+      parameters.addActions("execute-api:ManageConnections");
+      parameters.addResources(`arn:aws:execute-api:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:*`);
+      policies[`policy_${name}_exa`] = new iam.PolicyDocument({
+        statements: [parameters]
+      });
+    }
+    if (opts.includes("ssm")) {
+      const parameters = new iam.PolicyStatement();
+      parameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
+      parameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/*`);
+      policies[`policy_${name}_ssm`] = new iam.PolicyDocument({
+        statements: [parameters]
+      });
+    }
     if (opts.includes("bgg")) {
       const bggParameters = new iam.PolicyStatement();
       bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
@@ -239,10 +286,20 @@ export class MiscStack extends cdk.Stack {
         statements: [cwPolicy]
       });
     }
+    if (opts.indexOf("dynamo") >= 0) {
+      policies[`policy_${name}_dynamo`] = ACCESS_DYNAMO;
+    }
     return new iam.Role(this, `role_${name}`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       inlinePolicies: policies,
       managedPolicies: this.definePolicies(opts, n),
+    });
+  }
+
+  defineMessageQueue(): sqs.Queue {
+    return new sqs.Queue(this, "messageQueue", {
+      queueName: "MessageQueue",
+      visibilityTimeout: Duration.seconds(120)
     });
   }
 
@@ -259,6 +316,7 @@ export class MiscStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
     this.lookupExternalResources();
+    ACCESS_DYNAMO = this.defineAccessDynamoPolicy();
 
     // the VPC endpoint is so that the Lambdas inside the VPC can see the parameter store which is public.
     // this.defineVpcEndpoints();
@@ -273,5 +331,23 @@ export class MiscStack extends cdk.Stack {
     const cwFunction = this.defineLambda("misc_cw", "cloudwatch.handler", ["cw"], "public", 5);
     const sm2 = this.defineCountsStateMachine(cwFunction, countFunction);
     const rule6 = this.defineRuleToInvokeCounts(sm2, 6);
+    const messageQueue = this.defineMessageQueue();
+
+    new cdk.CfnOutput(this, 'MessageQueue', {
+      value: messageQueue.queueUrl,
+      exportName: 'misc-MessageQueueURL'
+    });
+
+    let messageLambda: lambda.IFunction = this.defineLambda("misc_message", "message.handler", ["dynamo","single","sqs","ssm","message"], "public", 7);
+    if (messageLambda) {
+      const mapping = new sources.SqsEventSource(messageQueue, {batchSize: 10, enabled: false, maxBatchingWindow: Duration.seconds(3) });
+      messageLambda.addEventSource(mapping);
+      new cdk.CfnOutput(this, 'messageMapping', {
+        value: mapping.eventSourceMappingId,
+        exportName: 'misc-MessageMappingUUID'
+      });
+    } else {
+      console.log("There isn't any message lambda");
+    }
   }
 }

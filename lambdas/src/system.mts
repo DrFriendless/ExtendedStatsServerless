@@ -9,6 +9,7 @@ export async function findSystem(opts: string[]): Promise<System | HttpResponse>
     if (opts.includes("bgg")) await s.loadBGGSecrets();
     if (opts.includes("logging")) await s.loadLoggingSecrets();
     if (opts.includes("db")) await s.loadDatabaseSecrets();
+    if (opts.includes("message")) await s.loadMessageSecrets();
     return s;
 }
 
@@ -21,6 +22,7 @@ export class System {
     private mysqlUsername: string | undefined;
     private mysqlPassword: string | undefined;
     private mysqlDatabase: string | undefined;
+    public messageQueue: string | undefined;
 
     async loadDatabaseSecrets(): Promise<HttpResponse | void> {
         this.mysqlHost = process.env.MYSQL_HOST;
@@ -45,9 +47,11 @@ export class System {
                 Name: key
             })
         );
-        console.log(`key = ${key}`);
-        console.log(`Value = ${response.Parameter.Value}`);
         return response.Parameter.Value;
+    }
+
+    async loadMessageSecrets(): Promise<void> {
+        this.messageQueue = await this.getParameter("/extstats/misc/messages");
     }
 
     async loadBGGSecrets(): Promise<HttpResponse | void> {
