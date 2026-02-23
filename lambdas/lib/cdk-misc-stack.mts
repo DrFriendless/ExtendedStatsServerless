@@ -327,7 +327,7 @@ export class MiscStack extends cdk.Stack {
     // const writeFunction = this.defineLambda("misc_report_write", "report.write", ["logging"], "public", 3);
     // const sm2 = this.defineReportStateMachine(reportFunction, writeFunction);
     // const rule2 = this.defineRuleToInvokeReport(sm2, 2);
-    const countFunction = this.defineLambda("misc_counts", "counts.handler", ["db"], "private", 4);
+    const countFunction = this.defineLambda("misc_counts", "counts.handler", ["db","dynamo"], "private", 4);
     const cwFunction = this.defineLambda("misc_cw", "cloudwatch.handler", ["cw"], "public", 5);
     const sm2 = this.defineCountsStateMachine(cwFunction, countFunction);
     const rule6 = this.defineRuleToInvokeCounts(sm2, 6);
