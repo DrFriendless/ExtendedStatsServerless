@@ -17,7 +17,8 @@ import {ApiGatewayv2DomainProperties} from "aws-cdk-lib/aws-route53-targets";
 
 const RUNTIME = lambda.Runtime.NODEJS_22_X;
 
-const EXPRESS_BASE = "https://eb2.drfriendless.com";
+// this has to be http or the API integrations don't work - https is only at CloudFront
+const EXPRESS_BASE = "http://eb2.drfriendless.com";
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 let DATABASE_VPC: ec2.IVpc = undefined;
 let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
@@ -216,7 +217,8 @@ export class ApiStack extends cdk.Stack {
   createWebSocketsInfrastructure(domainName: string, tableName: string, stageName: string) {
     const table = new ddb.Table(this, 'sockTable', {
       tableName,
-      partitionKey: { name: 'connectionId', type: ddb.AttributeType.STRING },
+      partitionKey: { name: 'geek', type: ddb.AttributeType.STRING },
+      sortKey: { name: "connectionId", type: ddb.AttributeType.STRING }
     });
     Tags.of(table).add("component", COMPONENT);
     this.defineGatewayEndpoints();
@@ -252,7 +254,6 @@ export class ApiStack extends cdk.Stack {
       domainMapping: { domainName: socksDomainName }
     });
     Tags.of(gw).add("component", COMPONENT);
-    console.log(gw.apiEndpoint);
     Tags.of(apiStage).add("component", COMPONENT);
     gw.grantManageConnections(connHandler);
     gw.grantManageConnections(discoHandler);

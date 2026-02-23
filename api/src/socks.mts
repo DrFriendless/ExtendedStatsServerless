@@ -11,6 +11,7 @@ import {
     ApiGatewayManagementApi,
 } from "@aws-sdk/client-apigatewaymanagementapi";
 import crypto from "crypto";
+import {HttpResponse} from "./system.mjs";
 
 const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION });
 const GEEK_TABLE = "geek_connections";
@@ -108,11 +109,32 @@ export async function getChatterCode(geek: string): Promise<string> {
     return uuid;
 }
 
+async function storeConnection(connectionId: string, geek: string, topics: string[]): Promise<HttpResponse> {
+    const cmd = new PutItemCommand({
+        TableName: CONNECTION_TABLE,
+        Item: {
+            connectionId: {S: connectionId},
+            geek: {S: geek},
+            topics: {SS: topics}
+        },
+    });
+    try {
+        const resp: PutItemCommandOutput = await ddbClient.send(cmd);
+        console.log(JSON.stringify(resp));
+    } catch (err) {
+        console.log(JSON.stringify(err));
+        return {statusCode: 500, body: 'Failed to connect: ' + JSON.stringify(err)};
+    }
+    return {statusCode: 200, body: 'Connected.'};
+}
+
 export async function connectHandler(event: APIGatewayProxyEvent) {
     console.log(JSON.stringify(event));
     // TODO - check authority to connect
     const geek = event.queryStringParameters["geek"];
     const id = event.queryStringParameters["id"];
+    const topic = event.queryStringParameters["topic"];
+    const topics: string[] = (!topic) ? ["."] : (topic.indexOf(",") >= 0) ? topic.split(",") : [topic];
     if (!geek || !id) {
         return { statusCode: 403 };
     }
@@ -121,23 +143,7 @@ export async function connectHandler(event: APIGatewayProxyEvent) {
         console.log("verification failed");
         return { statusCode: 403 };
     }
-    //
-    const cmd = new PutItemCommand({
-        TableName: CONNECTION_TABLE,
-        Item: {
-            connectionId: { S: event.requestContext.connectionId },
-            domainName: { S: event.requestContext.domainName },
-            stage: { S: event.requestContext.stage }
-        },
-    });
-    try {
-        const resp: PutItemCommandOutput = await ddbClient.send(cmd);
-        console.log(JSON.stringify(resp));
-    } catch (err) {
-        console.log(JSON.stringify(err));
-        return { statusCode: 500, body: 'Failed to connect: ' + JSON.stringify(err) };
-    }
-    return { statusCode: 200, body: 'Connected.' };
+    return await storeConnection(event.requestContext.connectionId, geek, topics);
 }
 
 export async function disconnectHandler(event: APIGatewayProxyEvent) {
