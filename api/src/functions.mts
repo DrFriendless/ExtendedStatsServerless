@@ -30,7 +30,7 @@ import {getCookiesFromEvent} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
 
@@ -41,21 +41,21 @@ export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpRespo
 }
 
 export async function markForUpdate(event: APIGatewayProxyEvent) {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     return await markUrlForUpdate(system, JSON.parse(event.body).url);
 }
 
 export async function updateOld(event: APIGatewayProxyEvent) {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     return await markGeekForUpdate(system, event.queryStringParameters.geek);
 }
 
 export async function getGeekSummary(event: APIGatewayProxyEvent): Promise<HttpResponse | GeekSummary> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     return await gatherGeekSummary(system, event.queryStringParameters.geek);
@@ -63,14 +63,14 @@ export async function getGeekSummary(event: APIGatewayProxyEvent): Promise<HttpR
 
 export async function incFAQCount(event: APIGatewayProxyEvent): Promise<HttpResponse | FAQCount[]> {
     console.log(event);
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     return await updateFAQCount(system, JSON.parse(event.body) as number[]);
 }
 
 export async function adminGatherSystemStats(event: APIGatewayProxyEvent): Promise<HttpResponse | SystemStats> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     return await gatherSystemStats(system);
@@ -78,14 +78,14 @@ export async function adminGatherSystemStats(event: APIGatewayProxyEvent): Promi
 
 // Lambda to retrieve the list of users
 export async function getUserList(ignored: APIGatewayProxyEvent): Promise<HttpResponse | string[]> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     return await listUsers(system);
 }
 
 export async function getUserCheckList(event: APIGatewayProxyEvent): Promise<HttpResponse> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
 
@@ -124,7 +124,7 @@ export async function getUserCheckList(event: APIGatewayProxyEvent): Promise<Htt
 
 // Lambda to retrieve the data for the war table.
 export async function getWarTable(ignored: APIGatewayProxyEvent): Promise<HttpResponse | WarTableRow[]> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     const rows = await listWarTable(system);
@@ -138,7 +138,7 @@ export async function getWarTable(ignored: APIGatewayProxyEvent): Promise<HttpRe
 export async function query(event: APIGatewayProxyEvent): Promise<Collection | CollectionWithPlays | CollectionWithMonthlyPlays | HttpResponse> {
     if (event && event.body) {
         const query = JSON.parse(event.body) as GeekGameQuery;
-        const system = await findSystem();
+        const system = await findSystem("private");
         if (isHttpResponse(system)) return system;
         await system.incrementApiCounter();
         return await system.asyncReturnWithConnection(async conn => await doQuery(conn, query));
@@ -153,7 +153,7 @@ export async function query(event: APIGatewayProxyEvent): Promise<Collection | C
 export async function plays(event: APIGatewayProxyEvent): Promise<MultiGeekPlays | HttpResponse> {
     if (event && event.body) {
         const query = JSON.parse(event.body) as PlaysQuery;
-        const system = await findSystem();
+        const system = await findSystem("private");
         if (isHttpResponse(system)) return system;
         await system.incrementApiCounter();
         return await system.asyncReturnWithConnection(async conn => await doPlaysQuery(conn, query));
@@ -163,7 +163,7 @@ export async function plays(event: APIGatewayProxyEvent): Promise<MultiGeekPlays
 }
 
 export async function getNews(event: APIGatewayProxyEvent): Promise<NewsItem[] | HttpResponse> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     return await system.asyncReturnWithConnection(async conn => await doGetNews(conn));
@@ -173,7 +173,7 @@ export async function getRankings(event: any): Promise<RankingTableRow[] | HttpR
     console.log(event);
     if (event) {
         const query = {}; // TODO
-        const system = await findSystem();
+        const system = await findSystem("private");
         if (isHttpResponse(system)) return system;
         await system.incrementApiCounter();
         return await rankGames(system, query);
@@ -183,7 +183,7 @@ export async function getRankings(event: any): Promise<RankingTableRow[] | HttpR
 }
 
 export async function getDisambiguationData(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<DisambiguationData | HttpResponse> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
 

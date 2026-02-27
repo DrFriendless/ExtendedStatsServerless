@@ -14,7 +14,7 @@ interface RawBlogComment {
 }
 
 export async function retrieveCommentsForUrl(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<BlogComment[] | HttpResponse> {
-    const system = await findSystem(event);
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     const url = event.queryStringParameters["url"];
     return await retrieveCommentsForUrlInternal(system, url);
@@ -47,7 +47,7 @@ async function retrieveCommentsForUrlInternal(system: System, url: string) {
 export async function deleteComment(event: APIGatewayProxyEventV2WithRequestContext<any>):
     Promise<{ posts: BlogComment[] } | HttpResponse> {
     console.log(event);
-    const system = await findSystem(event);
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     if (!system.user) {
         return {
@@ -91,7 +91,7 @@ export async function deleteComment(event: APIGatewayProxyEventV2WithRequestCont
 export async function saveComment(event: APIGatewayProxyEventV2WithRequestContext<any>):
     Promise<{ id: number | undefined, posts: BlogComment[] } | HttpResponse> {
     console.log(event);
-    const system = await findSystem(event);
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     if (!system.user) {
         return {
@@ -116,7 +116,7 @@ export async function saveComment(event: APIGatewayProxyEventV2WithRequestContex
 
 export async function updateComment(event: APIGatewayProxyEventV2WithRequestContext<any>):
     Promise<{ id: number, posts: BlogComment[] } | HttpResponse> {
-    const system = await findSystem(event);
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     if (!system.user) {
         return {

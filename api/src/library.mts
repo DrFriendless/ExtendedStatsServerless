@@ -63,3 +63,7 @@ export function getUserFromEvent(event: APIGatewayProxyEventV2WithRequestContext
     }
     return undefined;
 }
+
+export async function sleep(waitTimeInMs: number){
+    await new Promise(resolve => setTimeout(resolve, waitTimeInMs));
+}

@@ -9,7 +9,9 @@ import {
     WarTableRow
 } from "extstats-core";
 import {BlogComment} from "extstats-core/blog-interfaces.js";
+import {GeeklistCheck} from "./api-interfaces.mjs";
 
+export * from "./api-interfaces.mjs";
 export type AuthResultType = "code" | "userdata" | "failure";
 
 export interface AuthResultCode {
@@ -314,5 +316,15 @@ export class ExtstatsApi {
                 "Content-Type": "application/json"
             }
         })).json()) as DisambiguationData;
+    }
+
+    async checkGeeklist(geeklist: number): Promise<GeeklistCheck> {
+        return (await (await fetch(`${this.baseUrl}/geeklist?geeklist=${geeklist}`, {
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            method: "POST"
+        })).json()) as GeeklistCheck;
     }
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 rm api.zip
+rm -rf dist/*
 npm run build
 success=$?
 if [ $success -eq 0 ]; then

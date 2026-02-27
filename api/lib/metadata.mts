@@ -5,11 +5,14 @@ export const COMPONENT = "api";
 export const REGION = "ap-southeast-2";
 export const PROFILE = "drfriendless";
 
+type PUBLIC_PRIVATE = "public" | "private";
+
 export interface LambdaSpec {
     name: string;
     handler: string;
     route: string;
-    method: string;
+    method: "GET" | "POST";
+    pp?: PUBLIC_PRIVATE;
 }
 
 export interface LambdaOnlySpec {
@@ -20,7 +23,7 @@ export interface LambdaOnlySpec {
 export interface ExpressSpec {
     key: string;
     route: string;
-    method: string;
+    method: "GET" | "POST";
 }
 
 export const LAMBDA_SPECS: LambdaSpec[] = [
@@ -50,10 +53,12 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_saveComment`, handler: "blog.saveComment", route: "saveComment", method: "POST" },
     { name: `${COMPONENT}_updateComment`, handler: "blog.updateComment", route: "updateComment", method: "POST" },
     { name: `${COMPONENT}_deleteComment`, handler: "blog.deleteComment", route: "deleteComment", method: "POST" },
+    { name: `${COMPONENT}_geeklist`, handler: "geeklist.downloader", route: "geeklist", method: "POST", pp: "public" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [
-    { name: `auth_confirm`, handler: "auth.confirm" }
+    { name: `auth_confirm`, handler: "auth.confirm" },
+    { name: `api_geeklist_check`, handler: "geeklist.check" }
 ];
 
 export const OTHER_LAMBDA_NAMES: string[] = [

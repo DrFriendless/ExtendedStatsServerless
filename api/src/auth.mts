@@ -52,7 +52,7 @@ function makeLogoutCookie(test: boolean) {
  */
 export async function login(event: APIGatewayProxyEvent): Promise<HttpResponse> {
     console.log(event);
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     const body = JSON.parse(event.body) as any;
     const username = body['username'] || "";
@@ -119,7 +119,7 @@ function extractSalt(encodedPassword: string): { salt: string, p: string } {
 
 export async function changePassword(event: APIGatewayProxyEvent) {
     console.log(event);
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
 
     const body = JSON.parse(event.body) as any;
@@ -150,7 +150,7 @@ export async function changePassword(event: APIGatewayProxyEvent) {
 
 export async function signup(event: APIGatewayProxyEvent) {
     console.log(event);
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
 
     const body = JSON.parse(event.body) as any;
@@ -192,7 +192,7 @@ export async function signup(event: APIGatewayProxyEvent) {
 
 export async function logout(event: APIGatewayProxyEvent): Promise<HttpResponse> {
     console.log(event);
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     const cookie = makeLogoutCookie(event.headers.origin.includes("://localhost:"));
     return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: JSON.stringify({}) };
@@ -200,7 +200,7 @@ export async function logout(event: APIGatewayProxyEvent): Promise<HttpResponse>
 
 export async function updatePersonal(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
 
     const cookies = getCookiesFromEvent(event);
@@ -223,7 +223,7 @@ async function confirmTask(system: System, task: AuthTask) {
 
 export async function confirm(event: { Payload: {id: string, username: string, codes: string[]}[] }) {
     console.log(event);
-    const system = await findSystem();
+    const system = await findSystem("private");
     console.log(system);
     if (isHttpResponse(system)) return system;
 
@@ -252,7 +252,7 @@ async function getUserDataForUsername(system: System, username: string): Promise
 
 export async function personal(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
     console.log(JSON.stringify(event));
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
 
     const cookies: Record<string, string> = getCookiesFromEvent(event);

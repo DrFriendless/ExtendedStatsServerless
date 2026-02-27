@@ -9,13 +9,20 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import {GatewayVpcEndpoint} from "aws-cdk-lib/aws-ec2";
 import * as ddb from "aws-cdk-lib/aws-dynamodb";
 import * as apigw from "aws-cdk-lib/aws-apigatewayv2";
-import {IpAddressType} from "aws-cdk-lib/aws-apigatewayv2";
 import * as apigwi from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as route53 from "aws-cdk-lib/aws-route53";
-import {COMPONENT, DEPLOYMENT_BUCKET, EXPRESS_SPECS, LAMBDA_ONLY_SPECS, LAMBDA_SPECS} from "./metadata.mts";
+import {
+  COMPONENT,
+  DEPLOYMENT_BUCKET,
+  EXPRESS_SPECS,
+  LAMBDA_ONLY_SPECS,
+  LAMBDA_SPECS
+} from "./metadata.mts";
 import {ApiGatewayv2DomainProperties} from "aws-cdk-lib/aws-route53-targets";
 
 const RUNTIME = lambda.Runtime.NODEJS_22_X;
+
+type PUBLIC_PRIVATE = "public" | "private";
 
 // this has to be http or the API integrations don't work - https is only at CloudFront
 const EXPRESS_BASE = "http://eb2.drfriendless.com";
@@ -28,6 +35,7 @@ let API_GATEWAY: aws_apigatewayv2.IHttpApi = undefined;
 let STAR_CERT: acm.ICertificate = undefined;
 let DRFRIENDLESS_ZONE: route53.IHostedZone = undefined;
 let CREATE_EC2S: iam.IManagedPolicy = undefined;
+let WRITE_CW: iam.IManagedPolicy = undefined;
 let ACCESS_DYNAMO: iam.PolicyDocument = undefined;
 
 export class ApiStack extends cdk.Stack {
@@ -42,6 +50,7 @@ export class ApiStack extends cdk.Stack {
     STAR_CERT = acm.Certificate.fromCertificateArn(this, "stardrfriendless", "arn:aws:acm:ap-southeast-2:067508173724:certificate/aabe3460-bdd1-432c-863e-74514b1fa94b");
     DRFRIENDLESS_ZONE = route53.HostedZone.fromLookup(this, "zone", { domainName: "drfriendless.com" });
     CREATE_EC2S = iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s", "CreateEC2sForLambda");
+    WRITE_CW = iam.ManagedPolicy.fromManagedPolicyName(this, "writeToCW", "WriteToCloudwatchLogs");
   }
 
   defineAccessDynamoPolicy(): iam.PolicyDocument {
@@ -72,9 +81,7 @@ export class ApiStack extends cdk.Stack {
     const policies: Record<string, iam.PolicyDocument> = {};
     policies[`policy_access_dynamo`] = ACCESS_DYNAMO;
     const managedPolicies: iam.IManagedPolicy[] = [
-      CREATE_EC2S,
-      iam.ManagedPolicy.fromManagedPolicyName(this, "accessDB", "AccessDatabaseSecrets"),
-      iam.ManagedPolicy.fromManagedPolicyName(this, "writeToCW", "WriteToCloudwatchLogs"),
+      CREATE_EC2S, WRITE_CW
     ];
 
     return new iam.Role(this, `role_api`, {
@@ -84,14 +91,37 @@ export class ApiStack extends cdk.Stack {
     });
   }
 
-  defineLambda(scope: Construct, name: string, handler: string, route: string, method: apigw.HttpMethod, role: iam.IRole): lambda.Function {
-    const f = new lambda.Function(scope, name, {
-      functionName: name,
-      runtime: RUNTIME,
-      handler,
-      role: role,
-      code: lambda.Code.fromBucketV2(ZIP_BUCKET,  COMPONENT + ".zip"),
-      timeout: Duration.seconds(60),
+  definePublicLambdaRole(): iam.Role {
+    const policies: Record<string, iam.PolicyDocument> = {};
+
+    const bggParameters = new iam.PolicyStatement();
+    bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
+    bggParameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/downloader*`);
+    const bggSecrets = new iam.PolicyStatement();
+    bggSecrets.addActions("secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret");
+    bggSecrets.addResources(`arn:aws:secretsmanager:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:secret:extstats/bgg*`);
+    const invokePolicy = new iam.PolicyStatement;
+    invokePolicy.addActions("lambda:InvokeFunction");
+    invokePolicy.addResources(`arn:aws:lambda:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:function:api_*`);
+
+    policies[`policy_api_public`] = new iam.PolicyDocument({
+      statements: [bggParameters, bggSecrets, invokePolicy]
+    });
+
+    const managedPolicies: iam.IManagedPolicy[] = [
+      CREATE_EC2S, WRITE_CW,
+      iam.ManagedPolicy.fromManagedPolicyName(this, "accessDB", "AccessDatabaseSecrets"),
+    ];
+    return new iam.Role(this, `role_public_api`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      inlinePolicies: policies,
+      managedPolicies: managedPolicies,
+    });
+  }
+
+  defineLambda(scope: Construct, name: string, handler: string, route: string, method: "GET" | "POST", role: iam.IRole, pp: PUBLIC_PRIVATE): lambda.Function {
+    const m = (method === "GET") ? apigw.HttpMethod.GET : apigw.HttpMethod.POST;
+    const vpcParams: Partial<lambda.FunctionProps> = {
       allowPublicSubnet: true,
       vpc: DATABASE_VPC,
       vpcSubnets: {
@@ -101,13 +131,23 @@ export class ApiStack extends cdk.Stack {
         MYSQL_HOST: process.env.MYSQL_HOST,
         MYSQL_USERNAME: process.env.MYSQL_USERNAME,
         MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
-        MYSQL_DATABASE: process.env.MYSQL_DATABASE
-      }
+        MYSQL_DATABASE: process.env.MYSQL_DATABASE,
+        GEEKLIST_TOKEN: process.env.GEEKLIST_TOKEN
+      },
+    }
+    const f = new lambda.Function(scope, name, {
+      functionName: name,
+      runtime: RUNTIME,
+      handler,
+      role: role,
+      code: lambda.Code.fromBucketV2(ZIP_BUCKET,  COMPONENT + ".zip"),
+      timeout: Duration.seconds(60),
+      ...(pp === "private") ? vpcParams : {}
     });
     Tags.of(f).add("component", COMPONENT);
     const r = new aws_apigatewayv2.HttpRoute(scope, route, {
       httpApi: API_GATEWAY,
-      routeKey: apigw.HttpRouteKey.with(`/${route}`, method),
+      routeKey: apigw.HttpRouteKey.with(`/${route}`, m),
       integration: new apigwi.HttpLambdaIntegration(`integration_${route}`, f, {
         timeout: Duration.seconds(29),
       })
@@ -245,7 +285,7 @@ export class ApiStack extends cdk.Stack {
       defaultRouteOptions: {
         integration: new apigwi.WebSocketLambdaIntegration("sockdefault", defaultHandler, {})
       },
-      ipAddressType: IpAddressType.DUAL_STACK
+      ipAddressType: apigw.IpAddressType.DUAL_STACK
     });
     const apiStage = new apigw.WebSocketStage(this, 'sockStage', {
       webSocketApi: gw,
@@ -294,19 +334,15 @@ export class ApiStack extends cdk.Stack {
     this.createWebSocketsInfrastructure("socks.drfriendless.com", "websocket_connections", "live");
 
     const apiRole = this.defineApiRole();
+    const publicRole = this.definePublicLambdaRole();
     for (const spec of LAMBDA_SPECS) {
-      if (spec.method === "GET") {
-        this.defineLambda(this, spec.name, spec.handler, spec.route, apigw.HttpMethod.GET, apiRole);
-      } else if (spec.method === "POST") {
-        this.defineLambda(this, spec.name, spec.handler, spec.route, apigw.HttpMethod.POST, apiRole);
-      } else {
-        console.log("What's this?");
-        console.log(spec);
-      }
+      const role = (spec.pp && spec.pp === "public") ? publicRole : apiRole;
+      this.defineLambda(this, spec.name, spec.handler, spec.route, spec.method, role, spec.pp || "private");
     }
     for (const spec of LAMBDA_ONLY_SPECS) {
       this.defineLambdaOnly(this, spec.name, spec.handler, apiRole);
     }
+
     for (const spec of EXPRESS_SPECS) {
       if (spec.method === "GET") {
         this.defineExpressRoute(this, spec.key, spec.route, apigw.HttpMethod.GET);

@@ -737,7 +737,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
 }
 
 export async function retrieve(event: APIGatewayProxyEvent): Promise<HttpResponse | object> {
-    const system = await findSystem();
+    const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     const loaders = createLoaders(system);
     // handle empty query for CORS

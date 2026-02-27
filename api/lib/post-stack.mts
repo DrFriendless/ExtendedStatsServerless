@@ -50,7 +50,7 @@ for (const name of OTHER_LAMBDA_NAMES) {
 // set the retention period on the log groups
 console.log("Setting retention period on log groups");
 const cwClient = new CloudWatchLogsClient(CREDENTIALS);
-for (const prefix of ["api","auth","socks"]) {
+for (const prefix of ["api","auth","socks","geeklist"]) {
     const cmd = new DescribeLogGroupsCommand({ logGroupNamePrefix: `/aws/lambda/${prefix}_`,  });
     const gs = await cwClient.send(cmd);
     for (const g of gs.logGroups) {

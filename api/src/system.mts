@@ -1,25 +1,57 @@
 import * as mysql from "promise-mysql";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {getUserFromEvent} from "./library.mjs";
+import {PUBLIC_PRIVATE} from "./geeklist.mjs";
+import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
 
-export async function findSystem(event: APIGatewayProxyEventV2WithRequestContext<any> | undefined = undefined): Promise<System | HttpResponse> {
+export async function findSystem(pp: PUBLIC_PRIVATE, event: APIGatewayProxyEventV2WithRequestContext<any> | undefined = undefined): Promise<System | HttpResponse> {
     const sys = new System();
     if (event) sys.user = getUserFromEvent(event);
-    return await sys.loadSecrets();
+    return await sys.loadSecrets(pp);
 }
+
+const BGG_SECRETS = "extstats/bgg";
 
 export class System {
     private mysqlHost: string | undefined;
     private mysqlUsername: string | undefined;
     private mysqlPassword: string | undefined;
     private mysqlDatabase: string | undefined;
+    geeklistToken: string | undefined;
     user: string | undefined;
 
-    async loadSecrets(): Promise<System | HttpResponse> {
-        this.mysqlHost = process.env.MYSQL_HOST;
-        this.mysqlUsername = process.env.MYSQL_USERNAME;
-        this.mysqlPassword = process.env.MYSQL_PASSWORD;
-        this.mysqlDatabase = process.env.MYSQL_DATABASE;
+    async loadSecrets(pp: PUBLIC_PRIVATE): Promise<System | HttpResponse> {
+        if (pp === "public") {
+            return this.loadBGGSecrets();
+        } else {
+            this.mysqlHost = process.env.MYSQL_HOST;
+            this.mysqlUsername = process.env.MYSQL_USERNAME;
+            this.mysqlPassword = process.env.MYSQL_PASSWORD;
+            this.mysqlDatabase = process.env.MYSQL_DATABASE;
+        }
+        return this;
+    }
+
+    async loadBGGSecrets(): Promise<HttpResponse | System> {
+        const client = new SecretsManagerClient({
+            region: process.env.AWS_REGION
+        });
+        try {
+            const response = await client.send(
+                new GetSecretValueCommand({
+                    SecretId: BGG_SECRETS
+                })
+            );
+            const secret = response.SecretString;
+            const obj = JSON.parse(secret);
+            this.geeklistToken = obj.geeklist_token;
+        } catch (error) {
+            console.log(error);
+            return {
+                "statusCode": 500,
+                "body": JSON.stringify({error: `Can't find secret ${BGG_SECRETS} - make sure it exists in AWS.`})
+            }
+        }
         return this;
     }
 
@@ -64,5 +96,6 @@ export interface HttpResponse {
 }
 
 export function isHttpResponse(object: any): object is HttpResponse {
+    if (typeof object !== "object") return false;
     return 'statusCode' in object;
 }
