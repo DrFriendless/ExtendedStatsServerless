@@ -11,7 +11,12 @@ import {
     MonthlyPlays,
     PlaysWithDate, SelectorMetadataSet
 } from "extstats-core";
-import {doRetrieveGames, doRetrieveGamesShort, getMonthlyCounts, getMonthlyPlays} from "./mysql-rds.mjs";
+import {
+    doRetrieveGames,
+    doRetrieveGamesShort,
+    getMonthlyCounts,
+    getMonthlyPlays
+} from "./mysql-rds.mjs";
 import {getGeekId, getGeekIds} from "./library.mjs";
 import { parse } from "./parser.mjs";
 import {evaluateSimple, evaluateSimpleGames, GeekGameSelectResult, retrieveGeekGames} from "./selector.mjs";
@@ -328,6 +333,19 @@ function buildShortMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: Gra
     });
 }
 
+const FAKE_GEEK_GAME: Partial<GeekGameRow> = {
+    rating: -1,
+    owned: false,
+    wantToPlay: false,
+    wantInTrade: false,
+    wantToBuy: false,
+    prevOwned: false,
+    preordered: false,
+    wish: 0,
+    forTrade: false,
+    normRating: 0
+}
+
 function buildSchema(loaders: Loaders) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
     const gameDataTypeShort: GraphQLObjectType<GameDataShort> = buildGameDataTypeShort(loaders);
@@ -357,11 +375,29 @@ function buildSchema(loaders: Loaders) {
                         geek: { type: graphql.GraphQLString },
                         count: { type: graphql.GraphQLInt }
                     },
-                    type: new graphql.GraphQLList(gameDataType!),
+                    type: new graphql.GraphQLList(geekGameType!),
                     resolve: async (parent: unknown, args) => {
                         return await loaders.system.asyncReturnWithConnection(
                             async conn => {
-                                return await doRetrieveGames(conn, await mostPlayedUnplayed(conn, args.geek, args.count));
+                                const geekid = await getGeekId(conn, args.geek);
+                                const games = await mostPlayedUnplayed(conn, args.geek, args.count);
+                                const gds = await doRetrieveGames(conn, games);
+                                const gi: Record<string, ExtractedGameData> = {};
+                                gds.forEach(gd => gi[gd.bggid.toString()] = gd);
+                                const ggs = await doRetrieveGeekGames(conn, args.geek, games);
+                                const index: Record<string, ExtendedGeekGame> = {};
+                                ggs.forEach(gg => index[gg.bggid.toString()] = gg);
+                                // fill in fake GG information
+                                return games.map(async bggid => {
+                                    const gg = index[bggid.toString()];
+                                    return gg ? gg : { 
+                                        geek: args.geek,
+                                        geekid,
+                                        bggid,
+                                        ...FAKE_GEEK_GAME,
+                                        game: gi[bggid], 
+                                    }
+                                })
                             }
                         );
                     }
@@ -552,6 +588,10 @@ interface MonthlyPlaysAndCountsShort {
     geekGames: ExtendedGeekGameShort[]
 }
 
+async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
+    return await retrieveGeekGames(conn, ids, geek);
+}
+
 async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBindings): Promise<MonthlyPlaysAndCounts> {
     const evalResult: GeekGameSelectResult = await selectGames(conn, selector, varBindings);
     const geekGames = evalResult.geekGames.map(gg => gg.bggid);
@@ -737,6 +777,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
 }
 
 export async function retrieve(event: APIGatewayProxyEvent): Promise<HttpResponse | object> {
+    console.log(JSON.stringify(event));
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     const loaders = createLoaders(system);
