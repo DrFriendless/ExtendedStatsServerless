@@ -9,7 +9,7 @@ import {
     WarTableRow
 } from "extstats-core";
 import {BlogComment} from "extstats-core/blog-interfaces.js";
-import {GeeklistCheck} from "./api-interfaces.mjs";
+import {GeeklistCheck, ProcessedRecRow} from "./api-interfaces.mjs";
 
 export * from "./api-interfaces.mjs";
 export type AuthResultType = "code" | "userdata" | "failure";
@@ -326,5 +326,15 @@ export class ExtstatsApi {
             },
             method: "POST"
         })).json()) as GeeklistCheck;
+    }
+
+    async getRecommendations(geek: string): Promise<ProcessedRecRow[]> {
+        return (await (await fetch(`${this.baseUrl}/recommendations?geek=${geek}`, {
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            method: "POST"
+        })).json()) as ProcessedRecRow[];
     }
 }

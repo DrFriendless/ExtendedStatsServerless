@@ -26,8 +26,9 @@ import {
 } from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
-import {getCookiesFromEvent} from "./library.mjs";
+import {getCookiesFromEvent, getGeekId} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
+import * as mysql from "promise-mysql";
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
     const system = await findSystem("private");
@@ -216,5 +217,73 @@ export async function getDisambiguationData(event: APIGatewayProxyEventV2WithReq
         });
         return { geek, plays, items };
     });
+}
 
+interface RawRecRow {
+    bggid: number;
+    xfactor: string;
+    xfactor_bias: number;
+    name: string;
+    average: number;
+    rank: number;
+}
+
+interface ProcessedRecRow {
+    bggid: number;
+    name: string;
+    score: number;
+    score0: number;
+    score2: number;
+    bggRating: number;
+    bggRanking: number;
+}
+
+export async function getRecommendations(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<ProcessedRecRow[] | HttpResponse> {
+    const system = await findSystem("private");
+    if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter();
+
+    const geek = event.queryStringParameters.geek;
+    if (!geek) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify("You must specify a 'geek' parameter")
+        }
+    }
+
+    return await system.asyncReturnWithConnection(async conn => {
+        const geekid = await getGeekId(conn, geek);
+        const userXFactor = await conn.query("select xfactor from geeks where id = ?", [geekid]) as { xfactor: string }[];
+        if (!userXFactor || !userXFactor[0].xfactor) return {
+            statusCode: 400,
+            body: JSON.stringify("This user has not yet had an X-Factor calculated.")
+        };
+        const ux = JSON.parse(userXFactor[0].xfactor) as number[];
+        const data = await conn.query("select bggid, xfactor, xfactor_bias, name, games.average, games.rank from games where xfactor_bias is not null and bggid not in (select game from geekgames where geekid = ? and rating > 0)", [geekid]) as RawRecRow[];
+        const scoredData: ProcessedRecRow[] = data.map(row => {
+            const xf = JSON.parse(row.xfactor);
+            const score0 = dotProduct(ux, xf);
+            const score = dotProduct(ux, xf) + row.xfactor_bias;
+            const score2 = dotProduct(ux, xf) + row.xfactor_bias / 2;
+            return {
+                bggid: row.bggid,
+                name: row.name,
+                score,
+                score2,
+                score0,
+                bggRanking: row.rank,
+                bggRating: row.average
+            }
+        });
+        scoredData.sort((d1, d2) => d2.score - d1.score);
+        return scoredData.slice(0, 500);
+    });
+}
+
+function dotProduct(a: number[], b: number[]) {
+    let total = 0;
+    a.forEach((v, i) => {
+        total += v * b[i];
+    });
+    return total;
 }

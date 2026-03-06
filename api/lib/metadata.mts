@@ -54,6 +54,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_updateComment`, handler: "blog.updateComment", route: "updateComment", method: "POST" },
     { name: `${COMPONENT}_deleteComment`, handler: "blog.deleteComment", route: "deleteComment", method: "POST" },
     { name: `${COMPONENT}_geeklist`, handler: "geeklist.downloader", route: "geeklist", method: "POST", pp: "public" },
+    { name: `${COMPONENT}_recommendations`, handler: "functions.getRecommendations", route: "recommendations", method: "POST" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [

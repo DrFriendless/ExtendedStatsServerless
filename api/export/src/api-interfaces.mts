@@ -17,3 +17,13 @@ export interface GeeklistItemCheck {
     prevOwned: boolean;
     wishlist: number;
 }
+
+export interface ProcessedRecRow {
+    bggid: number;
+    name: string;
+    score: number;
+    score0: number;
+    score2: number;
+    bggRating: number;
+    bggRanking: number;
+}
