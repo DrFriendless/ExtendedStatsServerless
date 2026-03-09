@@ -250,6 +250,17 @@ async function getValidIds(conn: mysql.Connection, ids: number[]): Promise<numbe
     }
 }
 
+export async function retrieveGeekIdGames(conn: mysql.Connection, ids: number[], geek: string, geekId: number): Promise<GeekGameRow[]> {
+    const sqlOne = "select * from geekgames where geekid = ? and game = ?";
+    const sqlMany = "select * from geekgames where geekid = ? and game in (?)";
+    if (ids.length === 0) return [];
+    if (ids.length === 1) {
+        return (await conn.query(sqlOne, [geekId, ids[0]]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg));
+    } else {
+        return (await conn.query(sqlMany, [geekId, ids]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg));
+    }
+}
+
 export async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string): Promise<GeekGameRow[]> {
     const sqlOne = "select * from geekgames where geekid = ? and game = ?";
     const sqlMany = "select * from geekgames where geekid = ? and game in (?)";

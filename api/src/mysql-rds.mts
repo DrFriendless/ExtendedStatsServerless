@@ -1,5 +1,5 @@
 import { count, countTableRows, getGeekId, getGeekIds } from "./library.mjs";
-import { selectGames } from "./selector.mjs";
+import {retrieveGeekGames, retrieveGeekIdGames, selectGames} from "./selector.mjs";
 import {
     RankingTableRow, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
     TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery,
@@ -8,15 +8,51 @@ import {
 import {
     AllPlaysQueryResult,
     ExpansionPlay,
-    ExtractedGameData, LastYearQueryResult, MonthlyCountsQueryResult, MonthlyPlaysQueryResult,
+    ExtendedGeekGame,
+    ExtractedGameData,
+    FAKE_GEEK_GAME,
+    LastYearQueryResult,
+    MonthlyCountsQueryResult,
+    MonthlyPlaysQueryResult,
     NormalisedPlay,
-    PlayWithDate, ProcessMethodCount,
+    PlayWithDate,
+    ProcessMethodCount,
     RawGameData
 } from "./interfaces.mjs";
 import * as dateMath from 'date-arithmetic';
 import * as mysql from 'promise-mysql';
 import {System} from "./system.mjs";
 import {Connection} from "promise-mysql";
+
+export async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
+    return await retrieveGeekGames(conn, ids, geek);
+}
+
+export async function doRetrieveGeekIdGames(conn: mysql.Connection, geekId: number, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
+    return await retrieveGeekIdGames(conn, ids, geek, geekId);
+}
+
+export async function patchGeekData<T extends {bggid: number}>(conn: Connection, rows: T[], geek: string, geekId: number):
+    Promise<(T & { rating?: number })[]> {
+    const bggIds = rows.map(r => r.bggid);
+
+    const ggs = await doRetrieveGeekIdGames(conn, geekId, geek, bggIds);
+    const index: Record<string, ExtendedGeekGame> = {};
+    ggs.forEach(gg => index[gg.bggid.toString()] = gg);
+    // fill in fake GG information
+    return rows.map(row => {
+        const gg = index[row.bggid.toString()];
+        return gg ? {
+            ...row,
+            ...gg
+        } : {
+            ...row,
+            geek,
+            geekid: geekId,
+            ...FAKE_GEEK_GAME
+        }
+    });
+}
 
 export async function rankGames(system: System, query: object): Promise<RankingTableRow[]> {
     return await system.asyncReturnWithConnection(async conn => await doRankGames(conn, query));

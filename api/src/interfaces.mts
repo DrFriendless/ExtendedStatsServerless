@@ -1,4 +1,4 @@
-import {GameData} from "extstats-core";
+import {GameData, GeekGame} from "extstats-core";
 
 export interface GeekGameRow {
     geek: string;
@@ -225,4 +225,37 @@ export interface SelectorMetadata {
     owner?: string;
     player?: string;
     rater?: string;
+}
+
+export interface ExtendedGeekGame extends GeekGame {
+    normRating: number;
+}
+
+export interface MostPlaysRow {
+    bggid: number;
+    name: string;
+    geeks: number;
+    plays: number;
+    owned: boolean;
+    wantToPlay: boolean;
+    wantInTrade: boolean;
+    wantToBuy: boolean;
+    prevOwned: boolean;
+    preordered: boolean;
+    wish: number;
+    forTrade: boolean;
+    normRating: number;
+}
+
+export const FAKE_GEEK_GAME: Partial<GeekGameRow> = {
+    rating: -1,
+    owned: false,
+    wantToPlay: false,
+    wantInTrade: false,
+    wantToBuy: false,
+    prevOwned: false,
+    preordered: false,
+    wish: 0,
+    forTrade: false,
+    normRating: 0
 }

@@ -27,3 +27,17 @@ export interface ProcessedRecRow {
     bggRating: number;
     bggRanking: number;
 }
+
+export interface MostPlayedEntry {
+    bggid: number;
+    geeks: number;
+    plays: number;
+    rating?: number;
+}
+
+export interface Hotness {
+    year: number;
+    geek: string;
+    mostPlayed: MostPlayedEntry[];
+    mostPlayedNew: MostPlayedEntry[];
+}

@@ -9,7 +9,7 @@ import {
     WarTableRow
 } from "extstats-core";
 import {BlogComment} from "extstats-core/blog-interfaces.js";
-import {GeeklistCheck, ProcessedRecRow} from "./api-interfaces.mjs";
+import {GeeklistCheck, Hotness, ProcessedRecRow} from "./api-interfaces.mjs";
 
 export * from "./api-interfaces.mjs";
 export type AuthResultType = "code" | "userdata" | "failure";
@@ -336,5 +336,15 @@ export class ExtstatsApi {
             },
             method: "POST"
         })).json()) as ProcessedRecRow[];
+    }
+
+    async getHotness(geek: string, year: number): Promise<Hotness> {
+        return (await (await fetch(`${this.baseUrl}/hotness?geek=${geek}&year=${year}`, {
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            method: "GET"
+        })).json()) as Hotness;
     }
 }

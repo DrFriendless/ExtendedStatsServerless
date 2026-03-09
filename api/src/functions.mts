@@ -11,7 +11,7 @@ import {
     updateFAQCount,
     markUrlForUpdate,
     markGeekForUpdate,
-    gatherSystemUpdates, getGeekGames, getAmbiguousGames, loadExpansionData, doRetrieveGameNames
+    gatherSystemUpdates, getGeekGames, getAmbiguousGames, loadExpansionData, doRetrieveGameNames, patchGeekData
 } from "./mysql-rds.mjs";
 import {
     Collection, CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationData, ExpansionData,
@@ -28,7 +28,7 @@ import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
 import {getCookiesFromEvent, getGeekId} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
-import * as mysql from "promise-mysql";
+import {MostPlaysRow} from "./interfaces.mjs";
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
     const system = await findSystem("private");
@@ -236,6 +236,62 @@ interface ProcessedRecRow {
     score2: number;
     bggRating: number;
     bggRanking: number;
+}
+
+interface MostPlayedEntry {
+    bggid: number;
+    geeks: number;
+    plays: number;
+    rating?: number;
+}
+
+interface Hotness {
+    year: number;
+    geek: string;
+    mostPlayed: MostPlayedEntry[];
+    mostPlayedNew: MostPlayedEntry[];
+}
+
+export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<Hotness | HttpResponse> {
+    const system = await findSystem("private");
+    if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter();
+
+    const geek = event.queryStringParameters.geek;
+    if (!geek) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify("You must specify a 'geek' parameter")
+        }
+    }
+    const ys = event.queryStringParameters.year || "";
+    let year;
+    try {
+        year = parseInt(ys);
+    } catch (e) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify("You must specify a 'year' parameter")
+        }
+    }
+    const thisYear = (new Date()).getFullYear();
+    if (year < 2000 || year > thisYear) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify("We don't have good data for that year")
+        }
+    }
+
+    return await system.asyncReturnWithConnection(async conn => {
+        const geekid = await getGeekId(conn, geek);
+        const mpSql = "select games.bggid bggid, games.name name,count(distinct geek) geeks,sum(quantity) plays from plays_normalised,games where plays_normalised.game = games.bggid and expansion_play=0 and year=? group by year, game order by (geeks * 10 + plays) desc limit 50"
+        const mpRows = await conn.query(mpSql, [year]) as MostPlaysRow[];
+        const mpnSql = "select games.bggid bggid, games.name name,count(distinct geek) geeks,sum(quantity) plays from plays_normalised,games where plays_normalised.game = games.bggid and expansion_play=0 and year=? and yearPublished >= ? group by year, game order by (geeks * 10 + plays) desc limit 50"
+        const mpnRows = await conn.query(mpnSql, [year, year-1]) as MostPlaysRow[];
+        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekid);
+        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekid);
+        return { year, geek, mostPlayed, mostPlayedNew }
+    });
 }
 
 export async function getRecommendations(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<ProcessedRecRow[] | HttpResponse> {

@@ -6,14 +6,13 @@ import {
     ExtendedGeekGameShort,
     GameData,
     GameDataShort,
-    GeekGame,
     MonthlyPlayCount,
     MonthlyPlays,
     PlaysWithDate, SelectorMetadataSet
 } from "extstats-core";
 import {
     doRetrieveGames,
-    doRetrieveGamesShort,
+    doRetrieveGamesShort, doRetrieveGeekGames,
     getMonthlyCounts,
     getMonthlyPlays
 } from "./mysql-rds.mjs";
@@ -23,7 +22,8 @@ import {evaluateSimple, evaluateSimpleGames, GeekGameSelectResult, retrieveGeekG
 import {VarBindings} from "./varbindings.mjs";
 import DataLoader from "dataloader";
 import {
-    ExtractedGameData,
+    ExtendedGeekGame,
+    ExtractedGameData, FAKE_GEEK_GAME,
     GeekGameRow,
     LastYearPlaysQueryResult,
     NormalisedPlaysQueryResult,
@@ -333,19 +333,6 @@ function buildShortMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: Gra
     });
 }
 
-const FAKE_GEEK_GAME: Partial<GeekGameRow> = {
-    rating: -1,
-    owned: false,
-    wantToPlay: false,
-    wantInTrade: false,
-    wantToBuy: false,
-    prevOwned: false,
-    preordered: false,
-    wish: 0,
-    forTrade: false,
-    normRating: 0
-}
-
 function buildSchema(loaders: Loaders) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
     const gameDataTypeShort: GraphQLObjectType<GameDataShort> = buildGameDataTypeShort(loaders);
@@ -561,9 +548,7 @@ interface MonthlyPlayCountShort {
     c: number;
 }
 
-interface ExtendedGeekGame extends GeekGame {
-    normRating: number;
-}
+
 
 type GeekGameSelectWithGames = GeekGameSelectResult & { games: GameData[] };
 interface GeekGameSelectWithGamesShort {
@@ -586,10 +571,6 @@ interface MonthlyPlaysAndCountsShort {
     plays: CoreMonthlyPlaysShort[],
     counts: MonthlyPlayCountShort[],
     geekGames: ExtendedGeekGameShort[]
-}
-
-async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
-    return await retrieveGeekGames(conn, ids, geek);
 }
 
 async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBindings): Promise<MonthlyPlaysAndCounts> {
