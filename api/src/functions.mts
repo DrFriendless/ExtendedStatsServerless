@@ -264,7 +264,7 @@ export async function getRecommendations(event: APIGatewayProxyEventV2WithReques
             const xf = JSON.parse(row.xfactor);
             const score0 = dotProduct(ux, xf);
             const score = dotProduct(ux, xf) + row.xfactor_bias;
-            const score2 = dotProduct(ux, xf) + row.xfactor_bias / 2;
+            const score2 = dotProduct(ux, xf) + row.xfactor_bias / 5;
             return {
                 bggid: row.bggid,
                 name: row.name,

@@ -111,6 +111,21 @@ export function extractUserDataFromPage(geek: string, url: string, json: any): P
     return { geek, url, country, bggid };
 }
 
+interface NameId {
+    "_": string;
+    "$": {
+        objectid: string;
+    }
+}
+
+interface BGGName {
+    "_": string;
+    "$": {
+        primary: string;
+        sortindex: string;
+    }
+}
+
 export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string): Promise<ProcessGameResult> {
     const dom = await parseStringPromise(pageContent, {trim: true});
     if (!dom || !dom.boardgames || dom.boardgames.boardgame.length === 0) {
@@ -118,17 +133,16 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
     }
     const result = {} as ProcessGameResult;
     for (const boardgame of dom.boardgames.boardgame) {
-        const names = boardgame.name;
-        // TODO
-        // console.log(boardgame);
+        const names: BGGName[] = boardgame.name;
+        // console.log(JSON.stringify(boardgame));
         if (boardgame.error) throw new NoSuchGameError(bggid);
         const expansions = boardgame.boardgameexpansion || [];
         const expIds = expansions.filter((row: any) => row.$.inbound != "true").map((row: any) => parseInt(row.$.objectid));
-        const categories = boardgame.boardgamecategory;
-        const mechanics = boardgame.boardgamemechanic;
-        const designers = boardgame.boardgamedesigner;
-        const publishers = boardgame.boardgamepublisher;
-        const subdomains = boardgame.boardgamesubdomain;
+        const categories: NameId[] = boardgame.boardgamecategory;
+        const mechanics: NameId[] = boardgame.boardgamemechanic;
+        const designers: NameId[] = boardgame.boardgamedesigner;
+        const publishers: NameId[] = boardgame.boardgamepublisher;
+        const subdomains: NameId[] = boardgame.boardgamesubdomain;
         const statistics = boardgame.statistics;
         const ratings = statistics[0].ratings;
         const ranks = ratings[0].ranks[0].rank;
@@ -143,7 +157,7 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
                 }
             }
         }
-        const name = names.filter((it: any) => it.$.primary == 'true')[0]._;
+        const name = names.filter(it => it.$.primary == 'true')[0]._;
         result.gameId = parseInt(boardgame.$.objectid);
         result.yearPublished = parseInt(boardgame.yearpublished[0]);
         result.minPlayers = parseInt(boardgame.minplayers[0]);
@@ -161,10 +175,11 @@ export async function extractGameDataFromPage(bggid: number, url: string, pageCo
         result.usersRated = parseInt(ratings[0].usersrated);
         result.name = name;
         result.url = url;
-        result.categories = categories ? categories.map((c: any) => c._) : [];
-        result.mechanics = mechanics ? mechanics.map((c: any) => c._) : [];
-        result.designers = designers ? designers.map((c: any) => parseInt(c.$.objectid)) : [];
-        result.publishers = publishers ? publishers.map((c: any) => parseInt(c.$.objectid)) : [];
+        result.categories = categories ? categories.map(c => c._) : [];
+        result.mechanics = mechanics ? mechanics.map(c => c._) : [];
+        result.designers = designers ? designers.map(c => parseInt(c.$.objectid)) : [];
+        result.publishers = publishers ? publishers.map(c => parseInt(c.$.objectid)) : [];
+        // console.log(JSON.stringify(result));
         result.rank = ranking;
         result.expansions = expIds;
     }

@@ -18,7 +18,7 @@ import {
     ProcessUserResult,
     CleanUpCollectionResult,
     QueueMessage,
-    ProcessPlaysForPeriodResult, PlayData
+    ProcessPlaysForPeriodResult, PlayData, ProcessDesignerResult, ProcessPublisherResult
 } from 'extstats-core';
 import {System} from "./system.mjs";
 
@@ -74,6 +74,14 @@ export function dispatchSlowDown(system: System): Promise<void> {
 
 export function dispatchProcessGameResult(system: System, result: ProcessGameResult): Promise<void> {
     return sendToDownloaderQueue(system, { discriminator: "GameResultMessage", result }, result.url);
+}
+
+export async function dispatchDesignerData(system: System, result: ProcessDesignerResult): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "DesignerResultMessage", result }, result.url);
+}
+
+export async function dispatchPublisherData(system: System, result: ProcessPublisherResult): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "PublisherResultMessage", result }, result.url);
 }
 
 export function dispatchProcessUserResult(system: System, result: ProcessUserResult): Promise<void> {

@@ -6,6 +6,7 @@ import {
     NoSuchGameError
 } from "./extraction.mjs";
 import {
+    dispatchDesignerData,
     dispatchEnsureGames,
     dispatchMarkAsProcessed,
     dispatchMarkAsTryAgainTomorrow,
@@ -16,7 +17,7 @@ import {
     dispatchProcessCleanUpCollection,
     dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult,
-    dispatchProcessUserResult, dispatchSlowDown,
+    dispatchProcessUserResult, dispatchPublisherData, dispatchSlowDown,
     dispatchUpdateMetadata,
     dispatchUpdateTop50,
     dispatchUpdateUserList
@@ -366,8 +367,12 @@ export async function processDesigner(event: FileToProcess) {
     await initLogging(system, "processDesigner");
 
     const data = await fetchXMLFromBGG(system.extrasToken, event.url, event);
-    // TODO
-    console.log(data);
+    const name = between(data, "<name>", "</name>");
+    if (name.length > 0) {
+        await dispatchDesignerData(system, { url: event.url, bggid: event.bggid, name });
+    } else {
+        console.log(data);
+    }
     await flushLogging();
 }
 
@@ -377,7 +382,11 @@ export async function processPublisher(event: FileToProcess) {
     await initLogging(system, "processPublisher");
 
     const data = await fetchXMLFromBGG(system.extrasToken, event.url, event);
-    // TODO
-    console.log(data);
+    const name = between(data, "<name>", "</name>");
+    if (name.length > 0) {
+        await dispatchPublisherData(system, { url: event.url, bggid: event.bggid, name });
+    } else {
+        console.log(data);
+    }
     await flushLogging();
 }

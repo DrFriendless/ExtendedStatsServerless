@@ -31,7 +31,11 @@ import {
     doUpdateMetadata,
     doUpdateProcessUserResult,
     doMarkGeekDoesNotExist,
-    getGeeksThatDontExist, doUpdatePlaysForPeriod, doMarkPlaysUrlProcessed
+    getGeeksThatDontExist,
+    doUpdatePlaysForPeriod,
+    doMarkPlaysUrlProcessed,
+    doProcessDesignerResult,
+    doProcessPublisherResult
 } from "./mysql-rds.mjs";
 import {invokeLambdaAsync, listAdd, sendMessage, sendToQueue, sendToQueueWithDelay, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
@@ -201,7 +205,7 @@ async function noMessages(system: System, howManyToDo: number, slowDowns: number
     const geeksThatDontExist = await system.returnWithConnection(getGeeksThatDontExist);
     const todo: ToProcessElement[] =
         await system.returnWithConnection(conn =>
-            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed", "processYear"], true))
+            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed", "processYear", "processDesigner", "processPublisher"], true))
     for (const element of todo) {
         if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
             // this shouldn't happen.
@@ -370,6 +374,14 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             await system.withConnectionAsync(conn =>
                 doUpdateProcessUserResult(conn, message.result.geek, message.result.bggid, message.result.country, message.result.url));
             await sendMessage(system, [message.result.geek], ["updates"], { message: `Updated your geek info.`});
+            break;
+        case "DesignerResultMessage":
+            console.log(`DesignerResultMessage ${message.result.name}`);
+            await system.withConnectionAsync(conn => doProcessDesignerResult(conn, message.result));
+            break;
+        case "PublisherResultMessage":
+            console.log(`PublisherResultMessage ${message.result.name}`);
+            await system.withConnectionAsync(conn => doProcessPublisherResult(conn, message.result));
             break;
         default:
             // this should not happen

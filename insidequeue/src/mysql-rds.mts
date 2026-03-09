@@ -11,7 +11,7 @@ import {
     ProcessGameResult, ProcessMethod,
     RankingTableRow,
     SeriesMetadata, ToProcessElement,
-    WarTableRow, UserConfig
+    WarTableRow, UserConfig, ProcessDesignerResult, ProcessPublisherResult
 } from "extstats-core";
 import {count, eqSet, listIntersect, listMinus, parseYmd, splitYmd} from "./library.mjs";
 import { PlaysRow } from "./library.mjs";
@@ -152,6 +152,66 @@ async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mecha
     }
 }
 
+async function doEnsureDesigners(conn: mysql.Connection, data: number[] | undefined, bggid: number, gameName: string): Promise<void> {
+    if (!data || !data.length) {
+        console.log(`No designers for ${gameName}`);
+        return;
+    }
+    console.log(`Designers for ${gameName} are ${data}`);
+    // remove old designers in case it was incorrect
+    const cleanSql = "delete from game_designers where game = ?";
+    await conn.query(cleanSql, [bggid]);
+    for (const d of data) {
+        const url = `https://boardgamegeek.com/xmlapi/designer/${d}`;
+        // I forget why designers were boring, maybe "traditional", "unknown" etc.
+        const insertSql = "insert into designers (bggid, name, boring, url) values (?, ?, 0, ?)";
+        try {
+            await conn.query(insertSql, [d, "", url]);
+            const insertFile = "insert into files (url, processMethod, description, bggid) values (?, ?, ?, ?)";
+            await conn.query(insertFile, [url, "processDesigner", `Designer ${d}`, d]);
+        } catch (e) {
+            // uniqueness constraint violation usually
+            if (e.code !== "ER_DUP_ENTRY") console.log(e);
+        }
+        const insertSql2 = "insert into game_designers (game, designer) values (?, ?)";
+        try {
+            await conn.query(insertSql2, [bggid, d]);
+        } catch (e) {
+            // not expecting this
+            console.log(e);
+        }
+    }
+}
+
+async function doEnsurePublishers(conn: mysql.Connection, data: number[] | undefined, bggid: number, gameName: string): Promise<void> {
+    if (!data || !data.length) {
+        console.log(`No publishers for ${gameName}`);
+        return;
+    }
+    // remove old publishers in case it was incorrect
+    const cleanSql = "delete from game_publishers where game = ?";
+    await conn.query(cleanSql, [bggid]);
+    for (const d of data) {
+        const url = `https://boardgamegeek.com/xmlapi/publisher/${d}`;
+        const insertSql = "insert into publishers (bggid, name, url) values (?, ?, ?)";
+        try {
+            await conn.query(insertSql, [d, "", url]);
+            const insertFile = "insert into files (url, processMethod, description, bggid) values (?, ?, ?, ?)";
+            await conn.query(insertFile, [url, "processPublisher", `Publisher ${d}`, d]);
+        } catch (e) {
+            // uniqueness constraint violation usually
+            if (e.code !== "ER_DUP_ENTRY") console.log(e);
+        }
+        const insertSql2 = "insert into game_publishers (game, publisher) values (?, ?)";
+        try {
+            await conn.query(insertSql2, [bggid, d]);
+        } catch (e) {
+            // not expecting this
+            console.log(e);
+        }
+    }
+}
+
 async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
     const insertSql = "insert into games (bggid, name, average, `rank`, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
         "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
@@ -223,13 +283,27 @@ export async function doUpdateProcessUserResult(conn: mysql.Connection, geek: st
     await doMarkUrlProcessed(conn, "processUser", url);
 }
 
-export async function doProcessGameResult(conn: mysql.Connection, data: ProcessGameResult) {
+export async function doProcessDesignerResult(conn: mysql.Connection, data: ProcessDesignerResult): Promise<void> {
+    const sql = "update designers set name = ? where bggid = ?";
+    await conn.query(sql, [ data.name, data.bggid ]);
+    await doMarkUrlProcessedNoUpdate(conn, "processDesigner", data.url);
+}
+
+export async function doProcessPublisherResult(conn: mysql.Connection, data: ProcessPublisherResult): Promise<void> {
+    const sql = "update publishers set name = ? where bggid = ?";
+    await conn.query(sql, [ data.name, data.bggid ]);
+    await doMarkUrlProcessedNoUpdate(conn, "processPublisher", data.url);
+}
+
+export async function doProcessGameResult(conn: mysql.Connection, data: ProcessGameResult): Promise<void> {
     await doUpdateGame(conn, data);
+    await doEnsureDesigners(conn, data.designers, data.gameId, data.name);
+    await doEnsurePublishers(conn, data.publishers, data.gameId, data.name);
     await doRecordGameExpansions(conn, data.gameId, data.expansions);
     await doMarkUrlProcessed(conn, "processGame", data.url);
 }
 
-export async function doProcessCollectionCleanup(conn: mysql.Connection, geek: string, items: number[], url: string) {
+export async function doProcessCollectionCleanup(conn: mysql.Connection, geek: string, items: number[], url: string): Promise<void> {
     const geekid = await getGeekId(conn, geek);
     await doRestrictCollectionToGames(conn, geekid, items);
     await doMarkUrlProcessed(conn, "processCollection", url);
@@ -237,7 +311,7 @@ export async function doProcessCollectionCleanup(conn: mysql.Connection, geek: s
     await doUpdateNormalisedRankings(conn, geek);
 }
 
-async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: number, items: number[]) {
+async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: number, items: number[]): Promise<void> {
     const deleteStatementSome = "delete from geekgames where geekid = ? and game not in (?)";
     const deleteStatementOne = "delete from geekgames where geekid = ? and game != ?";
     const deleteStatementNone = "delete from geekgames where geekid = ?";

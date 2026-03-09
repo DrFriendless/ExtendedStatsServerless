@@ -20,6 +20,8 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_processCollection`, handler: "functions.processCollection", duration: 300, mem: 256, maxConcurrency: undefined },
     { name: `${COMPONENT}_processGame`, handler: "functions.processGame", duration: 60, mem: 128, maxConcurrency: undefined },
     { name: `${COMPONENT}_processPlayed`, handler: "functions.processPlayed", duration: 900, mem: 128, maxConcurrency: 1 },
-    { name: `${COMPONENT}_processMetadata`, handler: "functions.processMetadata", duration: 900, mem: 128, maxConcurrency: 1 },
+    { name: `${COMPONENT}_processMetadata`, handler: "functions.processMetadata", duration: 60, mem: 128, maxConcurrency: 1 },
+    { name: `${COMPONENT}_processDesigner`, handler: "functions.processDesigner", duration: 40, mem: 128, maxConcurrency: undefined },
+    { name: `${COMPONENT}_processPublisher`, handler: "functions.processPublisher", duration: 40, mem: 128, maxConcurrency: undefined },
 ];
 
