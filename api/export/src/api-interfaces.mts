@@ -30,9 +30,19 @@ export interface ProcessedRecRow {
 
 export interface MostPlayedEntry {
     bggid: number;
+    name: string;
     geeks: number;
     plays: number;
     rating?: number;
+    owned: boolean;
+    wantToPlay: boolean;
+    wantInTrade: boolean;
+    wantToBuy: boolean;
+    prevOwned: boolean;
+    preordered: boolean;
+    wish: number;
+    forTrade: boolean;
+    yourPlays: number;
 }
 
 export interface Hotness {

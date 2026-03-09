@@ -29,6 +29,7 @@ import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
 import {getCookiesFromEvent, getGeekId} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {MostPlaysRow} from "./interfaces.mjs";
+import {Hotness, MostPlayedEntry} from "./api-interfaces.mjs";
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
     const system = await findSystem("private");
@@ -238,20 +239,6 @@ interface ProcessedRecRow {
     bggRanking: number;
 }
 
-interface MostPlayedEntry {
-    bggid: number;
-    geeks: number;
-    plays: number;
-    rating?: number;
-}
-
-interface Hotness {
-    year: number;
-    geek: string;
-    mostPlayed: MostPlayedEntry[];
-    mostPlayedNew: MostPlayedEntry[];
-}
-
 export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<Hotness | HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
@@ -283,14 +270,26 @@ export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext
     }
 
     return await system.asyncReturnWithConnection(async conn => {
-        const geekid = await getGeekId(conn, geek);
+        const geekId = await getGeekId(conn, geek);
         const mpSql = "select games.bggid bggid, games.name name,count(distinct geek) geeks,sum(quantity) plays from plays_normalised,games where plays_normalised.game = games.bggid and expansion_play=0 and year=? group by year, game order by (geeks * 10 + plays) desc limit 50"
         const mpRows = await conn.query(mpSql, [year]) as MostPlaysRow[];
         const mpnSql = "select games.bggid bggid, games.name name,count(distinct geek) geeks,sum(quantity) plays from plays_normalised,games where plays_normalised.game = games.bggid and expansion_play=0 and year=? and yearPublished >= ? group by year, game order by (geeks * 10 + plays) desc limit 50"
         const mpnRows = await conn.query(mpnSql, [year, year-1]) as MostPlaysRow[];
-        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekid);
-        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekid);
-        return { year, geek, mostPlayed, mostPlayedNew }
+        let bggIds = mpRows.map(r => r.bggid);
+        bggIds = bggIds.concat(mpnRows.map(r => r.bggid).filter(id => bggIds.indexOf(id) < 0));
+        const playSql = "select game bggid, sum(quantity) q from plays_normalised where expansion_play = 0 and geek = ? and game in (?) group by game";
+        const yourPlays = await conn.query(playSql, [geekId, bggIds]) as { bggid: number, q: number }[];
+        const yourPlaysByGame: Record<string, number> = {};
+        for (const r of yourPlays) {
+            yourPlaysByGame[r.bggid.toString()] = r.q;
+        }
+        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekId);
+        mostPlayed.forEach(mp => mp.yourPlays = yourPlaysByGame[mp.bggid.toString()] || 0);
+        mostPlayed.sort((mp1, mp2) => mp2.plays - mp1.plays);
+        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekId);
+        mostPlayedNew.forEach(mp => mp.yourPlays = yourPlaysByGame[mp.bggid.toString()] || 0);
+        mostPlayedNew.sort((mp1, mp2) => mp2.plays - mp1.plays);
+        return { year, geek, mostPlayed, mostPlayedNew };
     });
 }
 

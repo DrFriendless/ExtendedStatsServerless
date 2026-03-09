@@ -13,7 +13,7 @@ import {
     FAKE_GEEK_GAME,
     LastYearQueryResult,
     MonthlyCountsQueryResult,
-    MonthlyPlaysQueryResult,
+    MonthlyPlaysQueryResult, MostPlaysRow,
     NormalisedPlay,
     PlayWithDate,
     ProcessMethodCount,
@@ -23,6 +23,7 @@ import * as dateMath from 'date-arithmetic';
 import * as mysql from 'promise-mysql';
 import {System} from "./system.mjs";
 import {Connection} from "promise-mysql";
+import {MostPlayedEntry} from "./api-interfaces.mjs";
 
 export async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
     return await retrieveGeekGames(conn, ids, geek);
@@ -32,8 +33,7 @@ export async function doRetrieveGeekIdGames(conn: mysql.Connection, geekId: numb
     return await retrieveGeekIdGames(conn, ids, geek, geekId);
 }
 
-export async function patchGeekData<T extends {bggid: number}>(conn: Connection, rows: T[], geek: string, geekId: number):
-    Promise<(T & { rating?: number })[]> {
+export async function patchGeekData(conn: Connection, rows: MostPlaysRow[], geek: string, geekId: number): Promise<MostPlayedEntry[]> {
     const bggIds = rows.map(r => r.bggid);
 
     const ggs = await doRetrieveGeekIdGames(conn, geekId, geek, bggIds);
@@ -44,12 +44,14 @@ export async function patchGeekData<T extends {bggid: number}>(conn: Connection,
         const gg = index[row.bggid.toString()];
         return gg ? {
             ...row,
-            ...gg
+            ...gg,
+            yourPlays: 0,
         } : {
             ...row,
             geek,
             geekid: geekId,
-            ...FAKE_GEEK_GAME
+            ...FAKE_GEEK_GAME,
+            yourPlays: 0
         }
     });
 }
