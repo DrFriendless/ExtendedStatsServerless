@@ -1,7 +1,7 @@
-import {BlogComment} from "extstats-core/blog-interfaces.js";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {OkPacket} from "mysql";
+import {BlogComment} from "./api-interfaces.mjs";
 
 interface RawBlogComment {
     id: number;
@@ -11,6 +11,7 @@ interface RawBlogComment {
     date: Date;
     reply_to: number | undefined;
     deleted: boolean;
+    post_title: string;
 }
 
 export async function retrieveCommentsForUrl(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<BlogComment[] | HttpResponse> {
@@ -20,7 +21,7 @@ export async function retrieveCommentsForUrl(event: APIGatewayProxyEventV2WithRe
     return await retrieveCommentsForUrlInternal(system, url);
 }
 
-async function retrieveCommentsForUrlInternal(system: System, url: string) {
+async function retrieveCommentsForUrlInternal(system: System, url: string): Promise<BlogComment[]> {
     const sql = "select * from blog_comments where post_url = ?";
     const posts = await system.asyncReturnWithConnection(
         async conn => await conn.query(sql, [url]) as RawBlogComment[]
@@ -39,8 +40,9 @@ async function retrieveCommentsForUrlInternal(system: System, url: string) {
             poster: rbp.poster,
             deleted: !!rbp.deleted,
             reply_to: rbp.reply_to || undefined,
-            date: rbp.date
-        } as BlogComment;
+            date: rbp.date,
+            post_title: rbp.post_title
+        };
     });
 }
 
@@ -102,11 +104,12 @@ export async function saveComment(event: APIGatewayProxyEventV2WithRequestContex
     const body = JSON.parse(event.body);
     const url = body.url;
     const comment = body.comment;
+    const post_title = body.post_title || "unknown";
     const replyTo: number | undefined = body["replyTo"];
 
-    const sql = "insert into blog_comments (post_url, poster, comment, date, reply_to, deleted) values (?, ?, ?, now(), ?, 0)";
+    const sql = "insert into blog_comments (post_url, poster, comment, date, reply_to, deleted, post_title) values (?, ?, ?, now(), ?, 0, ?)";
     const id: number = await system.asyncReturnWithConnection(async conn => {
-        const r: OkPacket = await conn.query(sql, [ url, system.user, comment, replyTo ]);
+        const r: OkPacket = await conn.query(sql, [ url, system.user, comment, replyTo, post_title ]);
         return r.insertId;
     });
 

@@ -8,8 +8,7 @@ import {
     ToProcessElement,
     WarTableRow
 } from "extstats-core";
-import {BlogComment} from "extstats-core/blog-interfaces.js";
-import {GeeklistCheck, Hotness, ProcessedRecRow} from "./api-interfaces.mjs";
+import {BlogComment, GeeklistCheck, Hotness, ProcessedRecRow} from "./api-interfaces.mjs";
 
 export * from "./api-interfaces.mjs";
 export type AuthResultType = "code" | "userdata" | "failure";
@@ -274,8 +273,8 @@ export class ExtstatsApi {
         })).json()) as BlogComment[];
     }
 
-    async saveComment(url: string, comment: string, replyTo: number | undefined): Promise<{ id: number | undefined, posts: BlogComment[] }> {
-        const body = { url, comment, replyTo };
+    async saveComment(url: string, comment: string, replyTo: number | undefined, post_title: string): Promise<{ id: number | undefined, posts: BlogComment[] }> {
+        const body = { url, comment, replyTo, post_title };
         return (await (await fetch(`${this.baseUrl}/saveComment`, {
             headers: {
                 "Accept": "application/json",
