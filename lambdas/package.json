@@ -19,7 +19,7 @@
     "@aws-sdk/client-cloudformation": "^3.994.0",
     "@aws-sdk/client-sqs": "^3.994.0",
     "bluebird": "^3.7.2",
-    "extstats-core": "file:../../repo/extstats-core-1.21.0.tgz",
+    "extstats-core": "file:../../repo/extstats-core-2.0.1.tgz",
     "fast-xml-parser": "^5.3.2",
     "mysql": "^2.18.1",
     "promise-mysql": "^5.2.0"

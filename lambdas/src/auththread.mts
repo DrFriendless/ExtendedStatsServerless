@@ -4,7 +4,7 @@ import {XMLParser} from "fast-xml-parser";
 import {PutParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 
 export async function handler(event: APIGatewayProxyEvent): Promise<any[] | HttpResponse> {
-    console.log(event);
+    console.log(JSON.stringify(event));
     const system = await findSystem(["bgg"]);
     if (isHttpResponse(system)) return system;
 
@@ -17,7 +17,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<any[] | Http
         }
     });
     if (!response.ok) {
-        console.log(response);
+        console.log(JSON.stringify(response));
         return;
     }
     const xml = await response.text();
@@ -53,7 +53,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<any[] | Http
         );
         console.log(response);
     }
-    console.log(result);
+    console.log(JSON.stringify(result));
     return result;
 }
 

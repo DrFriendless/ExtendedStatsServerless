@@ -32,8 +32,6 @@ export class System {
     }
 
     async loadLoggingSecrets(): Promise<HttpResponse | void> {
-        console.log("loadLoggingSecrets");
-        // this.systemLogGroup = await this.getParameter("/extstats/systemLogGroup");
         this.systemLogGroup = "extstats-system";
     }
 
@@ -55,7 +53,6 @@ export class System {
     }
 
     async loadBGGSecrets(): Promise<HttpResponse | void> {
-        console.log("loadBGGSecrets");
         const client = new SecretsManagerClient({
             region: process.env.AWS_REGION
         });
@@ -75,7 +72,6 @@ export class System {
                 "body": JSON.stringify({error: `Can't find secret ${BGG_SECRETS} - make sure it exists in AWS.`})
             }
         }
-        console.log("loadBGGSecrets2");
         const ssmClient = new SSMClient({
             apiVersion: '2014-11-06',
             region: process.env.AWS_REGION
@@ -88,7 +84,6 @@ export class System {
             })
         );
         for (const p of response.Parameters) {
-            console.log(p.Name);
             switch (p.Name) {
                 case `${path}/minarticleid`:
                     this.minarticleid = parseInt(p.Value);
