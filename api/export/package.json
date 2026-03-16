@@ -1,15 +1,12 @@
 {
   "name": "extstats-api",
-  "version": "1.4.1",
+  "version": "2.0.0",
   "description": "ExtendedStatsServerless API SDK",
   "type": "module",
   "main": "index.mjs",
   "files": [
     "*"
   ],
-  "dependencies": {
-    "extstats-core": "file:/home/john/projects/repo/extstats-core-1.35.0.tgz"
-  },
   "scripts": {
     "build": "tsc"
   },

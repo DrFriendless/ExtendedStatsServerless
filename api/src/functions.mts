@@ -13,25 +13,24 @@ import {
     markGeekForUpdate,
     gatherSystemUpdates, getGeekGames, getAmbiguousGames, loadExpansionData, doRetrieveGameNames, patchGeekData
 } from "./mysql-rds.mjs";
-import {
-    Collection, CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationData, ExpansionData,
-    FAQCount,
-    GeekGameQuery,
-    GeekSummary, MultiGeekPlays,
-    NewsItem,
-    PlaysQuery,
-    RankingTableRow,
-    SystemStats, ToProcessElement,
-    WarTableRow
-} from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
 import {getCookiesFromEvent, getGeekId} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {MostPlaysRow} from "./interfaces.mjs";
-import {Hotness, MostPlayedEntry} from "./api-interfaces.mjs";
+import {
+    Collection, CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationData,
+    FAQCount, GeekGameQuery,
+    GeekSummary,
+    Hotness,
+    MostPlayedEntry, MultiGeekPlays, NewsItem, PlaysQuery, RankingTableRow,
+    SystemStats,
+    ToProcessSummary,
+    WarTableRow
+} from "./api-interfaces.mjs";
+import {ExpansionData} from "extstats-core";
 
-export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
+export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();

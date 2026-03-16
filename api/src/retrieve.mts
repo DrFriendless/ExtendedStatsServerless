@@ -3,14 +3,6 @@ import { APIGatewayProxyEvent } from "aws-lambda";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
 import {
-    ExtendedGeekGameShort,
-    GameData,
-    GameDataShort,
-    MonthlyPlayCount,
-    MonthlyPlays,
-    PlaysWithDate, SelectorMetadataSet
-} from "extstats-core";
-import {
     doRetrieveGames,
     doRetrieveGamesShort, doRetrieveGeekGames,
     getMonthlyCounts,
@@ -31,6 +23,11 @@ import {
     ShouldPlayAdditionalData
 } from "./interfaces.mjs";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
+import {GameData, MonthlyPlayCount, MonthlyPlays, PlaysWithDate} from "./api-interfaces.mjs";
+import {SelectorMetadataSet} from "./selector-metadata.mjs";
+
+class GameDataShort {
+}
 
 interface Loaders {
     system: System;
@@ -236,6 +233,9 @@ function buildGeekGamesType(gameDataType: GraphQLObjectType<GameData>, geekGameT
             metadata: {type: new graphql.GraphQLList(SelectorMetadataType!)}
         }
     });
+}
+
+class ExtendedGeekGameShort {
 }
 
 function buildGeekGamesTypeShort(gameDataType: GraphQLObjectType<GameDataShort>, geekGameType: GraphQLObjectType<ExtendedGeekGameShort>) {

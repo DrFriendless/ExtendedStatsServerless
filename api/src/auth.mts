@@ -1,4 +1,3 @@
-import { UserData } from "extstats-core";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {getCookiesFromEvent} from "./library.mjs";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
@@ -17,6 +16,7 @@ import {
 import {AuthTask} from "./interfaces.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {getChatterCode} from "./socks.mjs";
+import {UserData} from "./api-interfaces.mjs";
 
 const COST = 4096;
 const SALT_LENGTH = 22;
@@ -226,6 +226,7 @@ export async function confirm(event: { Payload: {id: string, username: string, c
     const system = await findSystem("private");
     console.log(system);
     if (isHttpResponse(system)) return system;
+    console.log(JSON.stringify(event.Payload));
 
     for (const row of event.Payload) {
         for (const code of row.codes) {

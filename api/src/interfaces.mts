@@ -1,4 +1,4 @@
-import {GameData, GeekGame} from "extstats-core";
+import {GameData, GeekGame} from "./api-interfaces.mjs";
 
 export interface GeekGameRow {
     geek: string;

@@ -1,15 +1,16 @@
 import mysql = require('promise-mysql');
 import { Arg, Argument, Expression, Integer, Keyword, parse, StringValue } from "./parser.mjs";
 import { getGeekId } from "./library.mjs";
-import { GeekGameQuery, GeekGameQueryResult, SelectorMetadataSet } from "extstats-core";
 import {VarBinding, VarBindings} from "./varbindings.mjs";
 import {
     GameDesignersTableRow, GamePublishersTableRow,
     GeekGameRow,
     GeekGamesTableRow
 } from "./interfaces.mjs";
+import {GeekGameQuery} from './api-interfaces.mjs';
+import {SelectorMetadataSet} from "./selector-metadata.mjs";
 
-export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameQueryResult> {
+export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameSelectResult> {
     const expr = parse(q);
     return await evaluate(conn, expr, query);
 }

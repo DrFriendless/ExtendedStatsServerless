@@ -18,6 +18,16 @@ export interface GeeklistItemCheck {
     wishlist: number;
 }
 
+export interface ProcessedRecRow {
+    bggid: number;
+    name: string;
+    score: number;
+    score0: number;
+    score2: number;
+    bggRating: number;
+    bggRanking: number;
+}
+
 export interface MostPlayedEntry {
     bggid: number;
     name: string;
@@ -50,5 +60,272 @@ export interface BlogComment {
     date: Date;
     reply_to?: number;
     deleted?: boolean;
-    post_title: string;
+}
+
+export interface NewsItem {
+    id: number;
+    date: string;
+    html: string;
+}
+
+export interface WarTableRow {
+    geek: number;
+    geekName: string;
+    totalPlays: number;
+    distinctGames: number;
+    top50: number;
+    sdj: number;
+    owned: number;
+    want: number;
+    wish: number;
+    trade: number;
+    prevOwned: number;
+    friendless: number;
+    cfm: number;
+    utilisation: number;
+    tens: number;
+    zeros: number;
+    ext100: number;
+    hindex: number;
+    gindex: number;
+    hrindex: number;
+    preordered: number;
+}
+
+export interface GeekSummary {
+    warData?: WarTableRow;
+    rated: number;
+    average: number;
+    monthsPlayed: number;
+    error?: string;
+    geekId?: number;
+}
+
+export interface SystemStats {
+    userRows: number;
+    gameRows: number;
+    geekGamesRows: number;
+    expansionRows: number;
+    mechanics: number;
+    categories: number;
+    gameMechanics: number;
+    gameCategories: number;
+    notGames: number;
+    fileRows: TypeCount[];
+    ggForZero: number;
+    distinctGGOwners: number;
+    playsRows: number;
+    normalisedPlaysRows: number;
+    upcoming: {
+        type: string;
+        count: number;
+    }[][];
+    last24: {
+        type: string;
+        count: number;
+    }[];
+}
+
+export interface RankingTableRow {
+    game: number;
+    game_name: string;
+    total_ratings: number;
+    num_ratings: number;
+    bgg_ranking: number;
+    bgg_rating: number;
+    normalised_ranking: number;
+    total_plays: number;
+    ranking: number;
+    hindex: number;
+    gindex: number;
+}
+
+export interface FAQCount {
+    day: number;
+    week: number;
+    month: number;
+    year: number;
+    ever: number;
+}
+
+export interface DisambiguationGame {
+    bggid: number;
+    name: string;
+}
+
+export interface DisambiguationItem {
+    expansion: DisambiguationGame;
+    basegames: DisambiguationGame[];
+}
+
+export interface AmbiguousPlay extends DisambiguationGame {
+    year: number;
+}
+
+export interface DisambiguationData {
+    geek: string;
+    items: DisambiguationItem[];
+    plays: AmbiguousPlay[];
+}
+
+export interface Collection {
+    collection: GeekGame[];
+    games: GameData[];
+    metadata?: { [bggid: string]: SelectorMetadata };
+    extra?: number[];
+}
+
+export interface CollectionWithPlays extends Collection {
+    plays: GamePlays[];
+    lastYearPlays: GamePlays[];
+}
+
+export interface CollectionWithMonthlyPlays extends Collection {
+    plays: MonthlyPlays[];
+    counts: MonthlyPlayCount[];
+}
+
+export interface MultiGeekPlays extends Collection {
+    geeks: string[];
+    plays: {
+        [geek: string]: PlaysWithDate[];
+    };
+}
+
+export interface PlaysQuery {
+    geek: string;
+    geeks?: string[];
+    year?: number;
+    month?: number;
+    date?: number;
+    filter?: string;
+}
+
+export interface GeekGameQuery {
+    geek: string;
+    geeks?: string[];
+    query: string;
+    extra?: string;
+    format: string;
+    vars: {
+        THEM?: string;
+        YEAR?: number;
+        RATING?: number;
+        MONTH?: number;
+    };
+}
+
+export interface ToProcessSummary {
+    lastUpdate: any;
+    nextUpdate: any;
+    description: string;
+    lastattempt: any;
+    last_scheduled: any;
+    id: number;
+    processMethod: string;
+    url: string;
+    bggid: number;
+    geek: string;
+    month: number;
+    year: number;
+    geekid: number;
+}
+
+export interface TypeCount {
+    type: string;
+    existing: number;
+    waiting: number;
+    unprocessed: number;
+}
+
+export interface GeekGame {
+    bggid: number;
+    rating: number;
+    owned: boolean;
+    wantToBuy: boolean;
+    wantToPlay: boolean;
+    preordered: boolean;
+    prevOwned: boolean;
+}
+
+export interface GameData {
+    bggid: number;
+    name: string;
+    bggRating: number;
+    bggRanking: number;
+    yearPublished: number;
+    minPlayers: number;
+    maxPlayers: number;
+    playTime: number;
+    subdomain: string;
+    usersOwned: number;
+    weight: number;
+    isExpansion: boolean;
+}
+
+export interface GamePlays {
+    game: number;
+    plays: number;
+    expansion: boolean;
+    firstPlay?: number;
+    lastPlay?: number;
+    distinctYears: number;
+    distinctMonths: number;
+}
+
+export interface MonthlyPlays {
+    year: number;
+    month: number;
+    game: number;
+    expansion: boolean;
+    quantity: number;
+}
+
+export interface MonthlyPlayCount {
+    year: number;
+    month: number;
+    count: number;
+}
+
+export interface Plays {
+    geek?: string;
+    game: number;
+    expansions?: number[];
+    quantity: number;
+}
+
+export interface PlaysWithDate extends Plays {
+    year: number;
+    month: number;
+    date: number;
+}
+
+export interface GameDataShort {
+    bggid: number;
+    n: string;
+    rt: number;
+    rk: number;
+    yp: number;
+    min: number;
+    max: number;
+    pt: number;
+    sub: string;
+    w: number;
+    e: boolean;
+}
+
+export interface SelectorMetadata {
+    game: number;
+    colour?: string;
+    owner?: string;
+    player?: string;
+    rater?: string;
+}
+
+export interface UserData {
+    config: any;
+    userName: string;
+    created: Date;
+    lastLogin: Date | undefined;
+    loginCount: number;
 }

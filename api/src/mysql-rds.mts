@@ -1,11 +1,6 @@
 import { count, countTableRows, getGeekId, getGeekIds } from "./library.mjs";
 import {retrieveGeekGames, retrieveGeekIdGames, selectGames} from "./selector.mjs";
 import {
-    RankingTableRow, ExpansionData, GeekGameQuery, Collection, CollectionWithPlays, GamePlays, SystemStats,
-    TypeCount, WarTableRow, GeekSummary, FAQCount, CollectionWithMonthlyPlays, MonthlyPlays, NewsItem, PlaysQuery,
-    MultiGeekPlays, PlaysWithDate, MonthlyPlayCount, ToProcessElement, GameDataShort, DisambiguationGame, AmbiguousPlay
-} from "extstats-core";
-import {
     AllPlaysQueryResult,
     ExpansionPlay,
     ExtendedGeekGame,
@@ -23,7 +18,18 @@ import * as dateMath from 'date-arithmetic';
 import * as mysql from 'promise-mysql';
 import {System} from "./system.mjs";
 import {Connection} from "promise-mysql";
-import {MostPlayedEntry} from "./api-interfaces.mjs";
+import {
+    AmbiguousPlay,
+    Collection,
+    CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationGame, FAQCount, GameDataShort, GamePlays,
+    GeekGameQuery, GeekSummary,
+    MonthlyPlayCount,
+    MonthlyPlays,
+    MostPlayedEntry, MultiGeekPlays,
+    NewsItem, PlaysQuery, PlaysWithDate,
+    RankingTableRow, SystemStats, ToProcessSummary, TypeCount, WarTableRow
+} from "./api-interfaces.mjs";
+import { ExpansionData } from "extstats-core";
 
 export async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
     return await retrieveGeekGames(conn, ids, geek);
@@ -154,20 +160,20 @@ export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
     }
     switch (query.format) {
         case "Collection": {
-            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata, extra } as Collection;
+            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata.metadata, extra } as Collection;
         }
         case "CollectionWithPlays": {
             const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
             const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-            return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata, extra } as CollectionWithPlays;
+            return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata.metadata, extra } as CollectionWithPlays;
         }
         case "CollectionWithMonthlyPlays": {
             const plays = (await getMonthlyPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
             const counts = (await getMonthlyCounts(conn, query.geek));
-            return { collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata, extra, counts };
+            return { collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata.metadata, extra, counts };
         }
         default: {
-            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata, extra } as Collection;
+            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata.metadata, extra } as Collection;
         }
     }
 }
@@ -329,11 +335,11 @@ export async function gatherSystemUpdates(system: System): Promise<Record<string
     });
 }
 
-export async function gatherGeekUpdates(system: System, geek: string): Promise<ToProcessElement[]> {
+export async function gatherGeekUpdates(system: System, geek: string): Promise<ToProcessSummary[]> {
     return await system.asyncReturnWithConnection(async conn => await doGetGeekUpdates(conn, geek));
 }
 
-export async function markUrlForUpdate(system: System, url: string): Promise<ToProcessElement> {
+export async function markUrlForUpdate(system: System, url: string): Promise<ToProcessSummary> {
     return await system.asyncReturnWithConnection(async conn => await doMarkUrlForUpdate(conn, url));
 }
 
@@ -341,11 +347,11 @@ export async function markGeekForUpdate(system: System, geek: string): Promise<s
     return await system.asyncReturnWithConnection(async conn => await doMarkGeekForUpdate(conn, geek));
 }
 
-async function doGetGeekUpdates(conn: mysql.Connection, geek: string): Promise<(ToProcessElement & { recorded?: number })[]> {
+async function doGetGeekUpdates(conn: mysql.Connection, geek: string): Promise<(ToProcessSummary & { recorded?: number })[]> {
     const geekId = await getGeekId(conn, geek);
     const playsSQL = "select sum(quantity) q, year*100+month ym from plays where geek = ? group by month, year";
     const updatesSQL = "select * from files where geek = ?";
-    const result = await conn.query(updatesSQL, [geek]) as (ToProcessElement & { recorded?: number })[];
+    const result = await conn.query(updatesSQL, [geek]) as (ToProcessSummary & { recorded?: number })[];
     const plays = await conn.query(playsSQL, [geekId]) as { q: number, ym: number }[];
     const recorded: Record<string, number> = {};
     for (const row of plays) recorded[row.ym] = row.q;
@@ -358,11 +364,11 @@ async function doGetGeekUpdates(conn: mysql.Connection, geek: string): Promise<(
     return result;
 }
 
-async function doMarkUrlForUpdate(conn: mysql.Connection, url: string): Promise<ToProcessElement> {
+async function doMarkUrlForUpdate(conn: mysql.Connection, url: string): Promise<ToProcessSummary> {
     const markSQL = "update files set lastUpdate = null where url = ?";
     const updatesSQL = "select * from files where url = ?";
     await conn.query(markSQL, [url]);
-    const rows = await conn.query(updatesSQL, [url]) as ToProcessElement[];
+    const rows = await conn.query(updatesSQL, [url]) as ToProcessSummary[];
     if (rows.length > 0) return rows[0];
     return undefined;
 }

@@ -1,17 +1,25 @@
 import {
-    Collection, CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationData,
-    FAQCount, GeekGameQuery,
-    GeekSummary, MultiGeekPlays,
-    NewsItem, PlaysQuery,
+    BlogComment,
+    Collection,
+    CollectionWithMonthlyPlays,
+    CollectionWithPlays,
+    DisambiguationData,
+    FAQCount,
+    GeekGameQuery,
+    GeeklistCheck,
+    GeekSummary,
+    Hotness,
+    MultiGeekPlays,
+    NewsItem,
+    PlaysQuery,
+    ProcessedRecRow,
     RankingTableRow,
     SystemStats,
-    ToProcessElement,
+    ToProcessSummary,
     WarTableRow
-} from "extstats-core";
-import {BlogComment, GeeklistCheck, Hotness, ProcessedRecRow} from "./api-interfaces.mjs";
+} from "./api-interfaces.mjs";
 
 export * from "./api-interfaces.mjs";
-export type AuthResultType = "code" | "userdata" | "failure";
 
 export interface AuthResultCode {
     type: "code";
@@ -39,12 +47,12 @@ export class ExtstatsApi {
         })).json()) as WarTableRow[];
     }
 
-    async getUpdates(geek: string): Promise<{ forGeek: ToProcessElement[], forSystem: Record<string, number> }> {
+    async getUpdates(geek: string): Promise<{ forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {
         return (await (await fetch(`${this.baseUrl}/updates?geek=${geek}`, {
             headers: {
                 "Content-Type": "application/json"
             }
-        })).json()) as { forGeek: ToProcessElement[], forSystem: Record<string, number> };
+        })).json()) as { forGeek: ToProcessSummary[], forSystem: Record<string, number> };
     }
 
     async getGeekSummary(geek: string): Promise<GeekSummary> {
@@ -87,7 +95,7 @@ export class ExtstatsApi {
         })).json()) as RankingTableRow[];
     }
 
-    async markForUpdate(url: string): Promise<ToProcessElement> {
+    async markForUpdate(url: string): Promise<ToProcessSummary> {
         return (await (await fetch(`${this.baseUrl}/markForUpdate`, {
             headers: {
                 "Content-Type": "application/json",
@@ -95,7 +103,7 @@ export class ExtstatsApi {
             },
             body: JSON.stringify({ url }),
             method: "POST"
-        })).json()) as ToProcessElement;
+        })).json()) as ToProcessSummary;
     }
 
     async updateOld(geek: string): Promise<string[]> {
