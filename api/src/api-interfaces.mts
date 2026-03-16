@@ -55,6 +55,7 @@ export interface Hotness {
 export interface BlogComment {
     id: number;
     post_url: string;
+    post_title: string;
     poster: string;
     comment: string;
     date: Date;

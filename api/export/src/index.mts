@@ -281,6 +281,14 @@ export class ExtstatsApi {
         })).json()) as BlogComment[];
     }
 
+    async retrieveRecentComments(): Promise<BlogComment[]> {
+        return (await (await fetch(`${this.baseUrl}/retrieveRecentComments`, {
+            headers: {
+                "Accept": "application/json"
+            }
+        })).json()) as BlogComment[];
+    }
+
     async saveComment(url: string, comment: string, replyTo: number | undefined, post_title: string): Promise<{ id: number | undefined, posts: BlogComment[] }> {
         const body = { url, comment, replyTo, post_title };
         return (await (await fetch(`${this.baseUrl}/saveComment`, {

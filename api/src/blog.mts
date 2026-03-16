@@ -14,11 +14,38 @@ interface RawBlogComment {
     post_title: string;
 }
 
+export async function retrieveRecentComments() {
+    const system = await findSystem("private", undefined);
+    if (isHttpResponse(system)) return system;
+    return await retrieveRecentCommentsInternal(system);
+}
+
 export async function retrieveCommentsForUrl(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<BlogComment[] | HttpResponse> {
     const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     const url = event.queryStringParameters["url"];
     return await retrieveCommentsForUrlInternal(system, url);
+}
+
+function extractComment(rbp: RawBlogComment): BlogComment {
+    let url = rbp.post_url;
+    // figure out the real URL of the page the comment was on.
+    if (url.startsWith("blog:")) {
+        const slug = url.substring(5);
+        url = `/blog/${slug}.html`;
+    } else {
+        url = undefined;
+    }
+    return {
+        id: rbp.id,
+        comment: rbp.comment,
+        post_url: url,
+        poster: rbp.poster,
+        deleted: !!rbp.deleted,
+        reply_to: rbp.reply_to || undefined,
+        date: rbp.date,
+        post_title: rbp.post_title
+    };
 }
 
 async function retrieveCommentsForUrlInternal(system: System, url: string): Promise<BlogComment[]> {
@@ -32,18 +59,15 @@ async function retrieveCommentsForUrlInternal(system: System, url: string): Prom
             p.comment = "";
         }
     }
-    return posts.map(rbp => {
-        return {
-            id: rbp.id,
-            comment: rbp.comment,
-            post_url: "",
-            poster: rbp.poster,
-            deleted: !!rbp.deleted,
-            reply_to: rbp.reply_to || undefined,
-            date: rbp.date,
-            post_title: rbp.post_title
-        };
-    });
+    return posts.map(extractComment);
+}
+
+async function retrieveRecentCommentsInternal(system: System): Promise<BlogComment[]> {
+    const sql = "select * from blog_comments where deleted = 0 order by date desc limit 10";
+    const posts = await system.asyncReturnWithConnection(
+        async conn => await conn.query(sql, []) as RawBlogComment[]
+    );
+    return posts.map(extractComment);
 }
 
 export async function deleteComment(event: APIGatewayProxyEventV2WithRequestContext<any>):
