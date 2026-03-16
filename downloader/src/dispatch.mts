@@ -18,7 +18,7 @@ import {
     ProcessUserResult,
     CleanUpCollectionResult,
     QueueMessage,
-    ProcessPlaysForPeriodResult, PlayData, ProcessDesignerResult, ProcessPublisherResult
+    ProcessPlaysForPeriodResult, PlayDataResult, ProcessDesignerResult, ProcessPublisherResult
 } from 'extstats-core';
 import {System} from "./system.mjs";
 
@@ -135,7 +135,7 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
         // break this time period up into multiple.
         const dates: number[] = [];
         const countByDate: Record<string, number> = {};
-        const playsByDate: Record<string, PlayData[]> = {};
+        const playsByDate: Record<string, PlayDataResult[]> = {};
         for (const p of result.plays) {
             const { y, m, d } = splitYmd(p.date);
             const ymd = y * 10000 + m * 100 + d;
@@ -162,7 +162,7 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
         }
         dates.sort();
         let chunkStart = result.startYmdInc;
-        let chunkPlays: PlayData[] = [];
+        let chunkPlays: PlayDataResult[] = [];
         for (const d of dates) {
             const dPlays = playsByDate[d.toString()];
             const newPlays = chunkPlays.concat(dPlays);
@@ -215,7 +215,7 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
         return 10000 * date.getFullYear() + 100 * (date.getMonth() + 1) + date.getDate();
     }
 
-    async function emit(processMethod: string, symd: string, eymd: string, geek: string, plays: PlayData[]) {
+    async function emit(processMethod: string, symd: string, eymd: string, geek: string, plays: PlayDataResult[]) {
         const url = `${symd}=${eymd}=${geek}`;
         const playsResult: ProcessPlaysForPeriodResult = {
             processMethod, geek, startYmdInc: symd, endYmdInc: eymd, url, plays
@@ -224,7 +224,7 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
         await sendToDownloaderQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: playsResult }, url);
     }
 
-    function removeLocations(plays: PlayData[]): PlayData[] {
+    function removeLocations(plays: PlayDataResult[]): PlayDataResult[] {
         return plays.map(p => { return {...p, location: "" }; });
     }
 }

@@ -26,8 +26,8 @@ import {
     CleanUpCollectionResult,
     FileToProcess,
     METADATA_RULE_BASEGAME,
-    MetadataRule, PlayData, ProcessCollectionResult, ProcessPlaysForPeriodResult,
-    SeriesMetadata, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
+    MetadataRuleResult, PlayDataResult, ProcessCollectionResult, ProcessPlaysForPeriodResult,
+    SeriesMetadataResult, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
 } from "extstats-core";
 import {isHttpResponse, loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
@@ -68,8 +68,8 @@ export async function processMetadata(_: UpdateMetadataMessage) {
     const data = await resp.text();
     const lines: string[] = data.split(/\r?\n/).map(s => s.trim()).filter(s => !!s);
 
-    const series: SeriesMetadata[] = [];
-    const rules: MetadataRule[] = [];
+    const series: SeriesMetadataResult[] = [];
+    const rules: MetadataRuleResult[] = [];
     for (const line of lines) {
         if (line.length === 0) continue;
         if (line.startsWith('#')) continue;
@@ -290,7 +290,7 @@ export async function processPlayed(event: QueueInput) {
     for (const record of event.Records) {
         const invocation = JSON.parse(record.body);
         const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${invocation.geek}&type=thing&mindate=${invocation.startYmdInc}&maxdate=${invocation.endYmdInc}&subtype=boardgame&page=`;
-        const plays: PlayData[] = [];
+        const plays: PlayDataResult[] = [];
         let maxEntries: number | undefined;
         let maxPages = 1000;
         let pageNum = 1;
@@ -321,7 +321,7 @@ export async function processPlayed(event: QueueInput) {
                 break;
             }
             for (const play of doc.plays.play) {
-                const p: PlayData = {
+                const p: PlayDataResult = {
                     quantity: parseInt(play['@_quantity']),
                     location: play['@_location'],
                     date: play['@_date'],

@@ -1,4 +1,4 @@
-import { CollectionGame, ProcessCollectionResult, ProcessGameResult, ProcessUserResult } from "extstats-core";
+import { CollectionGameResult, ProcessCollectionResult, ProcessGameResult, ProcessUserResult } from "extstats-core";
 import { parseStringPromise } from 'xml2js';
 import {log} from "./logging.mjs";
 import {System} from "./system.mjs";
@@ -30,8 +30,8 @@ export async function extractUserCollectionFromPage(system: System, geek: string
         console.log("Found no games in collection");
         log("Found no games in collection for " + geek);
     }
-    const items: CollectionGame[] = [];
-    const byId: Record<string, Partial<CollectionGame>> = {};
+    const items: CollectionGameResult[] = [];
+    const byId: Record<string, Partial<CollectionGameResult>> = {};
     if (dom.items.item) {
         dom.items.item.forEach((item: any) => {
             if (item.$.subtype != 'boardgame') {
@@ -43,7 +43,7 @@ export async function extractUserCollectionFromPage(system: System, geek: string
                 const status = item.status[0];
                 const existingItem = byId[gameId];
                 const existing = !!existingItem;
-                const gameItem = existingItem || ({ gameId: gameId, rating: -1 } as unknown as CollectionGame);
+                const gameItem = existingItem || ({ gameId: gameId, rating: -1 } as unknown as CollectionGameResult);
                 if (stats) {
                     const rating = stats.rating;
                     if (rating && rating.length > 0) {
@@ -63,7 +63,7 @@ export async function extractUserCollectionFromPage(system: System, geek: string
                     gameItem.preordered = gameItem.preordered || (status.$.preordered === '1');
                 }
                 if (!existing) {
-                    items.push(gameItem as CollectionGame);
+                    items.push(gameItem as CollectionGameResult);
                     byId[gameItem.gameId] = gameItem;
                 }
             }
