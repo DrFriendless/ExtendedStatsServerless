@@ -5,13 +5,12 @@
 
 import mysql = require('promise-mysql');
 import {
-    CollectionGame,
-    ExpansionData,
-    MetadataRule, PlayData, ProcessPlaysForPeriodResult,
+    CollectionGameResult, ExpansionData,
+    MetadataRuleResult, PlayDataResult, ProcessPlaysForPeriodResult,
     ProcessGameResult, ProcessMethod,
-    RankingTableRow,
-    SeriesMetadata, ToProcessElement,
-    WarTableRow, UserConfig, ProcessDesignerResult, ProcessPublisherResult
+    RankingTableDatabaseRow,
+    SeriesMetadataResult, ToProcessElement,
+    WarTableDatabaseRow, UserConfig, ProcessDesignerResult, ProcessPublisherResult
 } from "extstats-core";
 import {count, eqSet, listIntersect, listMinus, parseYmd, splitYmd} from "./library.mjs";
 import { PlaysRow } from "./library.mjs";
@@ -21,12 +20,12 @@ export async function doUpdateBGGTop50(conn: mysql.Connection, games: number[]) 
     await doUpdateSeries(conn, [ { name: "BGG Top 50", games } ]);
 }
 
-export async function doUpdateMetadata(conn: mysql.Connection, series: SeriesMetadata[], rules: MetadataRule[]) {
+export async function doUpdateMetadata(conn: mysql.Connection, series: SeriesMetadataResult[], rules: MetadataRuleResult[]) {
     await doUpdateSeries(conn, series);
     await doUpdateMetadataRules(conn, rules);
 }
 
-async function doUpdateSeries(conn: mysql.Connection, seriesMetada: SeriesMetadata[]) {
+async function doUpdateSeries(conn: mysql.Connection, seriesMetada: SeriesMetadataResult[]) {
     const deleteSql = "delete from series where series_id = ?";
     const insertSql = "insert into series (series_id, game) values ?";
     const gamesThatDontExist = await getGamesThatDontExist(conn);
@@ -56,7 +55,7 @@ async function doGetOrCreateSeriesMetadata(conn: mysql.Connection, name: string)
     }
 }
 
-async function doUpdateMetadataRules(conn: mysql.Connection, rules: MetadataRule[]) {
+async function doUpdateMetadataRules(conn: mysql.Connection, rules: MetadataRuleResult[]) {
     const deleteSql = "delete from metadata";
     const insertSql = "insert into metadata  (ruletype, game) values (?,?)";
     const gamesThatDontExist = await getGamesThatDontExist(conn);
@@ -252,7 +251,7 @@ async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: nu
         gindex++;
     }
     const howManyPlays = hindexData.reduce((a, b) => a + b, 0);
-    const row: RankingTableRow = {
+    const row: RankingTableDatabaseRow = {
         game: game,
         game_name: data.name,
         bgg_ranking: data.rank || 1000000,
@@ -472,7 +471,7 @@ async function doEnsureUser(conn: mysql.Connection, user: string) {
     await doEnsureFileProcessUserPlayed(conn, user, geekId);
 }
 
-export async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: CollectionGame[]) {
+export async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: CollectionGameResult[]) {
     const geekId = await getGeekId(conn, geek);
     const notExist = await getGamesThatDontExist(conn);
     for (const game of games) {
@@ -481,7 +480,7 @@ export async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string,
     }
 }
 
-async function doUpdateGeekgame(conn: mysql.Connection, geekId: number, game: CollectionGame) {
+async function doUpdateGeekgame(conn: mysql.Connection, geekId: number, game: CollectionGameResult) {
     const insertSql = "insert into geekgames (geekId, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     const updateSql = "update geekgames set rating = ?, owned = ?, want = ?, wish = ?, trade = ?, prevowned = ?, wanttobuy = ?, wanttoplay = ?, preordered = ? where game = ? and geekid = ?";
     const updateResult = await conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade, game.prevOwned,
@@ -735,7 +734,7 @@ async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
     }
     const playsDataForWarTable: PlaysDataForWarTable = await doGatherPlaysDataForWarTable(conn, geekId);
     const fm = calcFriendlessMetrics(playsDataForWarTable.uses);
-    const fpg: WarTableRow = {
+    const fpg: WarTableDatabaseRow = {
         geek: geekId,
         geekName: geekName,
         totalPlays: playsDataForWarTable.totalPlays,
@@ -879,7 +878,7 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
 }
 
 export async function doSetGeekPlaysForYear(conn: mysql.Connection, geekId: number, startYmdInc: string, endYmdInc: string,
-                                             plays: PlayData[], notGames: number[], playsMonths: { y: number, m: number }[]) {
+                                             plays: PlayDataResult[], notGames: number[], playsMonths: { y: number, m: number }[]) {
     const s = splitYmd(startYmdInc);
     const e = splitYmd(endYmdInc);
     const deleteSql = "delete from plays where geek = ? and (year > ? || (year = ? and month >= ?)) and (year < ? || (year = ? and month <= ?))";
