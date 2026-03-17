@@ -12,12 +12,19 @@
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
-    "outDir": "dist",
-    //    "types": ["node"],
+    "outDir": "./dist",
     "lib": ["esnext"],
-    "target": "es2022"
+    "target": "es2022",
+    "composite": true,
+    "paths": {
+      "export": ["./export/src/index.mts"]
+    },
+    "rootDir": "./src"
   },
+  "references": [
+    { "path": "./export/tsconfig.json" }
+  ],
   "include": [
-    "src/*.mts"
+    "./src/*.mts"
   ]
 }

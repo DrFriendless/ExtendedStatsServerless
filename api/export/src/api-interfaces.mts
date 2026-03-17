@@ -1,3 +1,17 @@
+export interface AuthResultCode {
+    type: "code";
+    code: string;
+}
+export interface AuthResultLoginSuccess {
+    type: "userdata";
+    data: any;
+}
+export interface AuthResultFailure {
+    type: "failure";
+    state: string;
+}
+export type AuthResult = AuthResultCode | AuthResultLoginSuccess | AuthResultFailure;
+
 export interface GeeklistCheck {
     geek: string;
     geeklistId: number;
@@ -252,16 +266,26 @@ export interface GeekGame {
 export interface GameData {
     bggid: number;
     name: string;
+    n: string;
     bggRating: number;
+    rt: number;
     bggRanking: number;
+    rk: number;
     yearPublished: number;
+    yp: number;
     minPlayers: number;
+    min: number;
     maxPlayers: number;
+    max: number;
     playTime: number;
+    pt: number;
     subdomain: string;
+    sub: string;
     usersOwned: number;
     weight: number;
+    w: number;
     isExpansion: boolean;
+    e: boolean;
 }
 
 export interface GamePlays {

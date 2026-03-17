@@ -27,7 +27,7 @@ import {
     SystemStats,
     ToProcessSummary,
     WarTableRow
-} from "./api-interfaces.mjs";
+} from "export";
 import {ExpansionData} from "extstats-core";
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {

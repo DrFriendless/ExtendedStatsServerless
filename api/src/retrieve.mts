@@ -15,7 +15,7 @@ import {VarBindings} from "./varbindings.mjs";
 import DataLoader from "dataloader";
 import {
     ExtendedGeekGame,
-    ExtractedGameData, FAKE_GEEK_GAME,
+    FAKE_GEEK_GAME,
     GeekGameRow,
     LastYearPlaysQueryResult,
     NormalisedPlaysQueryResult,
@@ -23,7 +23,7 @@ import {
     ShouldPlayAdditionalData
 } from "./interfaces.mjs";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
-import {GameData, MonthlyPlayCount, MonthlyPlays, PlaysWithDate} from "./api-interfaces.mjs";
+import {GameData, MonthlyPlayCount, MonthlyPlays, PlaysWithDate} from "export";
 import {SelectorMetadataSet} from "./selector-metadata.mjs";
 
 class GameDataShort {
@@ -62,16 +62,26 @@ function buildGameDataType(loaders: Loaders) {
         fields: {
             bggid: {type: graphql.GraphQLInt!},
             bggRanking: {type: graphql.GraphQLInt!},
+            rk: {type: graphql.GraphQLInt!},
             yearPublished: {type: graphql.GraphQLInt!},
+            yp: {type: graphql.GraphQLInt!},
             minPlayers: {type: graphql.GraphQLInt!},
+            min: {type: graphql.GraphQLInt!},
             maxPlayers: {type: graphql.GraphQLInt!},
+            max: {type: graphql.GraphQLInt!},
             playTime: {type: graphql.GraphQLInt!},
+            pt: {type: graphql.GraphQLInt!},
             name: {type: graphql.GraphQLString!},
+            n: {type: graphql.GraphQLString!},
             subdomain: {type: graphql.GraphQLString!},
+            sub: {type: graphql.GraphQLString!},
             usersOwned: {type: graphql.GraphQLInt!},
             bggRating: {type: graphql.GraphQLFloat!},
+            rt: {type: graphql.GraphQLFloat!},
             weight: {type: graphql.GraphQLFloat!},
+            w: {type: graphql.GraphQLFloat!},
             isExpansion: {type: graphql.GraphQLBoolean!},
+            e: {type: graphql.GraphQLBoolean!},
             designers: {
                 type: new graphql.GraphQLList(DesignerType!),
                 resolve:
@@ -369,7 +379,7 @@ function buildSchema(loaders: Loaders) {
                                 const geekid = await getGeekId(conn, args.geek);
                                 const games = await mostPlayedUnplayed(conn, args.geek, args.count);
                                 const gds = await doRetrieveGames(conn, games);
-                                const gi: Record<string, ExtractedGameData> = {};
+                                const gi: Record<string, GameData> = {};
                                 gds.forEach(gd => gi[gd.bggid.toString()] = gd);
                                 const ggs = await doRetrieveGeekGames(conn, args.geek, games);
                                 const index: Record<string, ExtendedGeekGame> = {};
@@ -612,7 +622,7 @@ async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: strin
     return { ...evalResult, games };
 }
 
-async function gamesQueryForRetrieve(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<ExtractedGameData[]> {
+async function gamesQueryForRetrieve(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<GameData[]> {
     const evalResult = await selectGamesOnly(conn, selector, vars);
     return await doRetrieveGames(conn, evalResult);
 }

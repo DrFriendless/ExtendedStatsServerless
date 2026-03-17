@@ -16,7 +16,7 @@ import {
 import {AuthTask} from "./interfaces.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {getChatterCode} from "./socks.mjs";
-import {UserData} from "./api-interfaces.mjs";
+import { UserData } from "export";
 
 const COST = 4096;
 const SALT_LENGTH = 22;

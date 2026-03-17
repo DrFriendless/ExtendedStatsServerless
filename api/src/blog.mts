@@ -1,7 +1,7 @@
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {OkPacket} from "mysql";
-import {BlogComment} from "./api-interfaces.mjs";
+import {BlogComment} from "export";
 
 interface RawBlogComment {
     id: number;

@@ -1,6 +1,6 @@
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
-import {GeeklistCheck} from "./api-interfaces.mjs";
+import {GeeklistCheck} from "export";
 import {getCookiesFromEvent, sleep} from "./library.mjs";
 import {XMLParser} from "fast-xml-parser";
 import {InvokeCommand, InvokeCommandInput, LambdaClient} from "@aws-sdk/client-lambda";

@@ -1,4 +1,4 @@
-import {GameData, GeekGame} from "./api-interfaces.mjs";
+import {GameData, GeekGame} from "export";
 
 export interface GeekGameRow {
     geek: string;
@@ -68,10 +68,6 @@ export interface PlayWithDate {
     date?: number;
     expansions?: number[];
     location: string;
-}
-
-export interface ExtractedGameData extends GameData {
-
 }
 
 export interface ExpansionPlay {

@@ -7,8 +7,8 @@ import {
     GeekGameRow,
     GeekGamesTableRow
 } from "./interfaces.mjs";
-import {GeekGameQuery} from './api-interfaces.mjs';
 import {SelectorMetadataSet} from "./selector-metadata.mjs";
+import {GeekGameQuery} from "export";
 
 export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameSelectResult> {
     const expr = parse(q);

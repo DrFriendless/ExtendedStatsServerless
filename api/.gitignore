@@ -9,3 +9,5 @@ env.yml
 
 api.zip
 cdk.out
+/export/tsconfig.tsbuildinfo
+/tsconfig.tsbuildinfo

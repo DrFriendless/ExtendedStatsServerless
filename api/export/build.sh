@@ -1,7 +1,8 @@
 
+rm tsconfig.tsbuildinfo
+rm -rf dist
 mkdir dist
-rm dist/*
-tsc
+tsc --build
 cp package.json ./dist
 cd dist
 npm pack

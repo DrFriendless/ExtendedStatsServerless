@@ -4,7 +4,6 @@ import {
     AllPlaysQueryResult,
     ExpansionPlay,
     ExtendedGeekGame,
-    ExtractedGameData,
     FAKE_GEEK_GAME,
     LastYearQueryResult,
     MonthlyCountsQueryResult,
@@ -21,14 +20,14 @@ import {Connection} from "promise-mysql";
 import {
     AmbiguousPlay,
     Collection,
-    CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationGame, FAQCount, GameDataShort, GamePlays,
+    CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationGame, FAQCount, GameData, GameDataShort, GamePlays,
     GeekGameQuery, GeekSummary,
     MonthlyPlayCount,
     MonthlyPlays,
     MostPlayedEntry, MultiGeekPlays,
     NewsItem, PlaysQuery, PlaysWithDate,
     RankingTableRow, SystemStats, ToProcessSummary, TypeCount, WarTableRow
-} from "./api-interfaces.mjs";
+} from "export";
 import { ExpansionData } from "extstats-core";
 
 export async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
@@ -94,7 +93,7 @@ export async function doRetrieveGameNames(conn: mysql.Connection, ids: number[])
     return result;
 }
 
-export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<ExtractedGameData[]> {
+export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<GameData[]> {
     const sqlOne = "select * from games where bggid = ?";
     const sqlMany = "select * from games where bggid in (?)";
     const expansions: ExpansionData = await loadExpansionData(conn);
@@ -105,7 +104,7 @@ export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Pr
     } else {
         rows = await conn.query(sqlMany, [ids]);
     }
-    const index: Record<number, ExtractedGameData> = {};
+    const index: Record<number, GameData> = {};
     rows.forEach((row: RawGameData) => {
         const r = extractGameData(row, expansions);
         index[r.bggid] = r;
@@ -132,10 +131,15 @@ export async function doRetrieveGamesShort(conn: mysql.Connection, ids: number[]
     return ids.map(id => index[id]);
 }
 
-function extractGameData(row: RawGameData, expansionData: ExpansionData): ExtractedGameData {
-    return { bggid: row["bggid"], bggRanking: row["rank"], bggRating: row["average"], minPlayers: row["minPlayers"],
-        maxPlayers: row["maxPlayers"], name: row["name"], playTime: row["playTime"], subdomain: row["subdomain"], usersOwned: row["usersOwned"],
-        weight: row["averageWeight"], yearPublished: row["yearPublished"], isExpansion: expansionData.isExpansion(row["bggid"]) };
+function extractGameData(row: RawGameData, expansionData: ExpansionData): GameData {
+    const e = expansionData.isExpansion(row["bggid"])
+    return { bggid: row["bggid"], usersOwned: row["usersOwned"],
+        bggRanking: row["rank"], rk: row["rank"], bggRating: row["average"], rt: row["average"],
+        minPlayers: row["minPlayers"], min: row["minPlayers"], maxPlayers: row["maxPlayers"], max: row["maxPlayers"],
+        name: row["name"], n: row["name"], playTime: row["playTime"], pt: row["playTime"],
+        subdomain: row["subdomain"],sub: row["subdomain"],
+        weight: row["averageWeight"], w: row["averageWeight"], yearPublished: row["yearPublished"], yp: row["yearPublished"],
+        isExpansion: e, e };
 }
 
 function extractGameDataShort(row: RawGameData, expansionData: ExpansionData): GameDataShort {

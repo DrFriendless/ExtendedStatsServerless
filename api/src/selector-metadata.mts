@@ -1,4 +1,4 @@
-import {SelectorMetadata} from "./api-interfaces.mjs";
+import {SelectorMetadata} from "export";
 
 export class SelectorMetadataSet {
     metadata: { [bggid: string]: SelectorMetadata } = {};
