@@ -57,6 +57,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_geeklist`, handler: "geeklist.downloader", route: "geeklist", method: "POST", pp: "public" },
     { name: `${COMPONENT}_recommendations`, handler: "functions.getRecommendations", route: "recommendations", method: "POST" },
     { name: `${COMPONENT}_hotness`, handler: "functions.getHotness", route: "hotness", method: "GET" },
+    { name: `${COMPONENT}_designers`, handler: "designers.getDesigners", route: "designers", method: "GET" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [

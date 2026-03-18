@@ -354,3 +354,23 @@ export interface UserData {
     lastLogin: Date | undefined;
     loginCount: number;
 }
+
+export interface DesignerGameResult {
+    bggid: number;
+    name: string;
+    bggRating: number;
+    bggRanking: number;
+    rating: number;
+    owned: boolean;
+    prevOwned: boolean;
+    wtb: boolean;
+    wtp: boolean;
+    wit: boolean;
+}
+
+export interface DesignerResult {
+    bggid: number;
+    score: number;
+    name: string;
+    games?: DesignerGameResult[];
+}

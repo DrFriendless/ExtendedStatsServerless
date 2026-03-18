@@ -17,6 +17,7 @@ success=$?
 if [ $success -eq 0 ]; then
     zip -q api.zip -j dist/*
     zip -q api.zip -r node_modules/*
+    echo Successfully build lambda code
     echo Now you should probably do ./deploy.sh
 else
     echo Build failed, not proceeding.

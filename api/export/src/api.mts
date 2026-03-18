@@ -3,7 +3,7 @@ import {
     BlogComment,
     Collection,
     CollectionWithMonthlyPlays,
-    CollectionWithPlays,
+    CollectionWithPlays, DesignerResult,
     DisambiguationData,
     FAQCount,
     GeekGameQuery,
@@ -341,10 +341,18 @@ export class ExtstatsApi {
     async getHotness(geek: string, year: number): Promise<Hotness> {
         return (await (await fetch(`${this.baseUrl}/hotness?geek=${geek}&year=${year}`, {
             headers: {
-                "Accept": "application/json",
                 "Content-Type": "application/json"
             },
             method: "GET"
         })).json()) as Hotness;
+    }
+
+    async getDesignerInfo(geek: string): Promise<DesignerResult[]> {
+        return (await (await fetch(`${this.baseUrl}/designers?geek=${geek}`, {
+            headers: {
+                "Content-Type": "application/json"
+            },
+            method: "GET"
+        })).json()) as DesignerResult[];
     }
 }
