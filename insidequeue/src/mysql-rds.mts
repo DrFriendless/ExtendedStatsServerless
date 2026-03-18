@@ -283,9 +283,12 @@ export async function doUpdateProcessUserResult(conn: mysql.Connection, geek: st
 }
 
 export async function doProcessDesignerResult(conn: mysql.Connection, data: ProcessDesignerResult): Promise<void> {
-    const sql = "update designers set name = ? where bggid = ?";
-    await conn.query(sql, [ data.name, data.bggid ]);
-    await doMarkUrlProcessedNoUpdate(conn, "processDesigner", data.url);
+    const importanceSql = "select count(game) g from game_designers where designer = ?";
+    const importanceResult = await conn.query(importanceSql, [ data.bggid ]);
+    const importance = importanceResult[0].g;
+    const sql = "update designers set name = ?, importance = ? where bggid = ?";
+    await conn.query(sql, [ data.name, importance, data.bggid ]);
+    await doMarkUrlProcessed(conn, "processDesigner", data.url);
 }
 
 export async function doProcessPublisherResult(conn: mysql.Connection, data: ProcessPublisherResult): Promise<void> {
@@ -330,9 +333,18 @@ async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: numbe
 }
 
 // longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
-const TILL_NEXT_UPDATE: Record<ProcessMethod, string> = { "processCollection" : "72:00:00", "processMarket" : "72:00:00", "processPlayed" : "72:00:00",
-    "processGame" : "838:00:00", "processTop50" : "72:00:00", "processFrontPage" : "24:00:00", "processUser": "838:00:00",
-    "processPlays": undefined as string, "processDesigner": undefined as string, "processPublisher": undefined as string };
+const TILL_NEXT_UPDATE: Record<ProcessMethod, string> = {
+    "processCollection" : "72:00:00",
+    "processMarket" : "72:00:00",
+    "processPlayed" : "72:00:00",
+    "processGame" : "838:00:00",
+    "processTop50" : "72:00:00",
+    "processFrontPage" : "24:00:00",
+    "processUser": "838:00:00",
+    "processPlays": undefined as string,
+    "processDesigner": "838:00:00",
+    "processPublisher": undefined as string
+};
 
 function about3Days(): string {
     const minutes = 3600 + Math.floor(Math.random() * 1440);
@@ -878,7 +890,7 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
 }
 
 export async function doSetGeekPlaysForYear(conn: mysql.Connection, geekId: number, startYmdInc: string, endYmdInc: string,
-                                             plays: PlayDataResult[], notGames: number[], playsMonths: { y: number, m: number }[]) {
+                                            plays: PlayDataResult[], notGames: number[], playsMonths: { y: number, m: number }[]) {
     const s = splitYmd(startYmdInc);
     const e = splitYmd(endYmdInc);
     const deleteSql = "delete from plays where geek = ? and (year > ? || (year = ? and month >= ?)) and (year < ? || (year = ? and month <= ?))";
