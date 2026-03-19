@@ -366,6 +366,7 @@ export interface DesignerGameResult {
     wtb: boolean;
     wtp: boolean;
     wit: boolean;
+    plays: number;
 }
 
 export interface DesignerResult {

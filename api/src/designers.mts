@@ -17,8 +17,6 @@ export async function getDesigners(event: APIGatewayProxyEvent): Promise<HttpRes
         }
     }
 
-
-
     return await system.asyncReturnWithConnection(async conn => {
         const geekid = await getGeekId(conn, geek);
         // all designers that might be relevant
@@ -35,8 +33,10 @@ export async function getDesigners(event: APIGatewayProxyEvent): Promise<HttpRes
             designersForGames[row.bggid.toString()] = v;
         });
         // add one point per play
-        const playsSql = "select game bggid,sum(quantity) q from plays_normalised where geek = ? group by game";
+        const playsSql = "select game bggid,sum(quantity) q from plays_normalised where geek = ? and expansion_play = 0 group by game";
         const playsData = await conn.query(playsSql, [geekid]) as { bggid: number, q: number }[];
+        const playsIndex = makeIndex(playsData);
+        console.log(JSON.stringify(playsIndex));
         playsData.forEach(row => {
             const g= designersForGames[row.bggid.toString()];
             if (g) {
@@ -68,7 +68,7 @@ export async function getDesigners(event: APIGatewayProxyEvent): Promise<HttpRes
            }
         });
         // gather game data
-        const gameSql = "select bggid, name, average bggRating, `rank` bggRanking from games where bggid in (?)";
+        const gameSql = "select bggid, name, average bggRating, `rank` bggRanking from games where bggid in (?) and bggid not in (select expansion from expansions)";
         const gameData = await conn.query(gameSql, [resultGames]) as { bggid: number, name: string, bggRating: number, bggRanking: number }[];
         const gameDataIndex = makeIndex(gameData);
         const geekGameSql = "select game bggid, rating, owned, prevowned, wanttobuy wtb, wanttoplay wtp, want wit from geekgames where geekid = ? and game in (?)";
@@ -98,7 +98,7 @@ export async function getDesigners(event: APIGatewayProxyEvent): Promise<HttpRes
                   const designer = designerIndex[d.toString()];
                   if (designer) {
                       const gs = designer.games || [];
-                      gs.push({...g, ...rgg});
+                      gs.push({...g, ...rgg, plays: playsIndex[g.bggid]?.q || 0});
                       designer.games = gs;
                   }
                });
