@@ -75,16 +75,6 @@ export interface ExpansionPlay {
     baseplay: number;
 }
 
-export interface AllPlaysQueryResult {
-    game: number;
-    x: number;
-    q: number;
-    mi: number;
-    ma: number;
-    years: number;
-    months: number;
-}
-
 export interface MonthlyPlaysQueryResult {
     game: number;
     x: number;
@@ -98,13 +88,6 @@ export interface MonthlyCountsQueryResult {
     year: number;
     month: number;
     dates: number;
-}
-
-export interface LastYearQueryResult {
-    game: number;
-    x: number;
-    q: number;
-    months: number;
 }
 
 export interface ProcessMethodCount {
@@ -214,13 +197,6 @@ export interface GameDesignersTableRow {
 export interface GamePublishersTableRow {
     publisher: number;
     game: number;
-}
-export interface SelectorMetadata {
-    game: number;
-    colour?: string;
-    owner?: string;
-    player?: string;
-    rater?: string;
 }
 
 export interface ExtendedGeekGame extends GeekGame {

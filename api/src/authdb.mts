@@ -1,4 +1,4 @@
-import {System} from "./system.mjs";
+import {HttpResponse, System} from "./system.mjs";
 import {AuthTableRow, AuthTask, TaskData} from "./interfaces.mjs";
 
 export async function incrementLogin(system: System, username: string): Promise<void> {
@@ -6,9 +6,11 @@ export async function incrementLogin(system: System, username: string): Promise<
     await system.asyncWithConnection(conn => conn.query(sql, [ username ]));
 }
 
-export async function doUpdateUserConfig(system: System, username: string, userConfig: any) {
+export async function doUpdateUserConfig(system: System, username: string, userConfig: any): Promise<undefined | HttpResponse> {
+    const newString = JSON.stringify(userConfig || {});
     const updateSql = "update auth set configuration = ? where username = ?";
-    await system.asyncWithConnection(conn => conn.query(updateSql, [JSON.stringify(userConfig), username]));
+    await system.asyncWithConnection(conn => conn.query(updateSql, [newString, username]));
+    return undefined;
 }
 
 export async function loadAuth(system: System, username: string): Promise<AuthTableRow | undefined> {

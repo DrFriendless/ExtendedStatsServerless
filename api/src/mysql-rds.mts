@@ -1,15 +1,10 @@
-import { count, countTableRows, getGeekId, getGeekIds } from "./library.mjs";
-import {retrieveGeekGames, retrieveGeekIdGames, selectGames} from "./selector.mjs";
+import { count, countTableRows, getGeekId } from "./library.mjs";
+import {retrieveGeekGames, retrieveGeekIdGames} from "./selector.mjs";
 import {
-    AllPlaysQueryResult,
-    ExpansionPlay,
     ExtendedGeekGame,
     FAKE_GEEK_GAME,
-    LastYearQueryResult,
     MonthlyCountsQueryResult,
     MonthlyPlaysQueryResult, MostPlaysRow,
-    NormalisedPlay,
-    PlayWithDate,
     ProcessMethodCount,
     RawGameData
 } from "./interfaces.mjs";
@@ -19,13 +14,12 @@ import {System} from "./system.mjs";
 import {Connection} from "promise-mysql";
 import {
     AmbiguousPlay,
-    Collection,
-    CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationGame, FAQCount, GameData, GameDataShort, GamePlays,
-    GeekGameQuery, GeekSummary,
+    DisambiguationGame, FAQCount, GameData, GameDataShort,
+    GeekSummary,
     MonthlyPlayCount,
     MonthlyPlays,
-    MostPlayedEntry, MultiGeekPlays,
-    NewsItem, PlaysQuery, PlaysWithDate,
+    MostPlayedEntry,
+    NewsItem,
     RankingTableRow, SystemStats, ToProcessSummary, TypeCount, WarTableRow
 } from "export";
 import { ExpansionData } from "extstats-core";
@@ -61,11 +55,11 @@ export async function patchGeekData(conn: Connection, rows: MostPlaysRow[], geek
     });
 }
 
-export async function rankGames(system: System, query: object): Promise<RankingTableRow[]> {
-    return await system.asyncReturnWithConnection(async conn => await doRankGames(conn, query));
+export async function rankGames(system: System): Promise<RankingTableRow[]> {
+    return await system.asyncReturnWithConnection(async conn => await doRankGames(conn));
 }
 
-async function doRankGames(conn: mysql.Connection, query: object): Promise<RankingTableRow[]> {
+async function doRankGames(conn: mysql.Connection): Promise<RankingTableRow[]> {
     const sql = "select game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays, hindex, gindex from ranking_table order by total_ratings desc limit 1000";
     const rows = await conn.query(sql);
     let ranking = 1;
@@ -153,122 +147,83 @@ export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {
     return (await conn.query(sql)).map((it: any) => it as NewsItem);
 }
 
-export async function doQuery(conn: mysql.Connection, query: GeekGameQuery):
-    Promise<Collection | CollectionWithPlays | CollectionWithMonthlyPlays> {
-    const queryResult = await selectGames(conn, query, query.query);
-    const geekGames = queryResult.geekGames.map(gg => gg.bggid);
-    const games = await doRetrieveGames(conn, geekGames);
-    let extra;
-    if (query.extra) {
-        extra = (await selectGames(conn, query, query.extra)).geekGames.map(gg => gg.bggid);
-    }
-    switch (query.format) {
-        case "Collection": {
-            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata.metadata, extra } as Collection;
-        }
-        case "CollectionWithPlays": {
-            const plays = (await getAllPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-            const lastYearPlays = (await getLastYearOfPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-            return { collection: queryResult.geekGames, plays, games, lastYearPlays, metadata: queryResult.metadata.metadata, extra } as CollectionWithPlays;
-        }
-        case "CollectionWithMonthlyPlays": {
-            const plays = (await getMonthlyPlays(conn, query.geek)).filter(gp => geekGames.indexOf(gp.game) >= 0);
-            const counts = (await getMonthlyCounts(conn, query.geek));
-            return { collection: queryResult.geekGames, plays, games, metadata: queryResult.metadata.metadata, extra, counts };
-        }
-        default: {
-            return { collection: queryResult.geekGames, games, metadata: queryResult.metadata.metadata, extra } as Collection;
-        }
-    }
-}
+// type ShellBeRight = { [geek: string]: PlaysWithDate[] };
 
-type ShellBeRight = { [geek: string]: PlaysWithDate[] };
-
-export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): Promise<MultiGeekPlays> {
-    const geeks = query.geeks || [query.geek];
-    const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
-    if (Object.values(geekNameIds).length === 0) {
-        return { geeks: [], plays: {}, collection: [], games: [] };
-    }
-    let where = "geek in (?)";
-    const args: any[] = [ Object.keys(geekNameIds).map(s => parseInt(s)) ];
-    if (Object.keys(geekNameIds).length === 1) {
-        where = "geek = ?";
-        args[0] = parseInt(Object.keys(geekNameIds)[0]);
-    }
-    if (typeof query.year !== "undefined") {
-        where += " and year = ?";
-        args.push(query.year);
-    }
-    if (typeof query.month !== "undefined") {
-        where += " and month = ?";
-        args.push(query.month);
-    }
-    if (typeof query.date !== "undefined") {
-        where += " and date = ?";
-        args.push(query.date);
-    }
-    const filterTags = (query.filter || "").split(" ");
-    const first = filterTags.indexOf("first") >= 0;
-    const ymd = filterTags.indexOf("ymd") >= 0;
-    if (first) where += " order by ymd asc";
-    const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
-    const playsResult = await conn.query(playsSql, args) as NormalisedPlay[];
-    const expPlays: ExpansionPlay[] = [];
-    const basePlays: { [geek: string]: object[] } = {};
-    const playsById: Record<number, PlayWithDate> = {};
-    const gameIds: number[] = [];
-    const firstKeys: string[] = [];
-    for (const row of playsResult) {
-        if (gameIds.indexOf(row.game) < 0) gameIds.push(row.game);
-        if (first) {
-            const firstKey = `${row.game}-${row.geek}`;
-            if (firstKeys.indexOf(firstKey) >= 0) continue;
-            firstKeys.push(firstKey);
-        }
-        if (row["expansion_play"]) {
-            expPlays.push({...row, baseplay: undefined});
-        } else {
-            const pwd: PlayWithDate = { game: row.game, quantity: row.quantity, location: row.location || "" };
-            if (ymd) {
-                pwd['ymd'] = row.ymd;
-            } else {
-                pwd['year'] = row.year;
-                pwd['month'] = row.month;
-                pwd['date'] = row.date;
-            }
-            const username = geekNameIds[row.geek];
-            if (!username) {
-                console.log("No user found for " + row.geek);
-                continue;
-            }
-            if (!basePlays.hasOwnProperty(username)) basePlays[username] = [];
-            basePlays[username].push(pwd);
-            playsById[row.id] = pwd;
-        }
-    }
-    for (const ep of expPlays) {
-        const pwd = playsById[ep.baseplay];
-        if (!pwd) {
-            console.log("No base play " + ep.baseplay + " found");
-            continue;
-        }
-        if (!pwd.expansions) pwd.expansions = [];
-        pwd.expansions.push(ep.game);
-    }
-    const games = await doRetrieveGames(conn, gameIds);
-    return { geeks: Object.values(geekNameIds), plays: basePlays as ShellBeRight, collection: [], games };
-}
-
-async function getAllPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
-    const playsSql = "select game, sum(quantity) q, max(expansion_play) x, min(year * 10000 + month * 100 + date) mi, max(year * 10000 + month * 100 + date) ma, count(distinct year) years, count(distinct year*100+month) months from plays_normalised where geek = ? group by game";
-    const geekId = await getGeekId(conn, geek);
-    const rows = await conn.query(playsSql, [geekId]) as AllPlaysQueryResult[];
-    return rows.map(row => {
-        return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], firstPlay: row["mi"], lastPlay: row["ma"],
-            distinctMonths: row["months"], distinctYears: row["years"]} as GamePlays;
-    });
-}
+// export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): Promise<MultiGeekPlays> {
+//     const geeks = query.geeks || [query.geek];
+//     const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
+//     if (Object.values(geekNameIds).length === 0) {
+//         return { geeks: [], plays: {}, collection: [], games: [] };
+//     }
+//     let where = "geek in (?)";
+//     const args: any[] = [ Object.keys(geekNameIds).map(s => parseInt(s)) ];
+//     if (Object.keys(geekNameIds).length === 1) {
+//         where = "geek = ?";
+//         args[0] = parseInt(Object.keys(geekNameIds)[0]);
+//     }
+//     if (typeof query.year !== "undefined") {
+//         where += " and year = ?";
+//         args.push(query.year);
+//     }
+//     if (typeof query.month !== "undefined") {
+//         where += " and month = ?";
+//         args.push(query.month);
+//     }
+//     if (typeof query.date !== "undefined") {
+//         where += " and date = ?";
+//         args.push(query.date);
+//     }
+//     const filterTags = (query.filter || "").split(" ");
+//     const first = filterTags.indexOf("first") >= 0;
+//     const ymd = filterTags.indexOf("ymd") >= 0;
+//     if (first) where += " order by ymd asc";
+//     const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
+//     const playsResult = await conn.query(playsSql, args) as NormalisedPlay[];
+//     const expPlays: ExpansionPlay[] = [];
+//     const basePlays: { [geek: string]: object[] } = {};
+//     const playsById: Record<number, PlayWithDate> = {};
+//     const gameIds: number[] = [];
+//     const firstKeys: string[] = [];
+//     for (const row of playsResult) {
+//         if (gameIds.indexOf(row.game) < 0) gameIds.push(row.game);
+//         if (first) {
+//             const firstKey = `${row.game}-${row.geek}`;
+//             if (firstKeys.indexOf(firstKey) >= 0) continue;
+//             firstKeys.push(firstKey);
+//         }
+//         if (row["expansion_play"]) {
+//             expPlays.push({...row, baseplay: undefined});
+//         } else {
+//             const pwd: PlayWithDate = { game: row.game, quantity: row.quantity, location: row.location || "" };
+//             if (ymd) {
+//                 pwd['ymd'] = row.ymd;
+//             } else {
+//                 pwd['year'] = row.year;
+//                 pwd['month'] = row.month;
+//                 pwd['date'] = row.date;
+//             }
+//             const username = geekNameIds[row.geek];
+//             if (!username) {
+//                 console.log("No user found for " + row.geek);
+//                 continue;
+//             }
+//             if (!basePlays.hasOwnProperty(username)) basePlays[username] = [];
+//             basePlays[username].push(pwd);
+//             playsById[row.id] = pwd;
+//         }
+//     }
+//     for (const ep of expPlays) {
+//         const pwd = playsById[ep.baseplay];
+//         if (!pwd) {
+//             console.log("No base play " + ep.baseplay + " found");
+//             continue;
+//         }
+//         if (!pwd.expansions) pwd.expansions = [];
+//         pwd.expansions.push(ep.game);
+//     }
+//     const games = await doRetrieveGames(conn, gameIds);
+//     return { geeks: Object.values(geekNameIds), plays: basePlays as ShellBeRight, collection: [], games };
+// }
 
 export async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<MonthlyPlays[]> {
     const playsSql = "select game, sum(quantity) q, year, month, max(expansion_play) x from plays_normalised where geek = ? group by game, year, month";
@@ -287,17 +242,6 @@ export async function getMonthlyCounts(conn: mysql.Connection, geek: string): Pr
         .map((row: MonthlyCountsQueryResult) => {
             return { year: row["year"], month: row["month"], count: row["dates"] };
         });
-}
-
-async function getLastYearOfPlays(conn: mysql.Connection, geek: string): Promise<GamePlays[]> {
-    const now = new Date();
-    const today = now.getFullYear() * 10000 + now.getMonth() * 100 + now.getDate();
-    const playsSql = "select game, sum(quantity) q, max(expansion_play) x, count(month) months from plays_normalised where geek = ? and ? - (year * 10000 + month * 100 + date) < 10000  group by game";
-    const geekId = await getGeekId(conn, geek);
-    const rows = await conn.query(playsSql, [geekId, today]);
-    return rows.map((row: LastYearQueryResult) => {
-        return { game: row["game"], expansion: row["x"] > 0, plays: row["q"], distinctMonths: row["months"], distinctYears: 0 } as GamePlays;
-    });
 }
 
 export async function gatherSystemStats(system: System): Promise<SystemStats> {

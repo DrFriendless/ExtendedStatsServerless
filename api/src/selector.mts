@@ -1,23 +1,20 @@
 import mysql = require('promise-mysql');
-import { Arg, Argument, Expression, Integer, Keyword, parse, StringValue } from "./parser.mjs";
-import { getGeekId } from "./library.mjs";
-import {VarBinding, VarBindings} from "./varbindings.mjs";
-import {
-    GameDesignersTableRow, GamePublishersTableRow,
-    GeekGameRow,
-    GeekGamesTableRow
-} from "./interfaces.mjs";
+import {Arg, Argument, Expression, Integer, Keyword, StringValue} from "./parser.mjs";
+import {getGeekId} from "./library.mjs";
+import {VarBindings} from "./varbindings.mjs";
+import {GameDesignersTableRow, GamePublishersTableRow, GeekGameRow, GeekGamesTableRow} from "./interfaces.mjs";
 import {SelectorMetadataSet} from "./selector-metadata.mjs";
-import {GeekGameQuery} from "export";
-
-export async function selectGames(conn: mysql.Connection, query: GeekGameQuery, q: string): Promise<GeekGameSelectResult> {
-    const expr = parse(q);
-    return await evaluate(conn, expr, query);
-}
 
 async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars: VarBindings, metadata: SelectorMetadataSet):
     Promise<number[]> {
     switch (expr.func) {
+        case "ids": {
+            const result: number[] = [];
+            for (const arg of expr.args) {
+                if (arg.kind === Argument.Integer) result.push((arg as Integer).value);
+            }
+            return result;
+        }
         case "all": {
             const args = [] as number[][];
             for (const arg of expr.args) {
@@ -124,6 +121,19 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
         case "books" : {
             return await selectCategory(conn, "Book");
         }
+        case "tagged": {
+            if (!vars.hasUserData()) return [];
+            const userConfig = vars.getUserConfig();
+            const ts4gs: Record<string, string[]> = userConfig.get("tagalogue.tagsbygame", {});
+            const taggedIds: number[] = [];
+            for (const key in ts4gs) {
+                const v = ts4gs[key];
+                if (v && v.length > 0) {
+                    taggedIds.push(parseInt(key));
+                }
+            }
+            return taggedIds;
+        }
         case "category" : {
             const cat = getStringFromArgs(expr.args[0] as Arg, vars);
             return await selectCategory(conn, cat);
@@ -207,15 +217,6 @@ function evaluateSimpleArg(arg: Arg, vars: VarBindings): string | number {
             throw new Error("Can't evaluate " + arg);
         }
     }
-}
-
-async function evaluate(conn: mysql.Connection, expr: Expression, query: GeekGameQuery): Promise<GeekGameSelectResult> {
-    const vars: VarBinding[] = [ { name: 'ME', value: query.geek }];
-    if (query.vars.MONTH) vars.push({ name: "MONTH", value: query.vars.MONTH.toString() });
-    if (query.vars.RATING) vars.push({ name: "RATING", value: query.vars.RATING.toString() });
-    if (query.vars.THEM) vars.push({ name: "THEM", value: query.vars.THEM.toString() });
-    if (query.vars.YEAR) vars.push({ name: "YEAR", value: query.vars.YEAR.toString() });
-    return evaluateSimple(conn, expr, new VarBindings(vars));
 }
 
 /**

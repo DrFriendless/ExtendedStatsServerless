@@ -1,5 +1,4 @@
 import * as graphql from "graphql";
-import { APIGatewayProxyEvent } from "aws-lambda";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
 import {
@@ -8,7 +7,7 @@ import {
     getMonthlyCounts,
     getMonthlyPlays
 } from "./mysql-rds.mjs";
-import {getGeekId, getGeekIds} from "./library.mjs";
+import {getCookiesFromEvent, getGeekId, getGeekIds} from "./library.mjs";
 import { parse } from "./parser.mjs";
 import {evaluateSimple, evaluateSimpleGames, GeekGameSelectResult, retrieveGeekGames} from "./selector.mjs";
 import {VarBindings} from "./varbindings.mjs";
@@ -25,6 +24,8 @@ import {
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 import {GameData, MonthlyPlayCount, MonthlyPlays, PlaysWithDate} from "export";
 import {SelectorMetadataSet} from "./selector-metadata.mjs";
+import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
+import {loadAuth} from "./authdb.mjs";
 
 class GameDataShort {
 }
@@ -33,6 +34,12 @@ interface Loaders {
     system: System;
     games: DataLoader<number, GameData>;
     gamesShort: DataLoader<number, GameDataShort>;
+}
+
+// authenticated user
+export interface UserData {
+    user: string;
+    data: any;
 }
 
 function createLoaders(system: System): Loaders {
@@ -343,7 +350,7 @@ function buildShortMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: Gra
     });
 }
 
-function buildSchema(loaders: Loaders) {
+function buildSchema(loaders: Loaders, userData: UserData | undefined) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
     const gameDataTypeShort: GraphQLObjectType<GameDataShort> = buildGameDataTypeShort(loaders);
     const geekGameType: GraphQLObjectType<ExtendedGeekGame> = buildGeekGameType(loaders, gameDataType);
@@ -387,12 +394,12 @@ function buildSchema(loaders: Loaders) {
                                 // fill in fake GG information
                                 return games.map(async bggid => {
                                     const gg = index[bggid.toString()];
-                                    return gg ? gg : { 
+                                    return gg ? gg : {
                                         geek: args.geek,
                                         geekid,
                                         bggid,
                                         ...FAKE_GEEK_GAME,
-                                        game: gi[bggid], 
+                                        game: gi[bggid],
                                     }
                                 })
                             }
@@ -421,7 +428,7 @@ function buildSchema(loaders: Loaders) {
                     type: new graphql.GraphQLList(gameDataType!),
                     resolve: async (parent: unknown, args) => {
                         return await loaders.system.asyncReturnWithConnection(
-                            async conn => gamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars))
+                            async conn => gamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData))
                         );
                     }
                 },
@@ -433,7 +440,7 @@ function buildSchema(loaders: Loaders) {
                     type: buildGeekGamesType(gameDataType, geekGameType),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
-                            async conn => geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars)))
+                            async conn => geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData)))
                 },
                 geekgames2: {
                     args: {
@@ -443,7 +450,7 @@ function buildSchema(loaders: Loaders) {
                     type: buildGeekGamesTypeShort(gameDataTypeShort, geekGameTypeShort),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
-                            async conn => shorten2(await geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars))))
+                            async conn => shorten2(await geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData))))
                 },
                 years: {
                     args: {
@@ -462,7 +469,7 @@ function buildSchema(loaders: Loaders) {
                     type: buildMonthlyPlaysAndCountsType(loaders, gameDataType, geekGameType),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
-                            async conn => monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars)))
+                            async conn => monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData)))
                 },
                 monthly2: {
                     args: {
@@ -472,7 +479,7 @@ function buildSchema(loaders: Loaders) {
                     type: buildShortMonthlyPlaysAndCountsType(loaders, gameDataTypeShort, geekGameTypeShort),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
-                            async conn => shorten(await monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars))))
+                            async conn => shorten(await monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData))))
                 }
             }
         })
@@ -767,23 +774,43 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
     return { geeks: Object.values<string>(geekNameIds), plays: basePlays, games, geekgames };
 }
 
-export async function retrieve(event: APIGatewayProxyEvent): Promise<HttpResponse | object> {
+export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | object> {
     console.log(JSON.stringify(event));
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     const loaders = createLoaders(system);
-    // handle empty query for CORS
-    const result = event.queryStringParameters.query ? await graphql.graphql({
-        schema: buildSchema(loaders),
-        source: event.queryStringParameters['query'] }
-    ) : {};
-    if (result.errors) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify(result.errors)
+    if (event.queryStringParameters.query) {
+        // normal query
+        // give the selectors access to the authenticated user's private data
+        let userData: UserData | undefined = undefined;
+        const cookies = getCookiesFromEvent(event);
+        if (cookies['extstatsid']) {
+            const user = cookies['extstatsid'];
+            console.log(`User is ${user}`);
+            const sData: string = (await loadAuth(system, user))?.configuration || "{}";
+            userData = { user, data: JSON.parse(sData) };
         }
+        const schema = buildSchema(loaders, userData);
+        const result = await graphql.graphql({
+                schema,
+                source: event.queryStringParameters['query']
+            }
+        );
+        if (result.errors) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify(result.errors)
+            }
+        } else {
+            return {
+                statusCode: 200,
+                body: JSON.stringify(result.data)
+            }
+        }
+    } else {
+        // CORS
+        return {statusCode: 200, body: "" }
     }
-    return {statusCode: 200, body: JSON.stringify(result.data)};
 }
 
 async function batchGetGames(system: System, gameIds: number[]): Promise<GameData[]> {

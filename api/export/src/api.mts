@@ -1,18 +1,13 @@
 import {
     AuthResult,
     BlogComment,
-    Collection,
-    CollectionWithMonthlyPlays,
-    CollectionWithPlays, DesignerResult,
+    DesignerResult,
     DisambiguationData,
     FAQCount,
-    GeekGameQuery,
     GeeklistCheck,
     GeekSummary,
     Hotness,
-    MultiGeekPlays,
     NewsItem,
-    PlaysQuery,
     ProcessedRecRow,
     RankingTableRow,
     SystemStats,
@@ -111,27 +106,16 @@ export class ExtstatsApi {
         })).json()) as FAQCount[];
     }
 
-    async query(query: GeekGameQuery): Promise<Collection | CollectionWithPlays | CollectionWithMonthlyPlays> {
-        return (await (await fetch(`${this.baseUrl}/query`, {
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
-            body: JSON.stringify(query),
-            method: "POST"
-        })).json()) as Collection | CollectionWithPlays | CollectionWithMonthlyPlays;
-    }
-
-    async plays(query: PlaysQuery): Promise<MultiGeekPlays> {
-        return (await (await fetch(`${this.baseUrl}/plays`, {
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-            body: JSON.stringify(query),
-            method: "POST"
-        })).json()) as MultiGeekPlays;
-    }
+    // async plays(query: PlaysQuery): Promise<MultiGeekPlays> {
+    //     return (await (await fetch(`${this.baseUrl}/plays`, {
+    //         headers: {
+    //             "Content-Type": "application/json",
+    //             "Accept": "application/json",
+    //         },
+    //         body: JSON.stringify(query),
+    //         method: "POST"
+    //     })).json()) as MultiGeekPlays;
+    // }
 
     async retrieve(query: string): Promise<object> {
         return (await (await fetch(`${this.baseUrl}/retrieve?query=${query}`, {
@@ -140,7 +124,7 @@ export class ExtstatsApi {
                 "Accept": "application/json"
             },
             method: "GET"
-        })).json()) as MultiGeekPlays;
+        })).json()) as object;
     }
 
     async findGeeks(fragment: string): Promise<string[]> {

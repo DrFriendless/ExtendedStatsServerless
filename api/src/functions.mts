@@ -1,8 +1,6 @@
 import {
     doGetNews,
-    doQuery,
     gatherGeekSummary,
-    doPlaysQuery,
     gatherGeekUpdates,
     gatherSystemStats,
     listUsers,
@@ -19,11 +17,11 @@ import {getCookiesFromEvent, getGeekId} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {MostPlaysRow} from "./interfaces.mjs";
 import {
-    Collection, CollectionWithMonthlyPlays, CollectionWithPlays, DisambiguationData,
-    FAQCount, GeekGameQuery,
+    DisambiguationData,
+    FAQCount,
     GeekSummary,
     Hotness,
-    MostPlayedEntry, MultiGeekPlays, NewsItem, PlaysQuery, RankingTableRow,
+    MostPlayedEntry, NewsItem, RankingTableRow,
     SystemStats,
     ToProcessSummary,
     WarTableRow
@@ -136,32 +134,17 @@ export async function getWarTable(ignored: APIGatewayProxyEvent): Promise<HttpRe
     }
 }
 
-export async function query(event: APIGatewayProxyEvent): Promise<Collection | CollectionWithPlays | CollectionWithMonthlyPlays | HttpResponse> {
-    if (event && event.body) {
-        const query = JSON.parse(event.body) as GeekGameQuery;
-        const system = await findSystem("private");
-        if (isHttpResponse(system)) return system;
-        await system.incrementApiCounter();
-        return await system.asyncReturnWithConnection(async conn => await doQuery(conn, query));
-    } else {
-        return {
-            statusCode: 400,
-            body: "No query found"
-        };
-    }
-}
-
-export async function plays(event: APIGatewayProxyEvent): Promise<MultiGeekPlays | HttpResponse> {
-    if (event && event.body) {
-        const query = JSON.parse(event.body) as PlaysQuery;
-        const system = await findSystem("private");
-        if (isHttpResponse(system)) return system;
-        await system.incrementApiCounter();
-        return await system.asyncReturnWithConnection(async conn => await doPlaysQuery(conn, query));
-    } else {
-        return undefined;
-    }
-}
+// export async function plays(event: APIGatewayProxyEvent): Promise<MultiGeekPlays | HttpResponse> {
+//     if (event && event.body) {
+//         const query = JSON.parse(event.body) as PlaysQuery;
+//         const system = await findSystem("private");
+//         if (isHttpResponse(system)) return system;
+//         await system.incrementApiCounter();
+//         return await system.asyncReturnWithConnection(async conn => await doPlaysQuery(conn, query));
+//     } else {
+//         return undefined;
+//     }
+// }
 
 export async function getNews(event: APIGatewayProxyEvent): Promise<NewsItem[] | HttpResponse> {
     const system = await findSystem("private");
@@ -173,11 +156,10 @@ export async function getNews(event: APIGatewayProxyEvent): Promise<NewsItem[] |
 export async function getRankings(event: any): Promise<RankingTableRow[] | HttpResponse> {
     console.log(event);
     if (event) {
-        const query = {}; // TODO
         const system = await findSystem("private");
         if (isHttpResponse(system)) return system;
         await system.incrementApiCounter();
-        return await rankGames(system, query);
+        return await rankGames(system);
     } else {
         return [];
     }

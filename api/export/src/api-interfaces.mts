@@ -183,53 +183,6 @@ export interface DisambiguationData {
     plays: AmbiguousPlay[];
 }
 
-export interface Collection {
-    collection: GeekGame[];
-    games: GameData[];
-    metadata?: { [bggid: string]: SelectorMetadata };
-    extra?: number[];
-}
-
-export interface CollectionWithPlays extends Collection {
-    plays: GamePlays[];
-    lastYearPlays: GamePlays[];
-}
-
-export interface CollectionWithMonthlyPlays extends Collection {
-    plays: MonthlyPlays[];
-    counts: MonthlyPlayCount[];
-}
-
-export interface MultiGeekPlays extends Collection {
-    geeks: string[];
-    plays: {
-        [geek: string]: PlaysWithDate[];
-    };
-}
-
-export interface PlaysQuery {
-    geek: string;
-    geeks?: string[];
-    year?: number;
-    month?: number;
-    date?: number;
-    filter?: string;
-}
-
-export interface GeekGameQuery {
-    geek: string;
-    geeks?: string[];
-    query: string;
-    extra?: string;
-    format: string;
-    vars: {
-        THEM?: string;
-        YEAR?: number;
-        RATING?: number;
-        MONTH?: number;
-    };
-}
-
 export interface ToProcessSummary {
     lastUpdate: any;
     nextUpdate: any;
@@ -286,16 +239,6 @@ export interface GameData {
     w: number;
     isExpansion: boolean;
     e: boolean;
-}
-
-export interface GamePlays {
-    game: number;
-    plays: number;
-    expansion: boolean;
-    firstPlay?: number;
-    lastPlay?: number;
-    distinctYears: number;
-    distinctMonths: number;
 }
 
 export interface MonthlyPlays {

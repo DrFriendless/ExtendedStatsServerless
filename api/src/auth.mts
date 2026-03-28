@@ -206,7 +206,8 @@ export async function updatePersonal(event: APIGatewayProxyEventV2WithRequestCon
     const cookies = getCookiesFromEvent(event);
     console.log(cookies);
     if (cookies['extstatsid']) {
-        await doUpdateUserConfig(system, cookies['extstatsid'], JSON.parse(event.body || "{}"));
+        const resp = await doUpdateUserConfig(system, cookies['extstatsid'], JSON.parse(event.body || "{}"));
+        if (resp) return resp;
         return { statusCode: 200 };
     } else {
         return { statusCode: 403 };
