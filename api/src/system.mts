@@ -60,7 +60,8 @@ export class System {
             host: this.mysqlHost,
             user: this.mysqlUsername,
             password: this.mysqlPassword,
-            database: this.mysqlDatabase
+            database: this.mysqlDatabase,
+            charset: 'utf8mb4'
         };
         return mysql.createConnection(params);
     }
