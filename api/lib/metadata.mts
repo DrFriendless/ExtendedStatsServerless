@@ -13,6 +13,7 @@ export interface LambdaSpec {
     route: string;
     method: "GET" | "POST";
     pp?: PUBLIC_PRIVATE;
+    memSize?: number;
 }
 
 export interface LambdaOnlySpec {
@@ -38,7 +39,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_updateOld`, handler: "functions.updateOld", route: "updateOld", method: "POST" },
     { name: `${COMPONENT}_incFAQCount`, handler: "functions.incFAQCount", route: "incFAQCount", method: "POST" },
     { name: `${COMPONENT}_plays`, handler: "functions.plays", route: "plays", method: "POST" },
-    { name: `${COMPONENT}_retrieve`, handler: "retrieve.retrieve", route: "retrieve", method: "GET" },
+    { name: `${COMPONENT}_retrieve`, handler: "retrieve.retrieve", route: "retrieve", method: "GET", memSize: 256 },
     { name: `${COMPONENT}_login`, handler: "auth.login", route: "login", method: "POST" },
     { name: `${COMPONENT}_logout`, handler: "auth.logout", route: "logout", method: "POST" },
     { name: `${COMPONENT}_signup`, handler: "auth.signup", route: "signup", method: "POST" },
@@ -57,6 +58,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_recommendations`, handler: "functions.getRecommendations", route: "recommendations", method: "POST" },
     { name: `${COMPONENT}_hotness`, handler: "functions.getHotness", route: "hotness", method: "GET" },
     { name: `${COMPONENT}_designers`, handler: "designers.getDesigners", route: "designers", method: "GET" },
+    { name: `${COMPONENT}_catalistMetadata`, handler: "functions.getCatalistMetadata", route: "catalistMetadata", method: "GET" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [
@@ -70,5 +72,6 @@ export const OTHER_LAMBDA_NAMES: string[] = [
 
 export const EXPRESS_SPECS: ExpressSpec[] = [
     { key: "findgeeks", route: "findgeeks",  method: "GET" },
+    { key: "finddesigners", route: "finddesigners",  method: "GET" },
     { key: "count", route: "count",  method: "POST" },
 ];

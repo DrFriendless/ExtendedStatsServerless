@@ -1,6 +1,6 @@
 import {
     AuthResult,
-    BlogComment,
+    BlogComment, Designer,
     DesignerResult,
     DisambiguationData,
     FAQCount,
@@ -129,6 +129,10 @@ export class ExtstatsApi {
 
     async findGeeks(fragment: string): Promise<string[]> {
         return (await (await fetch(`${this.baseUrl}/findgeeks?fragment=${fragment}`)).json()) as string[];
+    }
+
+    async findDesigners(fragment: string): Promise<Designer[]> {
+        return (await (await fetch(`${this.baseUrl}/finddesigners?fragment=${fragment}`)).json()) as Designer[];
     }
 
     async signup(username: string, password: string): Promise<AuthResult> {

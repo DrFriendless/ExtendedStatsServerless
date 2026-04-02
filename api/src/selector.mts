@@ -134,6 +134,20 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
             }
             return taggedIds;
         }
+        case "tag": {
+            if (!vars.hasUserData()) return [];
+            const userConfig = vars.getUserConfig();
+            const tag = getStringFromArgs(expr.args[0] as Arg, vars);
+            const ts4gs: Record<string, string[]> = userConfig.get("tagalogue.tagsbygame", {});
+            const taggedIds: number[] = [];
+            for (const key in ts4gs) {
+                const v = ts4gs[key];
+                if (v && v.indexOf(tag) >= 0) {
+                    taggedIds.push(parseInt(key));
+                }
+            }
+            return taggedIds;
+        }
         case "category" : {
             const cat = getStringFromArgs(expr.args[0] as Arg, vars);
             return await selectCategory(conn, cat);

@@ -318,3 +318,14 @@ export interface DesignerResult {
     name: string;
     games?: DesignerGameResult[];
 }
+
+export interface CatalistMetadata {
+    tags: string[];
+    mechanics: string[];
+    categories: string[];
+}
+
+export interface Designer {
+    bggid: number;
+    name: string;
+}

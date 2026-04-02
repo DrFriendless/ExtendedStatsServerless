@@ -7,14 +7,14 @@ import { incrementExpressCounter, returnWithConnectionAsync } from "./library";
  * @param {} res
  */
 export const finddesigners = async (req: Request, res: Response) => {
-    const sql = "select name from designers where LOWER(name) like ? order by 1 limit 10";
+    const sql = "select bggid, name from designers where LOWER(name) like ? order by 1 limit 10";
     const f = (req.query["fragment"] || "").toString();
     const name = f.toLowerCase().replace(/%/g, "");
     console.log(`finddesigners ${name}}`);
     const matches = await returnWithConnectionAsync(async (conn) => {
-        let ms = await conn.query(sql, name + "%");
+        let ms = await conn.query(sql, name + "%") as { bggid: number, name: string }[];
         if (ms.length == 0) ms = await conn.query(sql, "%" + name + "%");
-        return ms.map((row: { [key: string]: any }) => row["name"]);
+        return ms;
     });
     await incrementExpressCounter();
     res.send(matches);

@@ -119,7 +119,8 @@ export class ApiStack extends cdk.Stack {
     });
   }
 
-  defineLambda(scope: Construct, name: string, handler: string, route: string, method: "GET" | "POST", role: iam.IRole, pp: PUBLIC_PRIVATE): lambda.Function {
+  defineLambda(scope: Construct, name: string, handler: string, route: string, method: "GET" | "POST", role: iam.IRole,
+               pp: PUBLIC_PRIVATE, memSize: number): lambda.Function {
     const m = (method === "GET") ? apigw.HttpMethod.GET : apigw.HttpMethod.POST;
     const vpcParams: Partial<lambda.FunctionProps> = {
       allowPublicSubnet: true,
@@ -142,6 +143,7 @@ export class ApiStack extends cdk.Stack {
       role: role,
       code: lambda.Code.fromBucketV2(ZIP_BUCKET,  COMPONENT + ".zip"),
       timeout: Duration.seconds(60),
+      memorySize: memSize,
       ...(pp === "private") ? vpcParams : {}
     });
     Tags.of(f).add("component", COMPONENT);
@@ -337,7 +339,7 @@ export class ApiStack extends cdk.Stack {
     const publicRole = this.definePublicLambdaRole();
     for (const spec of LAMBDA_SPECS) {
       const role = (spec.pp && spec.pp === "public") ? publicRole : apiRole;
-      this.defineLambda(this, spec.name, spec.handler, spec.route, spec.method, role, spec.pp || "private");
+      this.defineLambda(this, spec.name, spec.handler, spec.route, spec.method, role, spec.pp || "private", spec.memSize || 128);
     }
     for (const spec of LAMBDA_ONLY_SPECS) {
       this.defineLambdaOnly(this, spec.name, spec.handler, apiRole);

@@ -17,6 +17,7 @@ import {getCookiesFromEvent, getGeekId} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {MostPlaysRow} from "./interfaces.mjs";
 import {
+    CatalistMetadata,
     DisambiguationData,
     FAQCount,
     GeekSummary,
@@ -27,6 +28,19 @@ import {
     WarTableRow
 } from "export";
 import {ExpansionData} from "extstats-core";
+
+export async function getCatalistMetadata(event: APIGatewayProxyEvent): Promise<HttpResponse | CatalistMetadata> {
+    const system = await findSystem("private");
+    if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter();
+
+    // TODO - put real stuff in here.
+    return {
+        categories: [],
+        mechanics: [],
+        tags: []
+    }
+}
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {
     const system = await findSystem("private");
