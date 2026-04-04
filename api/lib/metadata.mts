@@ -73,5 +73,6 @@ export const OTHER_LAMBDA_NAMES: string[] = [
 export const EXPRESS_SPECS: ExpressSpec[] = [
     { key: "findgeeks", route: "findgeeks",  method: "GET" },
     { key: "finddesigners", route: "finddesigners",  method: "GET" },
+    { key: "findpublishers", route: "findpublishers",  method: "GET" },
     { key: "count", route: "count",  method: "POST" },
 ];

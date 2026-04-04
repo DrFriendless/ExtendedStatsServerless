@@ -8,7 +8,7 @@ import {
     GeekSummary,
     Hotness,
     NewsItem,
-    ProcessedRecRow,
+    ProcessedRecRow, Publisher,
     RankingTableRow,
     SystemStats,
     ToProcessSummary,
@@ -133,6 +133,10 @@ export class ExtstatsApi {
 
     async findDesigners(fragment: string): Promise<Designer[]> {
         return (await (await fetch(`${this.baseUrl}/finddesigners?fragment=${fragment}`)).json()) as Designer[];
+    }
+
+    async findPublishers(fragment: string): Promise<Publisher[]> {
+        return (await (await fetch(`${this.baseUrl}/findpublishers?fragment=${fragment}`)).json()) as Publisher[];
     }
 
     async signup(username: string, password: string): Promise<AuthResult> {

@@ -329,3 +329,8 @@ export interface Designer {
     bggid: number;
     name: string;
 }
+
+export interface Publisher {
+    bggid: number;
+    name: string;
+}

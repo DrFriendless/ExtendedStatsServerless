@@ -13,6 +13,7 @@ dotenv.config({ path: ".env" });
 import * as indexRoute from "./routes/index";
 import * as findGeeksRoute from "./routes/findgeeks";
 import * as findDesignersRoute from "./routes/finddesigners";
+import * as findPublishersRoute from "./routes/findpublishers";
 import * as countersRoute from "./routes/counters";
 
 // Create Express server
@@ -32,6 +33,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/findgeeks", cors(), findGeeksRoute.findgeeks);
 app.get("/finddesigners", cors(), findDesignersRoute.finddesigners);
+app.get("/findpublishers", cors(), findPublishersRoute.findpublishers);
 app.post("/count", cors(), countersRoute.count);
 app.get("/", indexRoute.index);
 

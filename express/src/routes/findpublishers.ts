@@ -1,0 +1,21 @@
+import { Request, Response } from "express";
+import { incrementExpressCounter, returnWithConnectionAsync } from "./library";
+
+/**
+ *
+ * @param {} req
+ * @param {} res
+ */
+export const findpublishers = async (req: Request, res: Response) => {
+    const sql = "select bggid, name from publishers where LOWER(name) like ? order by 1 limit 10";
+    const f = (req.query["fragment"] || "").toString();
+    const name = f.toLowerCase().replace(/%/g, "");
+    console.log(`findpublishers ${name}}`);
+    const matches = await returnWithConnectionAsync(async (conn) => {
+        let ms = await conn.query(sql, name + "%") as { bggid: number, name: string }[];
+        if (ms.length == 0) ms = await conn.query(sql, "%" + name + "%");
+        return ms;
+    });
+    await incrementExpressCounter();
+    res.send(matches);
+};
