@@ -9,7 +9,13 @@ import {
     updateFAQCount,
     markUrlForUpdate,
     markGeekForUpdate,
-    gatherSystemUpdates, getGeekGames, getAmbiguousGames, loadExpansionData, doRetrieveGameNames, patchGeekData
+    gatherSystemUpdates,
+    getGeekGames,
+    getAmbiguousGames,
+    loadExpansionData,
+    doRetrieveGameNames,
+    patchGeekData,
+    listCategoriesAndMechanics
 } from "./mysql-rds.mjs";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
@@ -27,19 +33,30 @@ import {
     ToProcessSummary,
     WarTableRow
 } from "export";
-import {ExpansionData} from "extstats-core";
+import {ExpansionData, UserConfig} from "extstats-core";
+import {loadAuth} from "./authdb.mjs";
 
-export async function getCatalistMetadata(event: APIGatewayProxyEvent): Promise<HttpResponse | CatalistMetadata> {
+export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | CatalistMetadata> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
 
-    // TODO - put real stuff in here.
-    return {
-        categories: [],
-        mechanics: [],
-        tags: []
+    let tags: string[] = [];
+    const cookies = getCookiesFromEvent(event);
+    if (cookies['extstatsid']) {
+        const user = cookies['extstatsid'];
+        const sData: string = (await loadAuth(system, user))?.configuration || "{}";
+        const uc = new UserConfig(JSON.parse(sData));
+        const tagGroups = uc.get("tagalogue.taggroups", []);
+        for (const tg of tagGroups) {
+            for (const t of tg.tags) {
+                if (tags.indexOf(t) < 0) tags.push(t);
+            }
+        }
+        tags.sort();
     }
+    const cm = await listCategoriesAndMechanics(system);
+    return { ...cm, tags };
 }
 
 export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {
@@ -147,18 +164,6 @@ export async function getWarTable(ignored: APIGatewayProxyEvent): Promise<HttpRe
         body: JSON.stringify(rows)
     }
 }
-
-// export async function plays(event: APIGatewayProxyEvent): Promise<MultiGeekPlays | HttpResponse> {
-//     if (event && event.body) {
-//         const query = JSON.parse(event.body) as PlaysQuery;
-//         const system = await findSystem("private");
-//         if (isHttpResponse(system)) return system;
-//         await system.incrementApiCounter();
-//         return await system.asyncReturnWithConnection(async conn => await doPlaysQuery(conn, query));
-//     } else {
-//         return undefined;
-//     }
-// }
 
 export async function getNews(event: APIGatewayProxyEvent): Promise<NewsItem[] | HttpResponse> {
     const system = await findSystem("private");

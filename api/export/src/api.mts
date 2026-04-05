@@ -1,6 +1,6 @@
 import {
     AuthResult,
-    BlogComment, Designer,
+    BlogComment, CatalistMetadata, Designer,
     DesignerResult,
     DisambiguationData,
     FAQCount,
@@ -346,5 +346,14 @@ export class ExtstatsApi {
             },
             method: "GET"
         })).json()) as DesignerResult[];
+    }
+
+    async getCatalistMetadata(): Promise<CatalistMetadata> {
+        return (await (await fetch(`${this.baseUrl}/catalistMetadata`, {
+            headers: {
+                "Content-Type": "application/json"
+            },
+            method: "GET"
+        })).json()) as CatalistMetadata;
     }
 }

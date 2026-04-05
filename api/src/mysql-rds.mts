@@ -487,6 +487,14 @@ export async function listWarTable(system: System): Promise<WarTableRow[]> {
     return system.asyncReturnWithConnection(conn => conn.query(sql));
 }
 
+export async function listCategoriesAndMechanics(system: System): Promise<{ categories: string[], mechanics: string[] }> {
+    const csql = "select name from categories order by 1 asc";
+    const msql = "select name from mechanics order by 1 asc";
+    const categories = ((await system.asyncReturnWithConnection(conn => conn.query(csql))) as { name: string }[]).map(r => r.name);
+    const mechanics = ((await system.asyncReturnWithConnection(conn => conn.query(msql))) as { name: string }[]).map(r => r.name);
+    return { categories, mechanics };
+}
+
 export async function listUsers(system: System): Promise<string[]> {
     const sql = "select username from geeks";
     return system.asyncReturnWithConnection(conn => conn.query(sql).then(data => data.map((row: { username: string}) => row["username"])));
