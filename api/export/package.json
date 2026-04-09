@@ -1,6 +1,6 @@
 {
   "name": "extstats-api",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "description": "ExtendedStatsServerless API SDK",
   "type": "module",
   "main": "index.mjs",

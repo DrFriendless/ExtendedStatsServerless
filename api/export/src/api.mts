@@ -139,6 +139,18 @@ export class ExtstatsApi {
         return (await (await fetch(`${this.baseUrl}/findpublishers?fragment=${fragment}`)).json()) as Publisher[];
     }
 
+    async findDesigner(bggid: number): Promise<Designer | undefined> {
+        const text = await (await fetch(`${this.baseUrl}/finddesigner?bggid=${bggid}`)).text();
+        if (!text) return undefined;
+        return (JSON.parse(text)) as Designer;
+    }
+
+    async findPublisher(bggid: number): Promise<Publisher | undefined> {
+        const text = await (await fetch(`${this.baseUrl}/findpublisher?bggid=${bggid}`)).text();
+        if (!text) return undefined;
+        return (JSON.parse(text)) as Publisher;
+    }
+
     async signup(username: string, password: string): Promise<AuthResult> {
         const response = await fetch(`${this.baseUrl}/signup`, {
             headers: {
