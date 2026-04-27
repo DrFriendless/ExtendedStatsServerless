@@ -80,6 +80,12 @@ export function inferExtraPlays(initialPlays: Record<string, NormalisedPlays[]>,
     return result;
 }
 
+export function inferNothing(initialPlays: Record<string, NormalisedPlays[]>, expansionData: ExpansionData): WorkingNormalisedPlays[] {
+    let result: WorkingNormalisedPlays[] = [];
+    Object.values(initialPlays).forEach(plays => result = result.concat(plays.map(p => toWorkingPlay(expansionData,p))));
+    return result;
+}
+
 /**
  *
  * @param input - plays which say they are at the location
@@ -241,6 +247,13 @@ export function normalise(rows: PlaysRow[], geekId: number, month: number, year:
     const byDate: Record<string, NormalisedPlays[]>[] = splitPlaysByDateAndLocation(rawData);
     return lodash.flatMap(byDate.map((plays: Record<string, NormalisedPlays[]>) => inferExtraPlays(plays, expansionData, baseGameDefaults)));
 }
+
+export function doNotNormalise(rows: PlaysRow[], geekId: number, month: number, year: number, expansionData: ExpansionData): WorkingNormalisedPlays[] {
+    const rawData: NormalisedPlays[] = rows.map(row => extractNormalisedPlayFromPlayRow(row, geekId, month, year));
+    const byDate: Record<string, NormalisedPlays[]>[] = splitPlaysByDateAndLocation(rawData);
+    return lodash.flatMap(byDate.map((plays: Record<string, NormalisedPlays[]>) => inferNothing(plays, expansionData)));
+}
+
 
 // src gets modified during this operation
 function subtractPlays(src: WorkingNormalisedPlays[], played: number[], quantity: number) {

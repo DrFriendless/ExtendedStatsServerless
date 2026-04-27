@@ -14,7 +14,7 @@ import {
 } from "extstats-core";
 import {count, eqSet, listIntersect, listMinus, parseYmd, splitYmd} from "./library.mjs";
 import { PlaysRow } from "./library.mjs";
-import {normalise} from "./plays.mjs";
+import {doNotNormalise, normalise} from "./plays.mjs";
 
 export async function doUpdateBGGTop50(conn: mysql.Connection, games: number[]) {
     await doUpdateSeries(conn, [ { name: "BGG Top 50", games } ]);
@@ -303,6 +303,23 @@ export async function doProcessGameResult(conn: mysql.Connection, data: ProcessG
     await doEnsurePublishers(conn, data.publishers, data.gameId, data.name);
     await doRecordGameExpansions(conn, data.gameId, data.expansions);
     await doMarkUrlProcessed(conn, "processGame", data.url);
+}
+
+export async function doReprocessPlays(conn: mysql.Connection, geek: string): Promise<void> {
+    const geekId = await getGeekId(conn, geek);
+    const t0 = (new Date()).getTime();
+    const expansionData = await loadExpansionData(conn); // 2.1 sec
+    const t1 = (new Date()).getTime();
+    const ymSql = "select distinct year y, month m from plays where geek = ?";
+    const playsMonths = (await conn.query(ymSql, [geekId])) as { y: number, m: number}[];
+    const t2 = (new Date()).getTime();
+    const deleteSql = "delete from plays_normalised where geek = ?";
+    await conn.query(deleteSql, [geekId]);
+    const t3 = (new Date()).getTime();
+    await doNormalisePlaysForYear(conn, geekId, geek, playsMonths, expansionData);
+    const t4 = (new Date()).getTime();
+    console.log(`doReprocessPlays ${t1-t0} ${t2-t1} ${t3-t2} ${t4-t3}`);
+    await doUpdateFrontPageGeek(conn, geek);
 }
 
 export async function doProcessCollectionCleanup(conn: mysql.Connection, geek: string, items: number[], url: string): Promise<void> {
@@ -843,11 +860,14 @@ export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: nu
     const userConfigData = await conn.query("select configuration from auth where username = ?", [geek]);
     const userConfigRaw = (userConfigData && userConfigData[0] && userConfigData[0].configuration) ? userConfigData[0].configuration : "{}";
     const userConfig = typeof userConfigRaw === typeof "" ? JSON.parse(userConfigRaw) : userConfigRaw;
+    const infer: boolean | undefined = new UserConfig(userConfig).get("disambiguation.enable", true);
     const baseGameDefaults: Record<string, number> = new UserConfig(userConfig).get("disambiguation.defaults", {}) || {};
 
     for (const {y, m} of playsMonths) {
         const rows: PlaysRow[] = await conn.query(selectSql, [geekId, m, y]);
-        const normalised = normalise(rows, geekId, m, y, expansionData, baseGameDefaults);
+        const normalised = infer ?
+            normalise(rows, geekId, m, y, expansionData, baseGameDefaults) :
+            doNotNormalise(rows, geekId, m, y, expansionData);
         // insert all of the base plays
         const basePlays: any[][] = [];
         for (const np of normalised) {

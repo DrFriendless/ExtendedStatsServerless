@@ -35,7 +35,7 @@ import {
     doUpdatePlaysForPeriod,
     doMarkPlaysUrlProcessed,
     doProcessDesignerResult,
-    doProcessPublisherResult
+    doProcessPublisherResult, doReprocessPlays
 } from "./mysql-rds.mjs";
 import {invokeLambdaAsync, listAdd, sendMessage, sendToQueue, sendToQueueWithDelay, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
@@ -300,6 +300,11 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
 
 async function handleQueueMessage(system: System, message: QueueMessage) {
     switch (message.discriminator) {
+        case "ReprocessPlays":
+            console.log(`ReprocessPlays ${message.geek}`);
+            await system.withConnectionAsync(conn => doReprocessPlays(conn, message.geek));
+            await sendMessage(system, [message.geek], ["updates"], { message: "Finished reprocessing your plays."});
+            break;
         case "CleanUpCollectionMessage":
             console.log(`CleanUpCollectionMessage ${message.params.geek} ${message.params.items.length}`);
             await system.withConnectionAsync(conn => doProcessCollectionCleanup(conn, message.params.geek, message.params.items, message.params.url));
