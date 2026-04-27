@@ -19,8 +19,12 @@ export class System {
     private mysqlDatabase: string | undefined;
     geeklistToken: string | undefined;
     user: string | undefined;
+    downloaderQueue: string | undefined;
+    AWS_REGION: string | undefined;
 
     async loadSecrets(pp: PUBLIC_PRIVATE): Promise<System | HttpResponse> {
+        this.downloaderQueue = process.env.DOWNLOADER_QUEUE;
+        this.AWS_REGION = process.env.AWS_REGION;
         if (pp === "public") {
             return this.loadBGGSecrets();
         } else {

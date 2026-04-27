@@ -86,6 +86,12 @@ export class ExtstatsApi {
         })).json()) as ToProcessSummary;
     }
 
+    async recalculatePlays(geek: string): Promise<void> {
+        await fetch(`${this.baseUrl}/recalculatePlays?geek=${geek}`, {
+            method: "POST"
+        });
+    }
+
     async updateOld(geek: string): Promise<string[]> {
         return (await (await fetch(`${this.baseUrl}/updateOld?geek=${geek}`, {
             headers: {

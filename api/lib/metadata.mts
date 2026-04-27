@@ -59,11 +59,12 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_hotness`, handler: "functions.getHotness", route: "hotness", method: "GET" },
     { name: `${COMPONENT}_designers`, handler: "designers.getDesigners", route: "designers", method: "GET" },
     { name: `${COMPONENT}_catalistMetadata`, handler: "functions.getCatalistMetadata", route: "catalistMetadata", method: "GET" },
+    { name: `${COMPONENT}_recalculatePlays`, handler: "functions.recalculatePlays", route: "recalculatePlays", method: "POST", pp: "public" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [
     { name: `auth_confirm`, handler: "auth.confirm" },
-    { name: `api_geeklist_check`, handler: "geeklist.check" }
+    { name: `${COMPONENT}_geeklist_check`, handler: "geeklist.check" }
 ];
 
 export const OTHER_LAMBDA_NAMES: string[] = [

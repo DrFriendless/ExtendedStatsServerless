@@ -37,6 +37,7 @@ let DRFRIENDLESS_ZONE: route53.IHostedZone = undefined;
 let CREATE_EC2S: iam.IManagedPolicy = undefined;
 let WRITE_CW: iam.IManagedPolicy = undefined;
 let ACCESS_DYNAMO: iam.PolicyDocument = undefined;
+let SEND_TO_DOWNLOADER: iam.PolicyDocument = undefined;
 
 export class ApiStack extends cdk.Stack {
   lookupExternalResources() {
@@ -51,6 +52,15 @@ export class ApiStack extends cdk.Stack {
     DRFRIENDLESS_ZONE = route53.HostedZone.fromLookup(this, "zone", { domainName: "drfriendless.com" });
     CREATE_EC2S = iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s", "CreateEC2sForLambda");
     WRITE_CW = iam.ManagedPolicy.fromManagedPolicyName(this, "writeToCW", "WriteToCloudwatchLogs");
+  }
+
+  defineSendToDownloaderPolicy(): iam.PolicyDocument {
+    const access = new iam.PolicyStatement();
+    access.addActions("sqs:SendMessage");
+    access.addResources("arn:aws:sqs:ap-southeast-2:067508173724:downloaderOutputQueue");
+    return new iam.PolicyDocument({
+      statements: [access]
+    });
   }
 
   defineAccessDynamoPolicy(): iam.PolicyDocument {
@@ -104,6 +114,7 @@ export class ApiStack extends cdk.Stack {
     invokePolicy.addActions("lambda:InvokeFunction");
     invokePolicy.addResources(`arn:aws:lambda:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:function:api_*`);
 
+    policies[`policy_send_to_downloader`] = SEND_TO_DOWNLOADER;
     policies[`policy_api_public`] = new iam.PolicyDocument({
       statements: [bggParameters, bggSecrets, invokePolicy]
     });
@@ -133,9 +144,15 @@ export class ApiStack extends cdk.Stack {
         MYSQL_USERNAME: process.env.MYSQL_USERNAME,
         MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
         MYSQL_DATABASE: process.env.MYSQL_DATABASE,
-        GEEKLIST_TOKEN: process.env.GEEKLIST_TOKEN
+        GEEKLIST_TOKEN: process.env.GEEKLIST_TOKEN,
+        DOWNLOADER_QUEUE: process.env.DOWNLOADER_QUEUE
       },
-    }
+    };
+    const publicParams: Partial<lambda.FunctionProps> = {
+      environment: {
+        DOWNLOADER_QUEUE: process.env.DOWNLOADER_QUEUE
+      }
+    };
     const f = new lambda.Function(scope, name, {
       functionName: name,
       runtime: RUNTIME,
@@ -144,7 +161,7 @@ export class ApiStack extends cdk.Stack {
       code: lambda.Code.fromBucketV2(ZIP_BUCKET,  COMPONENT + ".zip"),
       timeout: Duration.seconds(60),
       memorySize: memSize,
-      ...(pp === "private") ? vpcParams : {}
+      ...(pp === "private") ? vpcParams : publicParams
     });
     Tags.of(f).add("component", COMPONENT);
     const r = new aws_apigatewayv2.HttpRoute(scope, route, {
@@ -332,6 +349,7 @@ export class ApiStack extends cdk.Stack {
     super(scope, id, props);
     this.lookupExternalResources();
     ACCESS_DYNAMO = this.defineAccessDynamoPolicy();
+    SEND_TO_DOWNLOADER = this.defineSendToDownloaderPolicy();
 
     this.createWebSocketsInfrastructure("socks.drfriendless.com", "websocket_connections", "live");
 

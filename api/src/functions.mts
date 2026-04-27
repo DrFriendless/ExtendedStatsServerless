@@ -35,6 +35,7 @@ import {
 } from "export";
 import {ExpansionData, UserConfig} from "extstats-core";
 import {loadAuth} from "./authdb.mjs";
+import {SendMessageCommand, SendMessageCommandOutput, SQSClient} from "@aws-sdk/client-sqs";
 
 export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | CatalistMetadata> {
     const system = await findSystem("private");
@@ -82,6 +83,31 @@ export async function updateOld(event: APIGatewayProxyEvent) {
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
     return await markGeekForUpdate(system, event.queryStringParameters.geek);
+}
+
+export async function recalculatePlays(event: APIGatewayProxyEvent) {
+    const system = await findSystem("public");
+    if (isHttpResponse(system)) return system;
+    // can't do this as we are public
+    // await system.incrementApiCounter();
+
+    const geek = event.queryStringParameters.geek;
+    if (!geek) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify("You must specify a 'geek' parameter")
+        }
+    }
+    const body = { discriminator: "ReprocessPlays", geek };
+    const command = new SendMessageCommand({
+        QueueUrl: system.downloaderQueue,
+        MessageBody: JSON.stringify(body),
+    });
+    const sqsClient = new SQSClient({ region: system.AWS_REGION });
+    const dispatchResult: SendMessageCommandOutput = await sqsClient.send(command);
+    if (dispatchResult.$metadata.httpStatusCode !== 200) {
+        console.log(JSON.stringify(dispatchResult));
+    }
 }
 
 export async function getGeekSummary(event: APIGatewayProxyEvent): Promise<HttpResponse | GeekSummary> {
