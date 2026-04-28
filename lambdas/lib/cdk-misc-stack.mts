@@ -282,9 +282,11 @@ export class MiscStack extends cdk.Stack {
       cwPolicy.addActions("cloudwatch:ListEntitiesForMetric", "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics",
           "cloudwatch:GetMetricStream", "cloudwatch:ListMetricStreams", "cloudwatch:ListMetrics");
       cwPolicy.addResources("*");
-      policies[`policy_${name}_cw`] = new iam.PolicyDocument({
-        statements: [cwPolicy]
-      });
+      policies[`policy_${name}_cw`] = new iam.PolicyDocument({ statements: [cwPolicy] });
+      const s3Policy = new iam.PolicyStatement();
+      s3Policy.addActions("s3:ListAllMyBuckets");
+      s3Policy.addResources("*");
+      policies[`policy_${name}_s3`] = new iam.PolicyDocument({ statements: [s3Policy] });
     }
     if (opts.indexOf("dynamo") >= 0) {
       policies[`policy_${name}_dynamo`] = ACCESS_DYNAMO;

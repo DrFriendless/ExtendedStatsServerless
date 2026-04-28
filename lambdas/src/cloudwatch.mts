@@ -5,6 +5,7 @@ import {
     GetMetricStatisticsCommand, GetMetricStatisticsCommandInput,
     Statistic
 } from "@aws-sdk/client-cloudwatch";
+import {ListBucketsCommand, S3Client} from "@aws-sdk/client-s3";
 
 export async function handler(ignored: any): Promise<Record<string, number> | HttpResponse> {
     const system = await findSystem([]);
@@ -18,6 +19,12 @@ export async function handler(ignored: any): Promise<Record<string, number> | Ht
         StartTime: startTime,
         EndTime: endTime,
         Statistics: ["Maximum"]
+    };
+    const averageLongTime: { Period: number, StartTime: Date, EndTime: Date, Statistics: Statistic[] } = {
+        Period: 600,
+        StartTime: new Date(endTime.getTime() - 86400000),
+        EndTime: endTime,
+        Statistics: ["Average"]
     };
     const average: { Period: number, StartTime: Date, EndTime: Date, Statistics: Statistic[] } = {
         Period: 600,
@@ -75,6 +82,22 @@ export async function handler(ignored: any): Promise<Record<string, number> | Ht
             ...maximum
         }
     };
+
+    // can't get this to give me any data
+    // const s3Client = new S3Client({});
+    // const bucketData = await s3Client.send(new ListBucketsCommand());
+    // const dimensions = bucketData.Buckets.map(b => { return { Name: "BucketName", Value: b.Name } });
+    // const bucketSizeCommand = new GetMetricStatisticsCommand({
+    //     // Dimensions: dimensions,
+    //     Dimensions: [ { Name: "StorageType", Value: "STANDARD" } ],
+    //     MetricName: "BucketSizeBytes",
+    //     Namespace: "AWS/S3",
+    //     ...averageLongTime
+    // });
+    // console.log(JSON.stringify(bucketSizeCommand));
+    // const bucketSizes = await client.send(bucketSizeCommand);
+    // console.log(JSON.stringify(bucketSizes));
+
     const data: Record<string, number> = {};
     for (const input of Object.entries(inputs)) {
         try {
