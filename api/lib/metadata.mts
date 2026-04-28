@@ -11,7 +11,7 @@ export interface LambdaSpec {
     name: string;
     handler: string;
     route: string;
-    method: "GET" | "POST";
+    method: "GET" | "POST" | "ANY";
     pp?: PUBLIC_PRIVATE;
     memSize?: number;
 }
@@ -60,6 +60,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_designers`, handler: "designers.getDesigners", route: "designers", method: "GET" },
     { name: `${COMPONENT}_catalistMetadata`, handler: "functions.getCatalistMetadata", route: "catalistMetadata", method: "GET" },
     { name: `${COMPONENT}_recalculatePlays`, handler: "functions.recalculatePlays", route: "recalculatePlays", method: "POST", pp: "public" },
+    { name: `${COMPONENT}_u`, handler: "u.handler", route: "u/{proxy+}", method: "ANY" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [

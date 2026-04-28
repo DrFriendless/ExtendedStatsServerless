@@ -130,9 +130,9 @@ export class ApiStack extends cdk.Stack {
     });
   }
 
-  defineLambda(scope: Construct, name: string, handler: string, route: string, method: "GET" | "POST", role: iam.IRole,
+  defineLambda(scope: Construct, name: string, handler: string, route: string, method: "GET" | "POST" | "ANY", role: iam.IRole,
                pp: PUBLIC_PRIVATE, memSize: number): lambda.Function {
-    const m = (method === "GET") ? apigw.HttpMethod.GET : apigw.HttpMethod.POST;
+    const m = (method === "GET") ? apigw.HttpMethod.GET : (method === "ANY") ? apigw.HttpMethod.ANY : apigw.HttpMethod.POST;
     const vpcParams: Partial<lambda.FunctionProps> = {
       allowPublicSubnet: true,
       vpc: DATABASE_VPC,

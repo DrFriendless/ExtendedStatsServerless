@@ -158,7 +158,7 @@ export class ExtstatsApi {
     }
 
     async signup(username: string, password: string): Promise<AuthResult> {
-        const response = await fetch(`${this.baseUrl}/signup`, {
+        const response = await fetch(`${this.baseUrl}/u/signup`, {
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
@@ -186,7 +186,7 @@ export class ExtstatsApi {
     }
 
     async changedPassword(username: string, password: string): Promise<AuthResult> {
-        const response = await fetch(`${this.baseUrl}/changePassword`, {
+        const response = await fetch(`${this.baseUrl}/u/changePassword`, {
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
@@ -214,7 +214,7 @@ export class ExtstatsApi {
     }
 
     async login(username: string, password: string): Promise<AuthResult> {
-        const response = await fetch(`${this.baseUrl}/login`, {
+        const response = await fetch(`${this.baseUrl}/u/login`, {
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
@@ -242,7 +242,7 @@ export class ExtstatsApi {
     }
 
     async logout(): Promise<string> {
-        return (await (await fetch(`${this.baseUrl}/logout`, {
+        return (await (await fetch(`${this.baseUrl}/u/logout`, {
             headers: {
                 "Accept": "application/json",
             },
@@ -251,7 +251,7 @@ export class ExtstatsApi {
     }
 
     async getPersonalData(): Promise<any> {
-        return (await (await fetch(`${this.baseUrl}/personal`, {
+        return (await (await fetch(`${this.baseUrl}/u/personal`, {
             headers: {
                 "Accept": "application/json",
             }
@@ -259,7 +259,7 @@ export class ExtstatsApi {
     }
 
     async updatePersonalData(data: any): Promise<void> {
-        await fetch(`${this.baseUrl}/updatePersonal`, {
+        await fetch(`${this.baseUrl}/u/updatePersonal`, {
             headers: {
                 "Content-Type": "application/json",
             },

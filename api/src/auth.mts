@@ -50,8 +50,7 @@ function makeLogoutCookie(test: boolean) {
  * If they have the extstatsid cookie, return their user data.
  * @param event
  */
-export async function login(event: APIGatewayProxyEvent): Promise<HttpResponse> {
-    console.log(event);
+export async function login(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     const body = JSON.parse(event.body) as any;
@@ -117,7 +116,7 @@ function extractSalt(encodedPassword: string): { salt: string, p: string } {
     return { salt:  fields[3].substring(0, SALT_LENGTH), p: fields[3].substring(SALT_LENGTH) };
 }
 
-export async function changePassword(event: APIGatewayProxyEvent) {
+export async function changePassword(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
@@ -148,7 +147,7 @@ export async function changePassword(event: APIGatewayProxyEvent) {
     }
 }
 
-export async function signup(event: APIGatewayProxyEvent) {
+export async function signup(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
@@ -190,7 +189,7 @@ export async function signup(event: APIGatewayProxyEvent) {
     }
 }
 
-export async function logout(event: APIGatewayProxyEvent): Promise<HttpResponse> {
+export async function logout(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
     console.log(event);
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
