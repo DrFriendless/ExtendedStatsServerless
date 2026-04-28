@@ -233,6 +233,10 @@ export class DownloadStack extends cdk.Stack {
       value: outputQueue.queueUrl,
       exportName: 'downloader-OutputQueueURL'
     });
+    new cdk.CfnOutput(this, 'downloaderOutputQueueArn', {
+      value: outputQueue.queueArn,
+      exportName: 'downloader-OutputQueueARN'
+    });
     new cdk.CfnOutput(this, 'downloaderPlaysQueue', {
       value: playsQueue.queueUrl,
       exportName: 'downloader-PlaysQueueURL'

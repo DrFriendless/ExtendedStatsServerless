@@ -99,17 +99,24 @@ export async function processMetadata(_: UpdateMetadataMessage) {
 }
 
 export async function processBGGTop50(ignored: UpdateTop50Message) {
-    const TOP50_URL = "https://www.boardgamegeek.com/browse/boardgame";
-    const resp = await fetch(TOP50_URL);
+    const system = await loadSystem();
+    if (isHttpResponse(system)) return system;
+
+    const TOP50_URL = "https://boardgamegeek.com/data_dumps/bg_ranks";
+    const resp = await fetchFromBGG(system.gamesToken, TOP50_URL);
+    // const resp = await fetch(TOP50_URL);
     const data = await resp.text();
+    console.log(data);
     const lines: string[] = data.split(/\r?\n/).map(s => s.trim()).filter(s => !!s);
-    const top100 = _.dropWhile(lines, s => s.indexOf("<th class='collection_bggrating'>") < 0)
+    // console.log(JSON.stringify(lines));
+    const top100 = _.dropWhile(lines, s => s.indexOf("<th class='collection_table'>") < 0)
         .filter(s => s.indexOf('href="/boardgame/') >= 0)
-        .filter(s => s.indexOf('<img') >= 0)
+        .map(s => { console.log(s); return s; })
         .map(s => between(s, 'href="/boardgame/', '/'))
         .map(s => parseInt(s));
+    console.log(JSON.stringify(top100));
     const top50 = _.take(top100, 50);
-    await dispatchUpdateTop50(top50);
+    await dispatchUpdateTop50(system, top50);
 }
 
 // Lambda to harvest data about a game

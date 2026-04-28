@@ -55,9 +55,8 @@ export function dispatchUpdateMetadata(system: System, metadata: Metadata): Prom
     return sendToDownloaderQueue(system, { discriminator: "UpdateMetadataMessage", metadata });
 }
 
-export function dispatchUpdateTop50(top50: number[]): Promise<void> {
-    // TODO
-    return invokeLambdaAsync(INSIDE_PREFIX + FUNCTION_UPDATE_TOP50, top50);
+export function dispatchUpdateTop50(system: System, top50: number[]): Promise<void> {
+    return sendToDownloaderQueue(system, { discriminator: "UpdateTop50Message", top50 });
 }
 
 export function dispatchNoSuchGame(system: System, gameId: number): Promise<void> {

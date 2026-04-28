@@ -23,5 +23,6 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_processMetadata`, handler: "functions.processMetadata", duration: 60, mem: 128, maxConcurrency: 1 },
     { name: `${COMPONENT}_processDesigner`, handler: "functions.processDesigner", duration: 40, mem: 128, maxConcurrency: undefined },
     { name: `${COMPONENT}_processPublisher`, handler: "functions.processPublisher", duration: 40, mem: 128, maxConcurrency: undefined },
+    { name: `${COMPONENT}_processBGGTop50`, handler: "functions.processBGGTop50", duration: 40, mem: 128, maxConcurrency: undefined },
 ];
 
