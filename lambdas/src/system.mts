@@ -23,6 +23,7 @@ export class System {
     private mysqlPassword: string | undefined;
     private mysqlDatabase: string | undefined;
     public messageQueue: string | undefined;
+    public downloaderQueue: string | undefined;
 
     async loadDatabaseSecrets(): Promise<HttpResponse | void> {
         this.mysqlHost = process.env.MYSQL_HOST;
@@ -50,6 +51,7 @@ export class System {
 
     async loadMessageSecrets(): Promise<void> {
         this.messageQueue = await this.getParameter("/extstats/misc/messages");
+        this.downloaderQueue = await this.getParameter("/extstats/downloader/queue");
     }
 
     async loadBGGSecrets(): Promise<HttpResponse | void> {

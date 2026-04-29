@@ -12,6 +12,7 @@
     "@aws-sdk/client-cloudwatch-logs": "^3.994.0",
     "@aws-sdk/client-lambda": "^3.994.0",
     "@aws-sdk/client-s3": "^3.994.0",
+    "@aws-sdk/client-scheduler": "^3.994.0",
     "@aws-sdk/client-secrets-manager": "^3.994.0",
     "@aws-sdk/client-ssm": "^3.994.0",
     "@aws-sdk/client-dynamodb": "^3.994.0",

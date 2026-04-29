@@ -8,11 +8,11 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as events from "aws-cdk-lib/aws-events";
-import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as sqs from "aws-cdk-lib/aws-sqs";
-import {COMPONENT, DEPLOYMENT_BUCKET} from "./metadata.mts";
+import * as scheduler from "aws-cdk-lib/aws-scheduler";
+import * as targets from "aws-cdk-lib/aws-scheduler-targets";
 import * as sources from "aws-cdk-lib/aws-lambda-event-sources";
-// import {VpcEndpointIpAddressType} from "aws-cdk-lib/aws-ec2";
+import {COMPONENT, DEPLOYMENT_BUCKET} from "./metadata.mts";
 
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 let DATABASE_VPC: ec2.IVpc = undefined;
@@ -21,6 +21,7 @@ let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
 let CONFIRM_LAMBDA: lambda.IFunction = undefined;
 let ACCESS_DYNAMO: iam.PolicyDocument = undefined;
+let DOWNLOADER_QUEUE: string | undefined;
 
 export const RUNTIME = lambda.Runtime.NODEJS_22_X;
 // bgg - access BoardGameGeek, needs to be public
@@ -29,7 +30,8 @@ export const RUNTIME = lambda.Runtime.NODEJS_22_X;
 // cw - ability to read CloudWatch metrics, needs to be public
 // dynamo - access DynamoDB
 // single - max concurrency 1
-type OptsType = "bgg" | "db" | "logging" | "cw" | "dynamo" | "single" | "sqs" | "ssm" | "message";
+// downloader - access to send to downloader queue
+type OptsType = "bgg" | "db" | "logging" | "cw" | "dynamo" | "single" | "sqs" | "ssm" | "message" | "downloader";
 
 export class MiscStack extends cdk.Stack {
   // don't do this, it costs too much.
@@ -102,23 +104,7 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
-  defineReportStateMachine(reportFunc: lambda.Function, writeFunc: lambda.Function): sfn.StateMachine {
-    return new sfn.StateMachine(this, 'reportStateMachine', {
-      definitionBody: sfn.DefinitionBody.fromChainable(
-          new tasks.LambdaInvoke(this, "reportTask", {
-            lambdaFunction: reportFunc,
-          }).next(
-              new tasks.LambdaInvoke(this, "writeTask", {
-                lambdaFunction: writeFunc,
-              }).next(
-                  new sfn.Succeed(this, "Report completed")
-              )
-          )
-      ),
-    });
-  }
-
-  defineRuleToInvokeAuth(machine: sfn.IStateMachine, n: number): events.Rule {
+  defineScheduleToInvokeAuth(machine: sfn.IStateMachine, n: number): scheduler.Schedule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("states:StartExecution");
     st1.addResources(machine.stateMachineArn);
@@ -127,18 +113,28 @@ export class MiscStack extends cdk.Stack {
         statements: [st1]
       })
     };
-    const ruleRole = new iam.Role(this, "role_invoke_auth_thread", {
-      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
-      inlinePolicies: policies,
+    const role = new iam.Role(this, 'assumeAuthRole' + n, {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
     });
-    return new events.Rule(this, `machineRule${n}`, {
+    return new scheduler.Schedule(this, `authSchedule${n}`, {
       schedule: events.Schedule.cron({ minute: '0' }),
-      targets: [ new targets.SfnStateMachine(machine) ],
-      role: ruleRole
+      target: new targets.StepFunctionsStartExecution(machine, { role }),
+      description: "Every hour, check the BGG auth thread."
     });
   }
 
-  defineRuleToInvokeCounts(machine: sfn.IStateMachine, n: number): events.Rule {
+  defineScheduleToInvokeDaily(func: lambda.Function, n: number): scheduler.Schedule {
+    const role = new iam.Role(this, 'assumeDailyRole' + n, {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
+    });
+    return new scheduler.Schedule(this, `schedule_daily_${n}`, {
+      schedule: scheduler.ScheduleExpression.rate(Duration.hours(24)),
+      description: "Once per day run daily tasks, e.g. rebuild materialised views.",
+      target: new targets.LambdaInvoke(func, { role })
+    });
+  }
+
+  defineScheduleToInvokeCounts(machine: sfn.IStateMachine, n: number): scheduler.Schedule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("states:StartExecution");
     st1.addResources(machine.stateMachineArn);
@@ -147,34 +143,13 @@ export class MiscStack extends cdk.Stack {
         statements: [st1]
       })
     };
-    const ruleRole = new iam.Role(this, "role_invoke_counts_thread", {
-      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
-      inlinePolicies: policies,
+    const role = new iam.Role(this, 'assumeCountsRole' + n, {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
     });
-    return new events.Rule(this, `machineRule${n}`, {
+    return new scheduler.Schedule(this, `countsSchedule${n}`, {
       schedule: events.Schedule.rate(Duration.minutes(10)),
-      targets: [ new targets.SfnStateMachine(machine) ],
-      role: ruleRole
-    });
-  }
-
-  defineRuleToInvokeReport(machine: sfn.IStateMachine, n: number): events.Rule {
-    const st1 = new iam.PolicyStatement();
-    st1.addActions("states:StartExecution");
-    st1.addResources(machine.stateMachineArn);
-    const policies: Record<string, iam.PolicyDocument> = {
-      "policy_invoke_report": new iam.PolicyDocument({
-        statements: [st1]
-      })
-    };
-    const ruleRole = new iam.Role(this, "role_invoke_report", {
-      assumedBy: new iam.ServicePrincipal('events.amazonaws.com'),
-      inlinePolicies: policies,
-    });
-    return new events.Rule(this, `machineRule${n}`, {
-      schedule: events.Schedule.cron({ minute: '30' }),
-      targets: [ new targets.SfnStateMachine(machine) ],
-      role: ruleRole
+      target: new targets.StepFunctionsStartExecution(machine, { role }),
+      description: "Every 10 minutes get data from CloudWatch and store it as observability metrics."
     });
   }
 
@@ -237,6 +212,14 @@ export class MiscStack extends cdk.Stack {
 
   private defineRole(opts: OptsType[], name: string, n: number): iam.Role {
     const policies: Record<string, iam.PolicyDocument> = {};
+    if (opts.indexOf("downloader") >= 0) {
+      const access = new iam.PolicyStatement();
+      access.addActions("sqs:SendMessage");
+      access.addResources(DOWNLOADER_QUEUE);
+      policies[`policy_${name}_dlq`] = new iam.PolicyDocument({
+        statements: [access]
+      });
+    }
     if (opts.indexOf("message") >= 0) {
       const parameters = new iam.PolicyStatement();
       parameters.addActions("execute-api:ManageConnections");
@@ -313,6 +296,7 @@ export class MiscStack extends cdk.Stack {
     PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", "subnet-44646e1d");
     ZIP_BUCKET = s3.Bucket.fromBucketName(this, "bucket", DEPLOYMENT_BUCKET);
     CONFIRM_LAMBDA = lambda.Function.fromFunctionName(this, "confirmFunc", "auth_confirm");
+    DOWNLOADER_QUEUE = cdk.Fn.importValue('downloader-OutputQueueARN');
   }
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -321,19 +305,19 @@ export class MiscStack extends cdk.Stack {
     ACCESS_DYNAMO = this.defineAccessDynamoPolicy();
 
     // the VPC endpoint is so that the Lambdas inside the VPC can see the parameter store which is public.
+    // We don't use it because it's expensive, so the Lambdas inside the VPC have to be given their settings as environment variables.
     // this.defineVpcEndpoints();
     const threadFunction = this.defineLambda("misc_auth_thread", "auththread.handler", ["bgg"], "public", 1);
     const sm = this.defineAuthStateMachine(threadFunction);
-    const rule = this.defineRuleToInvokeAuth(sm, 1);
-    // const reportFunction = this.defineLambda("misc_report_read", "report.handler", ["db"], "private", 2);
-    // const writeFunction = this.defineLambda("misc_report_write", "report.write", ["logging"], "public", 3);
-    // const sm2 = this.defineReportStateMachine(reportFunction, writeFunction);
-    // const rule2 = this.defineRuleToInvokeReport(sm2, 2);
+    const rule = this.defineScheduleToInvokeAuth(sm, 1);
     const countFunction = this.defineLambda("misc_counts", "counts.handler", ["db","dynamo"], "private", 4);
     const cwFunction = this.defineLambda("misc_cw", "cloudwatch.handler", ["cw"], "public", 5);
     const sm2 = this.defineCountsStateMachine(cwFunction, countFunction);
-    const rule6 = this.defineRuleToInvokeCounts(sm2, 6);
+    const rule6 = this.defineScheduleToInvokeCounts(sm2, 6);
     const messageQueue = this.defineMessageQueue();
+    const dailyFunction = this.defineLambda("misc_daily", "daily.dailyTasks", ["ssm", "downloader"], "public", 8);
+    // schedules are the new way to do rules
+    const schedule7 = this.defineScheduleToInvokeDaily(dailyFunction, 9);
 
     new cdk.CfnOutput(this, 'MessageQueue', {
       value: messageQueue.queueUrl,
