@@ -305,6 +305,11 @@ export async function doProcessGameResult(conn: mysql.Connection, data: ProcessG
     await doMarkUrlProcessed(conn, "processGame", data.url);
 }
 
+export async function doRebuildMaterialisedViews(conn: mysql.Connection): Promise<void> {
+    await conn.query("TRUNCATE TABLE nickels_and_dimes");
+    await conn.query("INSERT INTO nickels_and_dimes select game bggid, sum(quantity) q, year, geek from plays_normalised group by year, bggid, geek");
+}
+
 export async function doReprocessPlays(conn: mysql.Connection, geek: string): Promise<void> {
     const geekId = await getGeekId(conn, geek);
     const t0 = (new Date()).getTime();

@@ -35,7 +35,7 @@ import {
     doUpdatePlaysForPeriod,
     doMarkPlaysUrlProcessed,
     doProcessDesignerResult,
-    doProcessPublisherResult, doReprocessPlays
+    doProcessPublisherResult, doReprocessPlays, doRebuildMaterialisedViews
 } from "./mysql-rds.mjs";
 import {invokeLambdaAsync, listAdd, sendMessage, sendToQueue, sendToQueueWithDelay, sleep} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
@@ -300,6 +300,10 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
 
 async function handleQueueMessage(system: System, message: QueueMessage) {
     switch (message.discriminator) {
+        case "RebuildMaterialisedViews":
+            console.log("RebuildMaterialisedViews");
+            await system.withConnectionAsync(conn => doRebuildMaterialisedViews(conn));
+            break;
         case "ReprocessPlays":
             console.log(`ReprocessPlays ${message.geek}`);
             await system.withConnectionAsync(conn => doReprocessPlays(conn, message.geek));
