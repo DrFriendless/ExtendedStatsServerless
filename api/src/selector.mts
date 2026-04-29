@@ -65,6 +65,10 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
             }
             return result;
         }
+        case "ranked": {
+            const sql = "select bggid from games  where `rank` is not null and `rank` > 0";
+            return (await conn.query(sql) as { bggid: number }[]).map(row => row.bggid);
+        }
         case "rated": {
             let { geekId, geek } = await getGeekIdFromArgs(conn, expr.args[0] as Arg, vars);
             const sql = "select game from geekgames where geekid = ? and rating > 0";
