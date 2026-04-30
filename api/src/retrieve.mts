@@ -22,10 +22,11 @@ import {
     ShouldPlayAdditionalData
 } from "./interfaces.mjs";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
-import {GameData, MonthlyPlayCount, MonthlyPlays, PlaysWithDate} from "export";
+import {GameData, MonthlyPlayCount, MonthlyPlays, NickelDimeData, PlaysWithDate} from "export";
 import {SelectorMetadataSet} from "./selector-metadata.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {loadAuth} from "./authdb.mjs";
+import {makeIndex} from "extstats-core";
 
 class GameDataShort {
 }
@@ -94,6 +95,21 @@ function buildGameDataType(loaders: Loaders) {
                 resolve:
                     async (parent: GameData) => await loaders.system.asyncReturnWithConnection(async conn => resolveDesignersForGame(conn, parent.bggid))
             }
+        }
+    });
+}
+
+function buildNickelDimeGameDataType(loaders: Loaders, gameDataType: GraphQLObjectType<GameData>) {
+    return new graphql.GraphQLObjectType({
+        name: "NickelDimeData",
+        fields: {
+            bggid: {type: graphql.GraphQLInt!},
+            game: {
+                type: gameDataType,
+                resolve: (parent: { bggid: number }) => loaders.games.load(parent.bggid)
+            },
+            nickels: {type: graphql.GraphQLInt!},
+            dimes: {type: graphql.GraphQLInt!}
         }
     });
 }
@@ -352,6 +368,7 @@ function buildShortMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: Gra
 
 function buildSchema(loaders: Loaders, userData: UserData | undefined) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
+    const nickelDimeDataType: GraphQLObjectType<NickelDimeData> = buildNickelDimeGameDataType(loaders, gameDataType);
     const gameDataTypeShort: GraphQLObjectType<GameDataShort> = buildGameDataTypeShort(loaders);
     const geekGameType: GraphQLObjectType<ExtendedGeekGame> = buildGeekGameType(loaders, gameDataType);
     const geekGameTypeShort: GraphQLObjectType<ExtendedGeekGameShort> = buildGeekGameTypeShort(loaders, gameDataTypeShort);
@@ -371,6 +388,26 @@ function buildSchema(loaders: Loaders, userData: UserData | undefined) {
                     resolve: async (parent: unknown, args) => {
                         return await loaders.system.asyncReturnWithConnection(
                             async conn => playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
+                        );
+                    }
+                },
+                mostnickelsanddimes: {
+                    args: {
+                        count: { type: graphql.GraphQLInt }
+                    },
+                    type: new graphql.GraphQLList(nickelDimeDataType!),
+                    resolve: async (parent: unknown, args) => {
+                        return await loaders.system.asyncReturnWithConnection(
+                            async conn => {
+                                const ndGames = await mostNickelsAndDimes(conn, args.count);
+                                const ndIndex = makeIndex(ndGames);
+                                const games = ndGames.map(x => x.bggid);
+                                const gds = await doRetrieveGames(conn, games);
+                                return gds.map(async gd => {
+                                    const nd = ndIndex[gd.bggid.toString()] || { bggid: gd.bggid, nickels: 0, dimes: 0 };
+                                    return { game: gd, ...nd } as NickelDimeData;
+                                });
+                            }
                         );
                     }
                 },
@@ -691,6 +728,31 @@ function ymdToDate(ymd: number): Date {
     const d = ymd % 100;
     const m = Math.floor(ymd / 100) % 100;
     return new Date(y, m - 1, d);
+}
+
+async function mostNickelsAndDimes(conn: mysql.Connection, count: number): Promise<{ bggid: number, nickels: number, dimes: number }[]> {
+    const nickelSql = "select bggid, count(distinct year, geek) c from nickels_and_dimes where q >= 5 and q < 10 group by bggid order by 2 desc limit ?";
+    const dimeSql = "select bggid, count(distinct year, geek) c from nickels_and_dimes where q >= 10 group by bggid order by 2 desc limit ?";
+    const moreNickelSql = "select bggid, count(distinct year, geek) c from nickels_and_dimes where q >= 5 and q < 10 and bggid in (?) group by bggid";
+    const moreDimeSql = "select bggid, count(distinct year, geek) c from nickels_and_dimes where q >= 10 and bggid in (?) group by bggid";
+    let nickels = await conn.query(nickelSql, [count]) as { bggid: number, c: number }[];
+    let dimes = await conn.query(dimeSql, [count]) as { bggid: number, c: number }[];
+    const nickelGames = new Set(nickels.map(bc => bc.bggid));
+    const dimeGames = new Set(dimes.map(bc => bc.bggid));
+    const needDimes = Array.from(nickelGames.difference(dimeGames));
+    console.log(JSON.stringify(needDimes));
+    if (needDimes.length > 0) {
+        const moreDimes = await conn.query(moreDimeSql, [needDimes]) as { bggid: number, c: number }[];
+        dimes = [...dimes, ...moreDimes];
+    }
+    const needNickels = Array.from(dimeGames.difference(nickelGames));
+    console.log(JSON.stringify(needNickels));
+    if (needNickels.length > 0) {
+        const moreNickels = await conn.query(moreNickelSql, [needNickels]) as { bggid: number, c: number }[];
+        nickels = [...nickels, ...moreNickels];
+    }
+    const dimeIndex = makeIndex(dimes);
+    return nickels.map(n => { return { bggid: n.bggid, nickels: n.c, dimes: (dimeIndex[n.bggid.toString()] || { c: 0 }).c } });
 }
 
 async function mostPlayedUnplayed(conn: mysql.Connection, geek: string, count: number): Promise<number[]> {

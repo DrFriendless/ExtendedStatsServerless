@@ -241,6 +241,13 @@ export interface GameData {
     e: boolean;
 }
 
+export interface NickelDimeData {
+    bggid: number;
+    nickels: number;
+    dimes: number;
+    game: GameData;
+}
+
 export interface MonthlyPlays {
     year: number;
     month: number;
