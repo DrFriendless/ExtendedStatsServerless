@@ -16,7 +16,21 @@ import {
 } from "./api-interfaces.mjs";
 
 export class ExtstatsApi {
+    private broken = false;
+
     constructor(private baseUrl: string) {
+    }
+
+    checkForBroken() {
+        if (this.broken) {
+            const mesg = "An error was detected loading your personal data, so personal data can't be written back to the server, lest it corrupt what is there. Reload the page and if the error persists advise Friendless.";
+            console.log(mesg);
+            throw new Error(mesg);
+        }
+    }
+
+    isBroken() {
+        return this.broken;
     }
 
     async getWarTable(): Promise<WarTableRow[]> {
@@ -111,17 +125,6 @@ export class ExtstatsApi {
             method: "POST"
         })).json()) as FAQCount[];
     }
-
-    // async plays(query: PlaysQuery): Promise<MultiGeekPlays> {
-    //     return (await (await fetch(`${this.baseUrl}/plays`, {
-    //         headers: {
-    //             "Content-Type": "application/json",
-    //             "Accept": "application/json",
-    //         },
-    //         body: JSON.stringify(query),
-    //         method: "POST"
-    //     })).json()) as MultiGeekPlays;
-    // }
 
     async retrieve(query: string): Promise<object> {
         return (await (await fetch(`${this.baseUrl}/retrieve?query=${query}`, {
@@ -251,14 +254,20 @@ export class ExtstatsApi {
     }
 
     async getPersonalData(): Promise<any> {
-        return (await (await fetch(`${this.baseUrl}/u/personal`, {
+        const resp = await fetch(`${this.baseUrl}/u/personal`, {
             headers: {
                 "Accept": "application/json",
             }
-        })).json()) as string;
+        });
+        if (!resp.ok) {
+            this.broken = true;
+            return "{}";
+        }
+        return (await resp.json()) as string;
     }
 
     async updatePersonalData(data: any): Promise<void> {
+        this.checkForBroken();
         await fetch(`${this.baseUrl}/u/updatePersonal`, {
             headers: {
                 "Content-Type": "application/json",
