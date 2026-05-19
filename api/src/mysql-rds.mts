@@ -23,6 +23,7 @@ import {
     RankingTableRow, SystemStats, ToProcessSummary, TypeCount, WarTableRow
 } from "export";
 import { ExpansionData } from "extstats-core";
+import {DesignerData} from "./retrieve.mjs";
 
 export async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
     return await retrieveGeekGames(conn, ids, geek);
@@ -85,6 +86,16 @@ export async function doRetrieveGameNames(conn: mysql.Connection, ids: number[])
         result[row.bggid] = row.name;
     });
     return result;
+}
+
+export async function doRetrieveDesigners(conn: mysql.Connection, ids: number[]): Promise<DesignerData[]> {
+    const sql = "select * from designers where bggid in (?)";
+    const rows = await conn.query(sql, [ids]);
+    return rows.map(extractDesignerData);
+}
+
+export function extractDesignerData(dbRow: any): DesignerData {
+    return { bggid: dbRow['bggid'] as number, name: dbRow['name'], url: dbRow['url'], boring: dbRow['boring'] };
 }
 
 export async function doRetrieveGames(conn: mysql.Connection, ids: number[]): Promise<GameData[]> {

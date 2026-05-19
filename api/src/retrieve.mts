@@ -2,8 +2,9 @@ import * as graphql from "graphql";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
 import {
+    doRetrieveDesigners,
     doRetrieveGames,
-    doRetrieveGamesShort, doRetrieveGeekGames,
+    doRetrieveGamesShort, doRetrieveGeekGames, extractDesignerData,
     getMonthlyCounts,
     getMonthlyPlays
 } from "./mysql-rds.mjs";
@@ -35,6 +36,8 @@ interface Loaders {
     system: System;
     games: DataLoader<number, GameData>;
     gamesShort: DataLoader<number, GameDataShort>;
+    designers: DataLoader<number, DesignerData>;
+    gameDesigners: DataLoader<number, DesignerData[]>;
 }
 
 // authenticated user
@@ -47,7 +50,9 @@ function createLoaders(system: System): Loaders {
     return {
         system: system,
         games: new DataLoader((ids: number[]) => batchGetGames(system, ids)),
-        gamesShort: new DataLoader((ids: number[]) => batchGetGamesShort(system, ids))
+        gamesShort: new DataLoader((ids: number[]) => batchGetGamesShort(system, ids)),
+        designers: new DataLoader((ids: number[]) => batchGetDesigners(system, ids)),
+        gameDesigners: new DataLoader((ids: number[]) => batchGetGameDesigners(system, ids))
     }
 }
 
@@ -93,7 +98,7 @@ function buildGameDataType(loaders: Loaders) {
             designers: {
                 type: new graphql.GraphQLList(DesignerType!),
                 resolve:
-                    async (parent: GameData) => await loaders.system.asyncReturnWithConnection(async conn => resolveDesignersForGame(conn, parent.bggid))
+                    async (parent: GameData) => loaders.gameDesigners.load(parent.bggid)
             }
         }
     });
@@ -374,8 +379,10 @@ function buildSchema(loaders: Loaders, userData: UserData | undefined) {
     const geekGameTypeShort: GraphQLObjectType<ExtendedGeekGameShort> = buildGeekGameTypeShort(loaders, gameDataTypeShort);
     const playsWithDateType: GraphQLObjectType<{ }> = buildPlaysWithDateType(loaders, gameDataType);
     return new graphql.GraphQLSchema({
+        description: "Extstats API GraphQL Schema",
         query: new graphql.GraphQLObjectType<any, PlaysRetrieveResult>({
             name: "RetrieveQuery",
+            description: "Basic GraphQL query",
             fields: {
                 plays: {
                     args: {
@@ -384,6 +391,7 @@ function buildSchema(loaders: Loaders, userData: UserData | undefined) {
                         startYMD: { type: graphql.GraphQLInt },
                         endYMD: { type: graphql.GraphQLInt }
                     },
+                    description: "Plays for multiple geeks",
                     type: buildMultiGeekPlaysType(gameDataType, geekGameType, playsWithDateType),
                     resolve: async (parent: unknown, args) => {
                         return await loaders.system.asyncReturnWithConnection(
@@ -610,7 +618,7 @@ interface GeekGameSelectWithGamesShort {
     geekGames: ExtendedGeekGameShort[];
     games: GameDataShort[]
 }
-interface DesignerData {
+export interface DesignerData {
     bggid: number;
     name: string;
     url: string;
@@ -646,8 +654,12 @@ async function resolveDesignersForGame(conn: mysql.Connection, gameId: number): 
     return rows.map(extractDesignerData);
 }
 
-function extractDesignerData(dbRow: any): DesignerData {
-    return { bggid: dbRow['bggid'] as number, name: dbRow['name'], url: dbRow['url'], boring: dbRow['boring'] };
+async function resolveDesignerIdsForGame(system: System, gameId: number): Promise<number[]> {
+    const sql = "select designer from game_designers where game = ?";
+    return await system.asyncReturnWithConnection(async conn => {
+        const rows = await conn.query(sql, [gameId]) as { designer: number }[];
+        return rows.map(r => r.designer);
+    });
 }
 
 async function selectGamesOnly(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<number[]> {
@@ -836,47 +848,110 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
     return { geeks: Object.values<string>(geekNameIds), plays: basePlays, games, geekgames };
 }
 
+interface NamedQuery {
+    query: string;
+    operationName: string;
+}
+
 export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | object> {
     console.log(JSON.stringify(event));
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     const loaders = createLoaders(system);
-    if (event.queryStringParameters.query) {
-        // normal query
-        // give the selectors access to the authenticated user's private data
-        let userData: UserData | undefined = undefined;
-        const cookies = getCookiesFromEvent(event);
-        if (cookies['extstatsid']) {
-            const user = cookies['extstatsid'];
-            console.log(`User is ${user}`);
-            const sData: string = (await loadAuth(system, user))?.configuration || "{}";
-            userData = { user, data: JSON.parse(sData) };
-        }
-        const schema = buildSchema(loaders, userData);
-        const result = await graphql.graphql({
-                schema,
-                source: event.queryStringParameters['query']
-            }
-        );
-        if (result.errors) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify(result.errors)
-            }
-        } else {
-            return {
-                statusCode: 200,
-                body: JSON.stringify(result.data)
-            }
-        }
+
+    // give the selectors access to the authenticated user's private data
+    let userData: UserData | undefined = undefined;
+    const cookies = getCookiesFromEvent(event);
+    if (cookies['extstatsid']) {
+        const user = cookies['extstatsid'];
+        console.log(`User is ${user}`);
+        const sData: string = (await loadAuth(system, user))?.configuration || "{}";
+        userData = { user, data: JSON.parse(sData) };
+    }
+    const schema = buildSchema(loaders, userData);
+    let query: string | undefined = undefined;
+    let operationName: string | undefined;
+    if (event.requestContext.http.method === "POST") {
+        const body = (event.isBase64Encoded) ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+        const jsonBody: NamedQuery = JSON.parse(body);
+        query = jsonBody.query.trim();
+        operationName = jsonBody.operationName;
+    } else if (event.requestContext.http.method === "GET" && event.queryStringParameters.query) {
+        // normal query from my code
+        query = event.queryStringParameters['query'];
     } else {
         // CORS
-        return {statusCode: 200, body: "" }
+        return {
+            statusCode: 200,
+            body: "",
+            // headers: {
+            //     "Access-Control-Allow-Methods": "POST",
+            //     "Access-Control-Allow-Origin": "*"
+            // }
+        }
+    }
+    console.log(query);
+    const result = await graphql.graphql({
+            schema,
+            source: query,
+            operationName
+        }
+    );
+    if (result.errors) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify(result.errors),
+            // headers: {
+            //     "Access-Control-Allow-Methods": "POST",
+            //     "Access-Control-Allow-Origin": "*"
+            // }
+        }
+    } else {
+        return {
+            statusCode: 200,
+            body: JSON.stringify(result.data),
+            // headers: {
+            //     "Access-Control-Allow-Methods": "POST",
+            //     "Access-Control-Allow-Origin": "*"
+            // }
+        }
     }
 }
 
 async function batchGetGames(system: System, gameIds: number[]): Promise<GameData[]> {
     return system.asyncReturnWithConnection(async conn => doRetrieveGames(conn, gameIds));
+}
+
+async function batchGetDesigners(system: System, designerIds: number[]): Promise<DesignerData[]> {
+    return system.asyncReturnWithConnection(async conn => doRetrieveDesigners(conn, designerIds));
+}
+
+async function batchGetGameDesigners(system: System, gameIds: number[]): Promise<DesignerData[][]> {
+    return system.asyncReturnWithConnection(async conn => {
+        const sql1 = "select game, designer from game_designers where game in (?)";
+        const sql2 = "select name, bggid, boring, url, importance from designers where bggid in (?)";
+        const gds = await conn.query(sql1, [gameIds]) as { game: number, designer: number }[];
+        const ds: number[] = [];
+        gds.map(gd => gd.designer).forEach(d => {
+            if (ds.indexOf(d) < 0) ds.push(d);
+        });
+        const designers = await conn.query(sql2, [ds]) as DesignerData[];
+        const byDesignerId: Record<string, DesignerData> = {};
+        designers.forEach(dd => {
+            byDesignerId[dd.bggid.toString()] = dd;
+        })
+        const result: DesignerData[][] = [];
+        const byGame: Record<string, DesignerData[]> = {};
+        for (const gid of gameIds) {
+            const list: DesignerData[] = [];
+            byGame[gid.toString()] = list;
+            result.push(list);
+        }
+        for (const gd of gds) {
+            byGame[gd.game.toString()].push(byDesignerId[gd.designer.toString()]);
+        }
+        return result;
+    });
 }
 
 async function batchGetGamesShort(system: System, gameIds: number[]): Promise<GameDataShort[]> {

@@ -39,7 +39,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_updateOld`, handler: "functions.updateOld", route: "updateOld", method: "POST" },
     { name: `${COMPONENT}_incFAQCount`, handler: "functions.incFAQCount", route: "incFAQCount", method: "POST" },
     { name: `${COMPONENT}_plays`, handler: "functions.plays", route: "plays", method: "POST" },
-    { name: `${COMPONENT}_retrieve`, handler: "retrieve.retrieve", route: "retrieve", method: "GET", memSize: 256 },
+    { name: `${COMPONENT}_retrieve`, handler: "retrieve.retrieve", route: "retrieve", method: "ANY", memSize: 256 },
     { name: `${COMPONENT}_login`, handler: "auth.login", route: "login", method: "POST" },
     { name: `${COMPONENT}_logout`, handler: "auth.logout", route: "logout", method: "POST" },
     { name: `${COMPONENT}_signup`, handler: "auth.signup", route: "signup", method: "POST" },
