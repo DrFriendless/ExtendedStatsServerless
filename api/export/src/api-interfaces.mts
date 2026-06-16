@@ -30,6 +30,7 @@ export interface GeeklistItemCheck {
     owned: boolean;
     prevOwned: boolean;
     wishlist: number;
+    tradeCode?: string;
 }
 
 export interface ProcessedRecRow {

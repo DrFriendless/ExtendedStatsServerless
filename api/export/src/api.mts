@@ -337,8 +337,8 @@ export class ExtstatsApi {
         })).json()) as DisambiguationData;
     }
 
-    async checkGeeklist(geeklist: number): Promise<GeeklistCheck> {
-        return (await (await fetch(`${this.baseUrl}/geeklist?geeklist=${geeklist}`, {
+    async checkGeeklist(geeklist: number, trade: boolean): Promise<GeeklistCheck> {
+        return (await (await fetch(`${this.baseUrl}/geeklist?geeklist=${geeklist}&trade=${trade}`, {
             headers: {
                 "Accept": "application/json",
                 "Content-Type": "application/json"

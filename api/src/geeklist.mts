@@ -88,6 +88,9 @@ interface ParsedGeeklist {
             "@_username": string;
             "@_objectid": string;
             "@_objectname": string;
+            comment: {
+                "#text": string;
+            }[];
         }[];
     }
 }
@@ -97,6 +100,7 @@ interface GeeklistItem {
     bggid: number;
     name: string;
     user: string;
+    tradeCode?: string;
 }
 
 interface GeeklistData {
@@ -106,6 +110,7 @@ interface GeeklistData {
 }
 
 export async function downloader(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | GeeklistCheck> {
+    const TRADE_CODE = /^[1-9][0-9]{7}-[A-Z0-9]{5}$/;
     const system = await findSystem("public");
     if (isHttpResponse(system)) return system;
     console.log(JSON.stringify(event));
@@ -139,15 +144,16 @@ export async function downloader(event: APIGatewayProxyEventV2WithRequestContext
         }
     }
     const geek = cookies['extstatsid'];
+    const trade = "true" === event.queryStringParameters.trade.toString();
 
-    const url = `https://boardgamegeek.com/xmlapi/geeklist/${geeklist}`;
+    const url = `https://boardgamegeek.com/xmlapi/geeklist/${geeklist}?comments=${trade ? 1 : 0}`;
     const xml = await fetchXMLFromBGG(system.geeklistToken,  url);
     if (isHttpResponse(xml)) return xml;
 
     const parser = new XMLParser({
         ignoreAttributes: false, trimValues: true,
         isArray: (name, jpath, isLeafNode, isAttribute) => {
-            if (["play","subtype","player","comments"].indexOf(name) >= 0) return true;
+            if (["play","subtype","player","comments","comment"].indexOf(name) >= 0) return true;
             if (["item","players","subtypes","body"].indexOf(name) >= 0) return false;
             if (name.startsWith("@_") || name.startsWith("?")) return false;
             return false;
@@ -157,13 +163,23 @@ export async function downloader(event: APIGatewayProxyEventV2WithRequestContext
     const gl = doc.geeklist;
     const items: GeeklistItem[] = [];
     for (const item of gl.item) {
+        console.log(JSON.stringify(item));
         if (item["@_subtype"] === "boardgame") {
-            items.push({
+            const ni: GeeklistItem = {
                 name: item["@_objectname"],
                 bggid: parseInt(item["@_objectid"]),
                 user: item["@_username"],
                 id: item["@_id"]
-            });
+            };
+            items.push(ni);
+            if (item.comment) {
+                for (const c of item.comment) {
+                    if (TRADE_CODE.test(c["#text"])) {
+                        ni.tradeCode = c["#text"];
+                        break;
+                    }
+                }
+            }
         }
     }
     const data: GeeklistData = {
