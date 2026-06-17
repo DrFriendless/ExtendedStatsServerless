@@ -110,7 +110,7 @@ interface GeeklistData {
 }
 
 export async function downloader(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | GeeklistCheck> {
-    const TRADE_CODE = /^[1-9][0-9]{7}-[A-Z0-9]{5}$/;
+    const TRADE_CODE = /^[1-9][0-9]{7}-[A-Z0-9_]{5}$/;
     const system = await findSystem("public");
     if (isHttpResponse(system)) return system;
     console.log(JSON.stringify(event));
