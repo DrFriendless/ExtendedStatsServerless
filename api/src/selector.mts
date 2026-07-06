@@ -83,6 +83,14 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
             if (geek) ids.forEach(id => metadata.add(id, "player", geek));
             return ids;
         }
+        case "piy": {
+            let { geekId, geek } = await getGeekIdFromArgs(conn, expr.args[0] as Arg, vars);
+            const year = getNumberFromArgs(expr.args[1] as Arg, vars);
+            const sql = "select distinct game from plays_normalised where geek = ? and year = ?";
+            const ids = (await conn.query(sql, [geekId, year]) as GeekGamesTableRow[]).map(row => row["game"]) as number[];
+            if (geek) ids.forEach(id => metadata.add(id, "player", geek));
+            return ids;
+        }
         case "owned": {
             let { geekId, geek } = await getGeekIdFromArgs(conn, expr.args[0] as Arg, vars);
             const sql = "select game from geekgames where geekid = ? and owned > 0";
