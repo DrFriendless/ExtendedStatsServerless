@@ -60,12 +60,12 @@ async function fetchXMLFromBGG(token: string, url: string): Promise<string | Htt
     let count = 0;
     while (resp.status === 202 && count < 3) {
         count++;
-        await sleep(5000);
+        await sleep(10000);
         resp = await fetchFromBGG(token, url);
     }
     if (count === 3) {
         return {
-            statusCode: 503,
+            statusCode: 202,
             body: JSON.stringify("BGG didn't supply the geeklist in time")
         };
     }
@@ -163,7 +163,7 @@ export async function downloader(event: APIGatewayProxyEventV2WithRequestContext
     const gl = doc.geeklist;
     const items: GeeklistItem[] = [];
     for (const item of gl.item) {
-        console.log(JSON.stringify(item));
+        // console.log(JSON.stringify(item));
         if (item["@_subtype"] === "boardgame") {
             const ni: GeeklistItem = {
                 name: item["@_objectname"],

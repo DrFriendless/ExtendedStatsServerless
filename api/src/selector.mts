@@ -119,6 +119,13 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
             if (geek) ids.forEach(id => metadata.add(id, "geek", geek));
             return ids;
         }
+        case "trade": {
+            let { geekId, geek } = await getGeekIdFromArgs(conn, expr.args[0] as Arg, vars);
+            const sql = "select game from geekgames where geekid = ? and trade = 1";
+            const ids = (await conn.query(sql, [geekId]) as GeekGamesTableRow[]).map(row => row["game"]);
+            if (geek) ids.forEach(id => metadata.add(id, "geek", geek));
+            return ids;
+        }
         case "expansions": {
             return (await conn.query("select distinct expansion from expansions") as { expansion: number }[]).map(row => row["expansion"]);
         }

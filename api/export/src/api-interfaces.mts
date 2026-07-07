@@ -215,6 +215,7 @@ export interface GeekGame {
     wantToPlay: boolean;
     preordered: boolean;
     prevOwned: boolean;
+    forTrade: boolean;
 }
 
 export interface GameData {
