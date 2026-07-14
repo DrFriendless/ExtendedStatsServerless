@@ -14,6 +14,7 @@ export interface GeekGameRow {
     wish: number;
     forTrade: boolean;
     normRating: number;
+    tags: string[];
 }
 
 export interface RetrievePlay {
@@ -229,5 +230,6 @@ export const FAKE_GEEK_GAME: Partial<GeekGameRow> = {
     preordered: false,
     wish: 0,
     forTrade: false,
-    normRating: 0
+    normRating: 0,
+    tags: []
 }

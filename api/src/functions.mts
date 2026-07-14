@@ -36,6 +36,7 @@ import {
 import {ExpansionData, UserConfig} from "extstats-core";
 import {loadAuth} from "./authdb.mjs";
 import {SendMessageCommand, SendMessageCommandOutput, SQSClient} from "@aws-sdk/client-sqs";
+import {getSecureUserData} from "./auth.mjs";
 
 export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | CatalistMetadata> {
     const system = await findSystem("private");
@@ -269,6 +270,8 @@ export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
+    const userData = await getSecureUserData(system, event);
+    const userConfig = userData ? new UserConfig(this.userData.data) : undefined;
 
     const geek = event.queryStringParameters.geek;
     if (!geek) {
@@ -309,10 +312,10 @@ export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext
         for (const r of yourPlays) {
             yourPlaysByGame[r.bggid.toString()] = r.q;
         }
-        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekId);
+        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekId, userConfig);
         mostPlayed.forEach(mp => mp.yourPlays = yourPlaysByGame[mp.bggid.toString()] || 0);
         mostPlayed.sort((mp1, mp2) => mp2.plays - mp1.plays);
-        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekId);
+        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekId, userConfig);
         mostPlayedNew.forEach(mp => mp.yourPlays = yourPlaysByGame[mp.bggid.toString()] || 0);
         mostPlayedNew.sort((mp1, mp2) => mp2.plays - mp1.plays);
         return { year, geek, mostPlayed, mostPlayedNew };

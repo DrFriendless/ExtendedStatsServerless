@@ -88,8 +88,11 @@ export class System {
         }
     }
 
-    async incrementApiCounter() {
+    async incrementApiCounter(mcp = false) {
         await this.asyncWithConnection(async conn => conn.query("update counters set api_calls = api_calls + 1"));
+        if (mcp) {
+            await this.asyncWithConnection(async conn => conn.query("update counters set mcp = mcp + 1"));
+        }
     }
 }
 

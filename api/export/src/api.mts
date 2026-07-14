@@ -17,8 +17,10 @@ import {
 
 export class ExtstatsApi {
     private broken = false;
+    private mcpOpt: string;
 
-    constructor(private baseUrl: string) {
+    constructor(private baseUrl: string, private mcp: boolean = false) {
+        this.mcpOpt = mcp ? "&mcp=1" : "";
     }
 
     checkForBroken() {
@@ -42,17 +44,19 @@ export class ExtstatsApi {
     }
 
     async getUpdates(geek: string): Promise<{ forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {
-        return (await (await fetch(`${this.baseUrl}/updates?geek=${geek}`, {
+        return (await (await fetch(`${this.baseUrl}/updates?geek=${geek}${this.mcpOpt}`, {
             headers: {
                 "Content-Type": "application/json"
             }
         })).json()) as { forGeek: ToProcessSummary[], forSystem: Record<string, number> };
     }
 
-    async getGeekSummary(geek: string): Promise<GeekSummary> {
-        return (await (await fetch(`${this.baseUrl}/geek?geek=${geek}`, {
+    async getGeekSummary(geek: string, username?: string, password?: string): Promise<GeekSummary> {
+        const authHeaders = this.authHeaders(username, password);
+        return (await (await fetch(`${this.baseUrl}/geek?geek=${geek}${this.mcpOpt}`, {
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                ...authHeaders
             }
         })).json()) as GeekSummary;
     }
@@ -101,13 +105,13 @@ export class ExtstatsApi {
     }
 
     async recalculatePlays(geek: string): Promise<void> {
-        await fetch(`${this.baseUrl}/recalculatePlays?geek=${geek}`, {
+        await fetch(`${this.baseUrl}/recalculatePlays?geek=${geek}${this.mcpOpt}`, {
             method: "POST"
         });
     }
 
     async updateOld(geek: string): Promise<string[]> {
-        return (await (await fetch(`${this.baseUrl}/updateOld?geek=${geek}`, {
+        return (await (await fetch(`${this.baseUrl}/updateOld?geek=${geek}${this.mcpOpt}`, {
             headers: {
                 "Accept": "application/json",
             },
@@ -126,11 +130,21 @@ export class ExtstatsApi {
         })).json()) as FAQCount[];
     }
 
-    async retrieve(query: string): Promise<object> {
-        return (await (await fetch(`${this.baseUrl}/retrieve?query=${query}`, {
+    private authHeaders(username?: string, password?: string): Record<string, string> {
+        const extraHeaders: Record<string, string> = {};
+        if (username && password) {
+            extraHeaders["Authorization"] = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+        }
+        return extraHeaders;
+    }
+
+    async retrieve(query: string, username?: string, password?: string): Promise<object> {
+        const authHeaders = this.authHeaders(username, password);
+        return (await (await fetch(`${this.baseUrl}/retrieve?query=${query}${this.mcpOpt}`, {
             headers: {
                 "Content-Type": "application/json",
-                "Accept": "application/json"
+                "Accept": "application/json",
+                ...authHeaders
             },
             method: "GET"
         })).json()) as object;
@@ -149,13 +163,13 @@ export class ExtstatsApi {
     }
 
     async findDesigner(bggid: number): Promise<Designer | undefined> {
-        const text = await (await fetch(`${this.baseUrl}/finddesigner?bggid=${bggid}`)).text();
+        const text = await (await fetch(`${this.baseUrl}/finddesigner?bggid=${bggid}${this.mcpOpt}`)).text();
         if (!text) return undefined;
         return (JSON.parse(text)) as Designer;
     }
 
     async findPublisher(bggid: number): Promise<Publisher | undefined> {
-        const text = await (await fetch(`${this.baseUrl}/findpublisher?bggid=${bggid}`)).text();
+        const text = await (await fetch(`${this.baseUrl}/findpublisher?bggid=${bggid}${this.mcpOpt}`)).text();
         if (!text) return undefined;
         return (JSON.parse(text)) as Publisher;
     }
@@ -338,7 +352,7 @@ export class ExtstatsApi {
     }
 
     async checkGeeklist(geeklist: number, trade: boolean): Promise<GeeklistCheck> {
-        return (await (await fetch(`${this.baseUrl}/geeklist?geeklist=${geeklist}&trade=${trade}`, {
+        return (await (await fetch(`${this.baseUrl}/geeklist?geeklist=${geeklist}&trade=${trade}${this.mcpOpt}`, {
             headers: {
                 "Accept": "application/json",
                 "Content-Type": "application/json"
@@ -348,7 +362,7 @@ export class ExtstatsApi {
     }
 
     async getRecommendations(geek: string): Promise<ProcessedRecRow[]> {
-        return (await (await fetch(`${this.baseUrl}/recommendations?geek=${geek}`, {
+        return (await (await fetch(`${this.baseUrl}/recommendations?geek=${geek}${this.mcpOpt}`, {
             headers: {
                 "Accept": "application/json",
                 "Content-Type": "application/json"
@@ -358,7 +372,7 @@ export class ExtstatsApi {
     }
 
     async getHotness(geek: string, year: number): Promise<Hotness> {
-        return (await (await fetch(`${this.baseUrl}/hotness?geek=${geek}&year=${year}`, {
+        return (await (await fetch(`${this.baseUrl}/hotness?geek=${geek}&year=${year}${this.mcpOpt}`, {
             headers: {
                 "Content-Type": "application/json"
             },
@@ -367,7 +381,7 @@ export class ExtstatsApi {
     }
 
     async getDesignerInfo(geek: string): Promise<DesignerResult[]> {
-        return (await (await fetch(`${this.baseUrl}/designers?geek=${geek}`, {
+        return (await (await fetch(`${this.baseUrl}/designers?geek=${geek}${this.mcpOpt}`, {
             headers: {
                 "Content-Type": "application/json"
             },

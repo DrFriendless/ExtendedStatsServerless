@@ -17,7 +17,7 @@ export async function check(data: GeeklistData):
     await system.incrementApiCounter();
 
     const bggids = [...new Set(data.items.map(i => i.bggid))];
-    const geekData = await system.asyncReturnWithConnection(conn => retrieveGeekGames(conn, bggids, data.geek));
+    const geekData = await system.asyncReturnWithConnection(conn => retrieveGeekGames(conn, bggids, data.geek, undefined));
     const index: Record<string, GeekGameRow> = {};
     geekData.forEach(gg => index[gg.bggid.toString()] = gg);
     return {

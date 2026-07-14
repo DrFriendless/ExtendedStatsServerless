@@ -8,7 +8,7 @@ import {
     getMonthlyCounts,
     getMonthlyPlays
 } from "./mysql-rds.mjs";
-import {getCookiesFromEvent, getGeekId, getGeekIds} from "./library.mjs";
+import {getGeekId, getGeekIds} from "./library.mjs";
 import { parse } from "./parser.mjs";
 import {evaluateSimple, evaluateSimpleGames, GeekGameSelectResult, retrieveGeekGames} from "./selector.mjs";
 import {VarBindings} from "./varbindings.mjs";
@@ -26,8 +26,8 @@ import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 import {GameData, MonthlyPlayCount, MonthlyPlays, NickelDimeData, PlaysWithDate} from "export";
 import {SelectorMetadataSet} from "./selector-metadata.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
-import {loadAuth} from "./authdb.mjs";
 import {makeIndex} from "extstats-core";
+import {getSecureUserData, SecureUserData} from "./auth.mjs";
 
 class GameDataShort {
 }
@@ -38,12 +38,6 @@ interface Loaders {
     gamesShort: DataLoader<number, GameDataShort>;
     designers: DataLoader<number, DesignerData>;
     gameDesigners: DataLoader<number, DesignerData[]>;
-}
-
-// authenticated user
-export interface UserData {
-    user: string;
-    data: any;
 }
 
 function createLoaders(system: System): Loaders {
@@ -164,6 +158,7 @@ function buildGeekGameType(loaders: Loaders, gameDataType: GraphQLObjectType<Gam
                 wantInTrade: {type: graphql.GraphQLBoolean!},
                 wish: {type: graphql.GraphQLInt!},
                 normRating: {type: graphql.GraphQLFloat!},
+                tags: {type: ListOfString},
                 game: {
                     type: gameDataType,
                     resolve: (parent: { bggid: number }) => loaders.games.load(parent.bggid)
@@ -371,7 +366,7 @@ function buildShortMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: Gra
     });
 }
 
-function buildSchema(loaders: Loaders, userData: UserData | undefined) {
+function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
     const nickelDimeDataType: GraphQLObjectType<NickelDimeData> = buildNickelDimeGameDataType(loaders, gameDataType);
     const gameDataTypeShort: GraphQLObjectType<GameDataShort> = buildGameDataTypeShort(loaders);
@@ -433,7 +428,7 @@ function buildSchema(loaders: Loaders, userData: UserData | undefined) {
                                 const gds = await doRetrieveGames(conn, games);
                                 const gi: Record<string, GameData> = {};
                                 gds.forEach(gd => gi[gd.bggid.toString()] = gd);
-                                const ggs = await doRetrieveGeekGames(conn, args.geek, games);
+                                const ggs = await doRetrieveGeekGames(conn, args.geek, games, undefined);
                                 const index: Record<string, ExtendedGeekGame> = {};
                                 ggs.forEach(gg => index[gg.bggid.toString()] = gg);
                                 // fill in fake GG information
@@ -842,7 +837,7 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
     const games: GameData[] = await doRetrieveGames(conn, gameIds);
     const geekgames: GeekGameRow[] = [];
     for (const geek of Object.values<string>(geekNameIds)) {
-        const ggs: GeekGameRow[] = await retrieveGeekGames(conn, gameIds, geek);
+        const ggs: GeekGameRow[] = await retrieveGeekGames(conn, gameIds, geek, undefined);
         geekgames.push(...ggs);
     }
     return { geeks: Object.values<string>(geekNameIds), plays: basePlays, games, geekgames };
@@ -857,17 +852,12 @@ export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<a
     console.log(JSON.stringify(event));
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(!!event.queryStringParameters['mcp']);
     const loaders = createLoaders(system);
 
     // give the selectors access to the authenticated user's private data
-    let userData: UserData | undefined = undefined;
-    const cookies = getCookiesFromEvent(event);
-    if (cookies['extstatsid']) {
-        const user = cookies['extstatsid'];
-        console.log(`User is ${user}`);
-        const sData: string = (await loadAuth(system, user))?.configuration || "{}";
-        userData = { user, data: JSON.parse(sData) };
-    }
+    const userData = await getSecureUserData(system, event);
+    console.log(userData);
     const schema = buildSchema(loaders, userData);
     let query: string | undefined = undefined;
     let operationName: string | undefined;
@@ -883,11 +873,7 @@ export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<a
         // CORS
         return {
             statusCode: 200,
-            body: "",
-            // headers: {
-            //     "Access-Control-Allow-Methods": "POST",
-            //     "Access-Control-Allow-Origin": "*"
-            // }
+            body: ""
         }
     }
     console.log(query);
@@ -901,19 +887,12 @@ export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<a
         return {
             statusCode: 400,
             body: JSON.stringify(result.errors),
-            // headers: {
-            //     "Access-Control-Allow-Methods": "POST",
-            //     "Access-Control-Allow-Origin": "*"
-            // }
         }
     } else {
+        console.log(JSON.stringify(result.data));
         return {
             statusCode: 200,
             body: JSON.stringify(result.data),
-            // headers: {
-            //     "Access-Control-Allow-Methods": "POST",
-            //     "Access-Control-Allow-Origin": "*"
-            // }
         }
     }
 }

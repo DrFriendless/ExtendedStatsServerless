@@ -1,5 +1,5 @@
-import {UserData} from "./retrieve.mjs";
 import {UserConfig} from "extstats-core";
+import {SecureUserData} from "./auth.mjs";
 
 export interface VarBinding {
     name: string;
@@ -8,9 +8,9 @@ export interface VarBinding {
 
 export class VarBindings {
     private readonly vars: Record<string, string> = {};
-    private readonly userData: UserData | undefined;
+    private readonly userData: SecureUserData | undefined;
 
-    constructor(varBindings: VarBinding[], userData: UserData | undefined) {
+    constructor(varBindings: VarBinding[], userData: SecureUserData | undefined) {
         for (const vb of varBindings) this.vars[vb.name] = vb.value;
         this.userData = userData;
     }

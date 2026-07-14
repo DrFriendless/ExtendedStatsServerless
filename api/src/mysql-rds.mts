@@ -10,7 +10,7 @@ import {
 } from "./interfaces.mjs";
 import * as dateMath from 'date-arithmetic';
 import * as mysql from 'promise-mysql';
-import {System} from "./system.mjs";
+import {HttpResponse, System} from "./system.mjs";
 import {Connection} from "promise-mysql";
 import {
     AmbiguousPlay,
@@ -22,21 +22,21 @@ import {
     NewsItem,
     RankingTableRow, SystemStats, ToProcessSummary, TypeCount, WarTableRow
 } from "export";
-import { ExpansionData } from "extstats-core";
+import {ExpansionData, UserConfig} from "extstats-core";
 import {DesignerData} from "./retrieve.mjs";
 
-export async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
-    return await retrieveGeekGames(conn, ids, geek);
+export async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[], userData: UserConfig | undefined): Promise<ExtendedGeekGame[]> {
+    return await retrieveGeekGames(conn, ids, geek, userData);
 }
 
-export async function doRetrieveGeekIdGames(conn: mysql.Connection, geekId: number, geek: string, ids: number[]): Promise<ExtendedGeekGame[]> {
-    return await retrieveGeekIdGames(conn, ids, geek, geekId);
+export async function doRetrieveGeekIdGames(conn: mysql.Connection, geekId: number, geek: string, ids: number[], userData: UserConfig | undefined): Promise<ExtendedGeekGame[]> {
+    return await retrieveGeekIdGames(conn, ids, geek, geekId, userData);
 }
 
-export async function patchGeekData(conn: Connection, rows: MostPlaysRow[], geek: string, geekId: number): Promise<MostPlayedEntry[]> {
+export async function patchGeekData(conn: Connection, rows: MostPlaysRow[], geek: string, geekId: number, userData: UserConfig | undefined): Promise<MostPlayedEntry[]> {
     const bggIds = rows.map(r => r.bggid);
 
-    const ggs = await doRetrieveGeekIdGames(conn, geekId, geek, bggIds);
+    const ggs = await doRetrieveGeekIdGames(conn, geekId, geek, bggIds, userData);
     const index: Record<string, ExtendedGeekGame> = {};
     ggs.forEach(gg => index[gg.bggid.toString()] = gg);
     // fill in fake GG information
@@ -280,7 +280,7 @@ export async function getAmbiguousGames(conn: Connection, geek: string): Promise
     return { games, plays };
 }
 
-export async function gatherGeekSummary(system: System, geek: string): Promise<GeekSummary> {
+export async function gatherGeekSummary(system: System, geek: string): Promise<GeekSummary | HttpResponse> {
     return await system.asyncReturnWithConnection(async conn => await doGetGeekSummary(conn, geek));
 }
 
@@ -340,10 +340,17 @@ async function doMarkGeekForUpdate(conn: mysql.Connection, geek: string): Promis
     return rows.map(row => row["url"]);
 }
 
-async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary> {
+async function doGetGeekSummary(conn: mysql.Connection, geek: string): Promise<GeekSummary | HttpResponse> {
     const ratedSql = "select count(*) c, avg(rating) avg from geekgames where geekId = ? and rating > 0";
     const monthsPlayedSql = "select count(*) c from months_played where geek = ?";
-    const geekId = await getGeekId(conn, geek);
+    let geekId: number = 0;
+    try {
+        geekId = await getGeekId(conn, geek);
+    } catch (err) {
+        return {
+            statusCode: 404
+        }
+    }
 
     const warSql = "select * from war_table where geek = ?";
     const warTableRow = (await conn.query(warSql, [geekId]))[0];
