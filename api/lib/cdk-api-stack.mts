@@ -145,12 +145,14 @@ export class ApiStack extends cdk.Stack {
         MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
         MYSQL_DATABASE: process.env.MYSQL_DATABASE,
         GEEKLIST_TOKEN: process.env.GEEKLIST_TOKEN,
-        DOWNLOADER_QUEUE: process.env.DOWNLOADER_QUEUE
+        DOWNLOADER_QUEUE: process.env.DOWNLOADER_QUEUE,
+        SECURE_COOKIE_KEY: process.env.SECURE_COOKIE_KEY
       },
     };
     const publicParams: Partial<lambda.FunctionProps> = {
       environment: {
-        DOWNLOADER_QUEUE: process.env.DOWNLOADER_QUEUE
+        DOWNLOADER_QUEUE: process.env.DOWNLOADER_QUEUE,
+        SECURE_COOKIE_KEY: process.env.SECURE_COOKIE_KEY
       }
     };
     const f = new lambda.Function(scope, name, {

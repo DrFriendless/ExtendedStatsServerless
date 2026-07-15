@@ -19,7 +19,7 @@ import {
 } from "./mysql-rds.mjs";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
-import {getCookiesFromEvent, getGeekId} from "./library.mjs";
+import {getGeekId, getUserFromEvent} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {MostPlaysRow} from "./interfaces.mjs";
 import {
@@ -44,9 +44,8 @@ export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithReque
     await system.incrementApiCounter();
 
     let tags: string[] = [];
-    const cookies = getCookiesFromEvent(event);
-    if (cookies['extstatsid']) {
-        const user = cookies['extstatsid'];
+    const user = getUserFromEvent(event);
+    if (user) {
         const sData: string = (await loadAuth(system, user))?.configuration || "{}";
         const uc = new UserConfig(JSON.parse(sData));
         const tagGroups = uc.get("tagalogue.taggroups", []);
@@ -216,13 +215,11 @@ export async function getDisambiguationData(event: APIGatewayProxyEventV2WithReq
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter();
 
-    const cookies = getCookiesFromEvent(event);
-    console.log(cookies);
-    const geek = cookies['extstatsid'];
+    const geek = getUserFromEvent(event);
     if (!geek) {
         return {
             statusCode: 400,
-            body: JSON.stringify("You must specify a 'geek' parameter")
+            body: JSON.stringify("You must be logged in")
         }
     }
     return await system.asyncReturnWithConnection(async conn => {

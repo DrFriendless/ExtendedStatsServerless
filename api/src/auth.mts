@@ -1,4 +1,4 @@
-import {getCookiesFromEvent} from "./library.mjs";
+import {getCookiesFromEvent, getUserFromEvent} from "./library.mjs";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 import utf8 from 'utf8';
 import {scryptSync} from "node:crypto";
@@ -16,6 +16,7 @@ import {AuthTableRow, AuthTask} from "./interfaces.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {getChatterCode} from "./socks.mjs";
 import {UserData} from "export";
+import crypto from "crypto";
 
 const COST = 4096;
 const SALT_LENGTH = 22;
@@ -29,10 +30,22 @@ function makeIdCookie(id: string, test: boolean) {
 }
 
 function makeSecureIdCookie(id: string, test: boolean) {
+    const iv = crypto.randomBytes(12);
+    const key = process.env.SECURE_COOKIE_KEY;
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encryptedCookie = Buffer.concat(
+        [
+            Buffer.from('v1:'), // prefix
+            iv,                      // 12 bytes nonce
+            cipher.update(id),       // cookie data
+            cipher.final(),
+            cipher.getAuthTag()      // 16 bytes authentication
+        ]);
+    const cookie = encryptedCookie.toString('base64');
     if (test) {
-        return "extstatssec=" + id + "; Domain=localhost; Path=/; Max-Age=360000; SameSite=Lax";
+        return "extstatssec=" + cookie + "; Domain=localhost; Path=/; Max-Age=360000; SameSite=Strict; HttpOnly";
     } else {
-        return "extstatssec=" + id + "; Domain=drfriendless.com; Path=/; Max-Age=360000; SameSite=Lax";
+        return "extstatssec=" + cookie + "; Domain=drfriendless.com; Path=/; Max-Age=360000; SameSite=Strict; HttpOnly; Secure";
     }
 }
 
@@ -55,9 +68,9 @@ function makeLogoutCookie(test: boolean) {
 
 function makeSecureLogoutCookie(test: boolean) {
     if (test) {
-        return "extstatssec=; Domain=localhost; Path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+        return "extstatssec=; Domain=localhost; Path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; HttpOnly";
     } else {
-        return "extstatssec=; Domain=drfriendless.com; Path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+        return "extstatssec=; Domain=drfriendless.com; Path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; HttpOnly; Secure";
     }
 }
 
@@ -88,7 +101,6 @@ async function checkPassword(system: System, username: string, password: string)
 }
 
 /**
- * If they have the extstatsid cookie, return their user data.
  * @param event
  */
 export async function login(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
@@ -215,7 +227,8 @@ export async function logout(event: APIGatewayProxyEventV2WithRequestContext<any
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     const cookie = makeLogoutCookie(event.headers.origin.includes("://localhost:"));
-    return { "statusCode": 200, headers: {"Set-Cookie": cookie}, body: JSON.stringify({}) };
+    const secCookie = makeSecureLogoutCookie(event.headers.origin.includes("://localhost:"));
+    return { "statusCode": 200, cookies: [cookie, secCookie], body: JSON.stringify({}) };
 }
 
 export async function updatePersonal(event: APIGatewayProxyEventV2WithRequestContext<any>) {
@@ -223,10 +236,9 @@ export async function updatePersonal(event: APIGatewayProxyEventV2WithRequestCon
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
 
-    const cookies = getCookiesFromEvent(event);
-    console.log(cookies);
-    if (cookies['extstatsid']) {
-        const resp = await doUpdateUserConfig(system, cookies['extstatsid'], JSON.parse(event.body || "{}"));
+    const user = getUserFromEvent(event);
+    if (user) {
+        const resp = await doUpdateUserConfig(system, user, JSON.parse(event.body || "{}"));
         if (resp) return resp;
         return { statusCode: 200 };
     } else {
@@ -277,18 +289,19 @@ export async function personal(event: APIGatewayProxyEventV2WithRequestContext<a
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
 
-    const cookies: Record<string, string> = getCookiesFromEvent(event);
-    if (cookies['extstatsid']) {
-        const user = await loadAuth(system, cookies['extstatsid']);
-        if (!user) {
+    const user = getUserFromEvent(event);
+    if (user) {
+        const authRow = await loadAuth(system, user);
+        if (!authRow) {
             return { "statusCode": 403, body: "{}" };
         } else {
             const test = !!event.headers.referer && event.headers.referer.indexOf("://localhost:") >= 0;
-            const idCookie = makeIdCookie(cookies['extstatsid'], test);
-            const chatterCookie = await makeChatterCookie(cookies['extstatsid'], test);
+            const idCookie = makeIdCookie(user, test);
+            const secureIdCookie = makeSecureIdCookie(user, test);
+            const chatterCookie = await makeChatterCookie(user, test);
             console.log([ test, idCookie, chatterCookie ]);
             // to set multiple cookies, use a string[] rather than a string.
-            return { "statusCode": 200, cookies: [ idCookie, chatterCookie ], body: user.configuration || "{}" };
+            return { "statusCode": 200, cookies: [ idCookie, secureIdCookie, chatterCookie ], body: authRow.configuration || "{}" };
         }
     } else {
         return { "statusCode": 403, body: "{}" };
@@ -304,6 +317,8 @@ export interface SecureUserData {
 export async function getSecureUserData(system: System, event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<SecureUserData | undefined> {
     let userData: SecureUserData | undefined = undefined;
     const cookies = getCookiesFromEvent(event);
+    const secureCookie = cookies['extstatssec'];
+    // const insecureCookie = cookies['extstatsid'];
     let authHeader: string | undefined = undefined;
     for (const h in event.headers) {
         if (h.toLowerCase() === "authorization") {
@@ -326,12 +341,34 @@ export async function getSecureUserData(system: System, event: APIGatewayProxyEv
             }
         }
     }
-    if (!userData && cookies['extstatsid']) {
-        // TODO - this is insecure as a server can send whatever it wants
-        const user = cookies['extstatsid'];
-        console.log(`User is ${user}`);
+    if (!userData && secureCookie) {
+        const user = getUserFromSecureCookie(secureCookie);
         const sData: string = (await loadAuth(system, user))?.configuration || "{}";
         userData = { user, data: JSON.parse(sData) };
     }
+    // if (!userData && insecureCookie) {
+    //     // TODO - this is insecure as a server can send whatever it wants
+    //     const user = insecureCookie;
+    //     console.log(`User is ${user}`);
+    //     const sData: string = (await loadAuth(system, user))?.configuration || "{}";
+    //     userData = { user, data: JSON.parse(sData) };
+    // }
     return userData;
+}
+
+export function getUserFromSecureCookie(secureCookie: string): string {
+    const encryptedCookie = Buffer.from(secureCookie, 'base64');
+    const key = process.env.SECURE_COOKIE_KEY;
+    const prefix = encryptedCookie.subarray(0, 3);                            // prefix
+    const iv = encryptedCookie.subarray(3, 3 + 12);                               // 12 bytes nonce
+    const ciphertext = encryptedCookie.subarray(3 + 12, encryptedCookie.length - 16);  // encrypted cookie
+    const authTag = encryptedCookie.subarray(encryptedCookie.length - 16);             // 12 bytes authentication tag
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(Buffer.from(authTag, ));
+    const decryptedCookie = Buffer.concat(
+        [
+            decipher.update(ciphertext),      // encrypted cookie
+            decipher.final(),
+        ]);
+    return decryptedCookie.toString("utf8");
 }
