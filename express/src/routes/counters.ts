@@ -7,6 +7,7 @@ import { incrementExpressCounter, withConnectionAsync } from "./library";
  * @param {} res
  */
 export async function count(req: Request, res: Response): Promise<void> {
+    console.log("Express count");
     const f = (req.query["counts"] || "").toString();
     for (const s1 of f.split(",").filter(s => s.length > 0)) {
         switch (s1) {
@@ -19,5 +20,5 @@ export async function count(req: Request, res: Response): Promise<void> {
         }
     }
     await incrementExpressCounter();
-    res.status(200);
+    res.status(200).send("");
 }
