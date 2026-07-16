@@ -41,7 +41,7 @@ import {getSecureUserData} from "./auth.mjs";
 export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | CatalistMetadata> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
 
     let tags: string[] = [];
     const user = getUserFromEvent(event);
@@ -60,10 +60,10 @@ export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithReque
     return { ...cm, tags };
 }
 
-export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpResponse | { forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {
+export async function getUpdates(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | { forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
 
     return {
         forGeek: await gatherGeekUpdates(system, event.queryStringParameters.geek),
@@ -71,17 +71,17 @@ export async function getUpdates(event: APIGatewayProxyEvent): Promise<HttpRespo
     };
 }
 
-export async function markForUpdate(event: APIGatewayProxyEvent) {
+export async function markForUpdate(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     return await markUrlForUpdate(system, JSON.parse(event.body).url);
 }
 
-export async function updateOld(event: APIGatewayProxyEvent) {
+export async function updateOld(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     return await markGeekForUpdate(system, event.queryStringParameters.geek);
 }
 
@@ -110,40 +110,40 @@ export async function recalculatePlays(event: APIGatewayProxyEvent) {
     }
 }
 
-export async function getGeekSummary(event: APIGatewayProxyEvent): Promise<HttpResponse | GeekSummary> {
+export async function getGeekSummary(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | GeekSummary> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     return await gatherGeekSummary(system, event.queryStringParameters.geek);
 }
 
-export async function incFAQCount(event: APIGatewayProxyEvent): Promise<HttpResponse | FAQCount[]> {
+export async function incFAQCount(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | FAQCount[]> {
     console.log(event);
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     return await updateFAQCount(system, JSON.parse(event.body) as number[]);
 }
 
-export async function adminGatherSystemStats(event: APIGatewayProxyEvent): Promise<HttpResponse | SystemStats> {
+export async function adminGatherSystemStats(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | SystemStats> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     return await gatherSystemStats(system);
 }
 
 // Lambda to retrieve the list of users
-export async function getUserList(ignored: APIGatewayProxyEvent): Promise<HttpResponse | string[]> {
+export async function getUserList(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | string[]> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     return await listUsers(system);
 }
 
-export async function getUserCheckList(event: APIGatewayProxyEvent): Promise<HttpResponse> {
+export async function getUserCheckList(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
 
     const geek = event.queryStringParameters.geek;
     if (!geek) {
@@ -179,10 +179,10 @@ export async function getUserCheckList(event: APIGatewayProxyEvent): Promise<Htt
 }
 
 // Lambda to retrieve the data for the war table.
-export async function getWarTable(ignored: APIGatewayProxyEvent): Promise<HttpResponse | WarTableRow[]> {
+export async function getWarTable(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | WarTableRow[]> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     const rows = await listWarTable(system);
     console.log(rows);
     return {
@@ -191,19 +191,19 @@ export async function getWarTable(ignored: APIGatewayProxyEvent): Promise<HttpRe
     }
 }
 
-export async function getNews(event: APIGatewayProxyEvent): Promise<NewsItem[] | HttpResponse> {
+export async function getNews(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<NewsItem[] | HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     return await system.asyncReturnWithConnection(async conn => await doGetNews(conn));
 }
 
-export async function getRankings(event: any): Promise<RankingTableRow[] | HttpResponse> {
+export async function getRankings(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<RankingTableRow[] | HttpResponse> {
     console.log(event);
     if (event) {
         const system = await findSystem("private");
         if (isHttpResponse(system)) return system;
-        await system.incrementApiCounter();
+        await system.incrementApiCounter(event);
         return await rankGames(system);
     } else {
         return [];
@@ -213,7 +213,7 @@ export async function getRankings(event: any): Promise<RankingTableRow[] | HttpR
 export async function getDisambiguationData(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<DisambiguationData | HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
 
     const geek = getUserFromEvent(event);
     if (!geek) {
@@ -266,7 +266,7 @@ interface ProcessedRecRow {
 export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<Hotness | HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
     const userData = await getSecureUserData(system, event);
     const userConfig = userData ? new UserConfig(this.userData.data) : undefined;
 
@@ -319,10 +319,10 @@ export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext
     });
 }
 
-export async function getRecommendations(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<ProcessedRecRow[] | HttpResponse> {
+export async function getRecommendations(event: APIGatewayProxyEventV2WithRequestContext<any> | undefined): Promise<ProcessedRecRow[] | HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
 
     const geek = event.queryStringParameters.geek;
     if (!geek) {

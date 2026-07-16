@@ -852,7 +852,7 @@ export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<a
     console.log(JSON.stringify(event));
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter(!!event.queryStringParameters['mcp']);
+    await system.incrementApiCounter(event);
     const loaders = createLoaders(system);
 
     // give the selectors access to the authenticated user's private data

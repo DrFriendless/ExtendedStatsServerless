@@ -88,8 +88,9 @@ export class System {
         }
     }
 
-    async incrementApiCounter(mcp = false) {
+    async incrementApiCounter(event: APIGatewayProxyEventV2WithRequestContext<any>) {
         await this.asyncWithConnection(async conn => conn.query("update counters set api_calls = api_calls + 1"));
+        const mcp = event && event.queryStringParameters && event.queryStringParameters['mcp'];
         if (mcp) {
             await this.asyncWithConnection(async conn => conn.query("update counters set mcp = mcp + 1"));
         }

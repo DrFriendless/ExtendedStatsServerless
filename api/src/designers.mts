@@ -1,13 +1,13 @@
-import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
 import {DesignerResult} from "export";
 import {getGeekId} from "./library.mjs";
 import {makeIndex} from "extstats-core";
+import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 
-export async function getDesigners(event: APIGatewayProxyEvent): Promise<HttpResponse | DesignerResult[]> {
+export async function getDesigners(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | DesignerResult[]> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(event);
 
     const geek = event.queryStringParameters.geek;
     if (!geek) {

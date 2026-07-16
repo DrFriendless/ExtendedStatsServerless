@@ -14,7 +14,7 @@ export async function check(data: GeeklistData):
     Promise<GeeklistCheck | HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
-    await system.incrementApiCounter();
+    await system.incrementApiCounter(undefined);
 
     const bggids = [...new Set(data.items.map(i => i.bggid))];
     const geekData = await system.asyncReturnWithConnection(conn => retrieveGeekGames(conn, bggids, data.geek, undefined));

@@ -346,13 +346,6 @@ export async function getSecureUserData(system: System, event: APIGatewayProxyEv
         const sData: string = (await loadAuth(system, user))?.configuration || "{}";
         userData = { user, data: JSON.parse(sData) };
     }
-    // if (!userData && insecureCookie) {
-    //     // TODO - this is insecure as a server can send whatever it wants
-    //     const user = insecureCookie;
-    //     console.log(`User is ${user}`);
-    //     const sData: string = (await loadAuth(system, user))?.configuration || "{}";
-    //     userData = { user, data: JSON.parse(sData) };
-    // }
     return userData;
 }
 
