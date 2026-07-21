@@ -1,8 +1,7 @@
 import { count, countTableRows, getGeekId } from "./library.mjs";
-import {retrieveGeekGames, retrieveGeekIdGames} from "./selector.mjs";
 import {
     ExtendedGeekGame,
-    FAKE_GEEK_GAME,
+    FAKE_GEEK_GAME, GeekGameRow, GeekGamesTableRow,
     MonthlyCountsQueryResult,
     MonthlyPlaysQueryResult, MostPlaysRow,
     ProcessMethodCount,
@@ -22,38 +21,126 @@ import {
     NewsItem,
     RankingTableRow, SystemStats, ToProcessSummary, TypeCount, WarTableRow
 } from "export";
-import {ExpansionData, UserConfig} from "extstats-core";
+import {ExpansionData} from "extstats-core";
 import {DesignerData} from "./retrieve.mjs";
 
-export async function doRetrieveGeekGames(conn: mysql.Connection, geek: string, ids: number[], userData: UserConfig | undefined): Promise<ExtendedGeekGame[]> {
-    return await retrieveGeekGames(conn, ids, geek, userData);
+export async function addTagToDatabase(conn: Connection, geek: string, bggid: number, tag: string): Promise<string[]> {
+    const geekId = await getGeekId(conn, geek);
+    const sql = "select tags from geekgames where geekid = ? and game = ?";
+    const rows: any[] = await conn.query(sql, [geekId, bggid]);
+    if (rows.length === 0) {
+        const insertSql = "insert into geekgames (game, geekid, tags, rating, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?)";
+        const tags: string[] = [ tag ];
+        await conn.query(insertSql, [bggid, geekId, JSON.stringify(tags), -1, 0, 0, 0]);
+        return tags;
+    } else {
+        console.log(`addTagToDatabase ${geek} ${bggid} ${tag} ${geekId}`);
+        console.log(JSON.stringify(rows));
+        const found: string[] = [];
+        let tags = rows[0].tags;
+        if (typeof tags === typeof "") tags = JSON.parse(tags);
+        if (!tags) tags = [];
+        for (const k of tags) {
+            const sk = k.toString();
+            if (sk && found.indexOf(sk) < 0) {
+                found.push(sk);
+            }
+        }
+        if (found.indexOf(tag) < 0) {
+            found.push(tag);
+        }
+        console.log(JSON.stringify(found));
+        const updateSql = "update geekgames set tags = ? where geekid = ? and game = ?";
+        await conn.query(updateSql, [JSON.stringify(found), geekId, bggid]);
+        return found;
+    }
+
 }
 
-export async function doRetrieveGeekIdGames(conn: mysql.Connection, geekId: number, geek: string, ids: number[], userData: UserConfig | undefined): Promise<ExtendedGeekGame[]> {
-    return await retrieveGeekIdGames(conn, ids, geek, geekId, userData);
+export async function removeTagFromDatabase(conn: Connection, geek: string, bggid: number, tag: string): Promise<string[]> {
+    const geekId = await getGeekId(conn, geek);
+    const sql = "select tags from geekgames where geekid = ? and game = ?";
+    const rows: any[] = await conn.query(sql, [geekId, bggid]);
+    console.log(`removeTagFromDatabase ${geek} ${bggid} ${tag} ${geekId}`);
+    console.log(JSON.stringify(rows));
+    if (rows.length === 0) return;
+    const found: string[] = [];
+    let tags = rows[0].tags;
+    if (typeof tags === typeof "") tags = JSON.parse(tags);
+    if (!tags) tags = [];
+    for (const k of tags) {
+        const sk = k.toString();
+        if (sk && found.indexOf(sk) < 0 && sk !== tag) {
+            found.push(sk);
+        }
+    }
+    console.log(JSON.stringify(found));
+    const updateSql = "update geekgames set tags = ? where geekid = ? and game = ?";
+    await conn.query(updateSql, [JSON.stringify(found), geekId, bggid]);
+    return found;
 }
 
-export async function patchGeekData(conn: Connection, rows: MostPlaysRow[], geek: string, geekId: number, userData: UserConfig | undefined): Promise<MostPlayedEntry[]> {
+export async function retrieveGeekIdGames(conn: mysql.Connection, ids: number[], geek: string, geekId: number, secureUser: string | undefined): Promise<GeekGameRow[]> {
+    if (ids.length === 0) return [];
+    const sqlMany = "select * from geekgames where geekid = ? and game in (?)";
+    const rows = (await conn.query(sqlMany, [geekId, ids]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg));
+    if (secureUser) {
+        await attachTags(conn, secureUser, rows);
+    }
+    return rows;
+}
+
+function extractGeekGame(geek: string, row: GeekGamesTableRow): GeekGameRow {
+    // The tags
+    return {
+        geek,
+        geekid: row["geekid"],
+        bggid: row["game"],
+        rating: row["rating"],
+        owned: row['owned'] > 0,
+        prevOwned: row['prevowned'] > 0,
+        wantToBuy: row['wanttobuy'] > 0,
+        wantToPlay: row['wanttoplay'] > 0,
+        preordered: row['preordered'] > 0,
+        wantInTrade: row['want'] > 0,
+        wish: row['wish'],
+        forTrade: row['trade'] > 0,
+        normRating: row.normrating,
+        // we do not use the value from the table, as we might not be allowed to see it.
+        tags: undefined
+    };
+}
+
+export async function patchGeekData(conn: Connection, rows: MostPlaysRow[], geek: string, geekId: number, secureUser: string | undefined): Promise<MostPlayedEntry[]> {
     const bggIds = rows.map(r => r.bggid);
 
-    const ggs = await doRetrieveGeekIdGames(conn, geekId, geek, bggIds, userData);
+    const ggs = await retrieveGeekIdGames(conn, bggIds, geek, geekId, secureUser);
     const index: Record<string, ExtendedGeekGame> = {};
     ggs.forEach(gg => index[gg.bggid.toString()] = gg);
     // fill in fake GG information
-    return rows.map(row => {
+    const entries: MostPlayedEntry[] = rows.map(row => {
         const gg = index[row.bggid.toString()];
-        return gg ? {
-            ...row,
-            ...gg,
-            yourPlays: 0,
-        } : {
-            ...row,
-            geek,
-            geekid: geekId,
-            ...FAKE_GEEK_GAME,
-            yourPlays: 0
+        if (gg) {
+            const entry: MostPlayedEntry = {
+                ...row,
+                ...gg,
+                yourPlays: 0,
+            };
+            return entry;
+        } else {
+            const entry: MostPlayedEntry = {
+                ...row,
+                geek,
+                geekid: geekId,
+                ...FAKE_GEEK_GAME,
+                yourPlays: 0,
+                tags: undefined
+            };
+            return entry;
         }
     });
+    if (secureUser) await attachTags(conn, secureUser, entries);
+    return entries;
 }
 
 export async function rankGames(system: System): Promise<RankingTableRow[]> {
@@ -144,7 +231,7 @@ function extractGameData(row: RawGameData, expansionData: ExpansionData): GameDa
         name: row["name"], n: row["name"], playTime: row["playTime"], pt: row["playTime"],
         subdomain: row["subdomain"],sub: row["subdomain"],
         weight: row["averageWeight"], w: row["averageWeight"], yearPublished: row["yearPublished"], yp: row["yearPublished"],
-        isExpansion: e, e };
+        isExpansion: e, e, tags: undefined };
 }
 
 function extractGameDataShort(row: RawGameData, expansionData: ExpansionData): GameDataShort {
@@ -158,83 +245,21 @@ export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {
     return (await conn.query(sql)).map((it: any) => it as NewsItem);
 }
 
-// type ShellBeRight = { [geek: string]: PlaysWithDate[] };
-
-// export async function doPlaysQuery(conn: mysql.Connection, query: PlaysQuery): Promise<MultiGeekPlays> {
-//     const geeks = query.geeks || [query.geek];
-//     const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
-//     if (Object.values(geekNameIds).length === 0) {
-//         return { geeks: [], plays: {}, collection: [], games: [] };
-//     }
-//     let where = "geek in (?)";
-//     const args: any[] = [ Object.keys(geekNameIds).map(s => parseInt(s)) ];
-//     if (Object.keys(geekNameIds).length === 1) {
-//         where = "geek = ?";
-//         args[0] = parseInt(Object.keys(geekNameIds)[0]);
-//     }
-//     if (typeof query.year !== "undefined") {
-//         where += " and year = ?";
-//         args.push(query.year);
-//     }
-//     if (typeof query.month !== "undefined") {
-//         where += " and month = ?";
-//         args.push(query.month);
-//     }
-//     if (typeof query.date !== "undefined") {
-//         where += " and date = ?";
-//         args.push(query.date);
-//     }
-//     const filterTags = (query.filter || "").split(" ");
-//     const first = filterTags.indexOf("first") >= 0;
-//     const ymd = filterTags.indexOf("ymd") >= 0;
-//     if (first) where += " order by ymd asc";
-//     const playsSql = "select (year * 10000 + month * 100 + date) ymd, id, game, geek, quantity, year, month, date, expansion_play, baseplay, location from plays_normalised where " + where;
-//     const playsResult = await conn.query(playsSql, args) as NormalisedPlay[];
-//     const expPlays: ExpansionPlay[] = [];
-//     const basePlays: { [geek: string]: object[] } = {};
-//     const playsById: Record<number, PlayWithDate> = {};
-//     const gameIds: number[] = [];
-//     const firstKeys: string[] = [];
-//     for (const row of playsResult) {
-//         if (gameIds.indexOf(row.game) < 0) gameIds.push(row.game);
-//         if (first) {
-//             const firstKey = `${row.game}-${row.geek}`;
-//             if (firstKeys.indexOf(firstKey) >= 0) continue;
-//             firstKeys.push(firstKey);
-//         }
-//         if (row["expansion_play"]) {
-//             expPlays.push({...row, baseplay: undefined});
-//         } else {
-//             const pwd: PlayWithDate = { game: row.game, quantity: row.quantity, location: row.location || "" };
-//             if (ymd) {
-//                 pwd['ymd'] = row.ymd;
-//             } else {
-//                 pwd['year'] = row.year;
-//                 pwd['month'] = row.month;
-//                 pwd['date'] = row.date;
-//             }
-//             const username = geekNameIds[row.geek];
-//             if (!username) {
-//                 console.log("No user found for " + row.geek);
-//                 continue;
-//             }
-//             if (!basePlays.hasOwnProperty(username)) basePlays[username] = [];
-//             basePlays[username].push(pwd);
-//             playsById[row.id] = pwd;
-//         }
-//     }
-//     for (const ep of expPlays) {
-//         const pwd = playsById[ep.baseplay];
-//         if (!pwd) {
-//             console.log("No base play " + ep.baseplay + " found");
-//             continue;
-//         }
-//         if (!pwd.expansions) pwd.expansions = [];
-//         pwd.expansions.push(ep.game);
-//     }
-//     const games = await doRetrieveGames(conn, gameIds);
-//     return { geeks: Object.values(geekNameIds), plays: basePlays as ShellBeRight, collection: [], games };
-// }
+export async function attachTags(conn: mysql.Connection, geek: string, games: { bggid: number, tags: string[] | undefined }[]) {
+    const geekId = await getGeekId(conn, geek);
+    console.log(`attachTags geekId ${geekId}`);
+    const getTagsSql = "select game bggid, tags from geekgames where tags is not null and geekId = ?";
+    const index: Record<string, { bggid: number, tags: string[] | undefined }> = {};
+    for (const g of games) {
+        index[g.bggid.toString()] = g;
+    }
+    const data = await conn.query(getTagsSql, [geekId]) as { bggid: number, tags: string }[];
+    for (const row of data) {
+        if (index[row.bggid.toString()]) {
+            index[row.bggid.toString()].tags = JSON.parse(row.tags);
+        }
+    }
+}
 
 export async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<MonthlyPlays[]> {
     const playsSql = "select game, sum(quantity) q, year, month, max(expansion_play) x from plays_normalised where geek = ? group by game, year, month";

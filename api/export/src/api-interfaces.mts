@@ -41,6 +41,7 @@ export interface ProcessedRecRow {
     score2: number;
     bggRating: number;
     bggRanking: number;
+    tags: string[] | undefined;
 }
 
 export interface MostPlayedEntry {
@@ -58,6 +59,7 @@ export interface MostPlayedEntry {
     wish: number;
     forTrade: boolean;
     yourPlays: number;
+    tags: string[] | undefined;
 }
 
 export interface Hotness {
@@ -216,6 +218,7 @@ export interface GeekGame {
     preordered: boolean;
     prevOwned: boolean;
     forTrade: boolean;
+    tags: string[] | undefined;
 }
 
 export interface GameData {
@@ -241,6 +244,7 @@ export interface GameData {
     w: number;
     isExpansion: boolean;
     e: boolean;
+    tags: string[] | undefined;
 }
 
 export interface NickelDimeData {

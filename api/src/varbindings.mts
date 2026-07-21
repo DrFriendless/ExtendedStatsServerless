@@ -23,6 +23,11 @@ export class VarBindings {
         return !!this.userData;
     }
 
+    getUser(): string | undefined {
+        if (this.userData) return this.userData.user;
+        return undefined;
+    }
+
     getUserConfig(): UserConfig | undefined {
         if (this.userData) return new UserConfig(this.userData.data);
         return undefined;

@@ -291,6 +291,32 @@ export class ExtstatsApi {
         });
     }
 
+    async addTag(bggid: number, tag: string, username?: string, password?: string): Promise<string[]> {
+        const authHeaders = this.authHeaders(username, password);
+        const resp = await fetch(`${this.baseUrl}/u/addTag?bggid=${bggid}&tag=${encodeURIComponent(tag)}`, {
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                ...authHeaders
+            },
+            method: "POST"
+        });
+        return await resp.json() as string[];
+    }
+
+    async removeTag(bggid: number, tag: string, username?: string, password?: string): Promise<string[]> {
+        const authHeaders = this.authHeaders(username, password);
+        const resp = await fetch(`${this.baseUrl}/u/removeTag?bggid=${bggid}&tag=${encodeURIComponent(tag)}`, {
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                ...authHeaders
+            },
+            method: "POST"
+        });
+        return await resp.json() as string[];
+    }
+
     async retrieveCommentsForUrl(url: string): Promise<BlogComment[]> {
         return (await (await fetch(`${this.baseUrl}/retrieveComments?url=${url}`, {
             headers: {

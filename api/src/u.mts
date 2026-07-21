@@ -1,7 +1,7 @@
 // master Lambda for user auth functions, to avoid startup times.
 
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
-import {changePassword, login, logout, personal, signup, updatePersonal} from "./auth.mjs";
+import {changePassword, login, logout, personal, signup, updatePersonal, addTag, removeTag} from "./auth.mjs";
 
 export async function handler(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<any> {
     console.log(JSON.stringify(event));
@@ -13,6 +13,8 @@ export async function handler(event: APIGatewayProxyEventV2WithRequestContext<an
                 case "signup": return await signup(event);
                 case "changePassword": return await changePassword(event);
                 case "updatePersonal": return await updatePersonal(event);
+                case "addTag": return await addTag(event);
+                case "removeTag": return await removeTag(event);
                 default: return { statusCode: 404 }
             }
         }

@@ -188,6 +188,7 @@ export interface GeekGamesTableRow {
     wanttoplay: number;
     wish: number;
     normrating: number;
+    tags: string | undefined;
 }
 
 export interface GameDesignersTableRow {
@@ -230,6 +231,5 @@ export const FAKE_GEEK_GAME: Partial<GeekGameRow> = {
     preordered: false,
     wish: 0,
     forTrade: false,
-    normRating: 0,
-    tags: []
+    normRating: 0
 }

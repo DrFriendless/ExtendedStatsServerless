@@ -17,6 +17,7 @@ import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-g
 import {getChatterCode} from "./socks.mjs";
 import {UserData} from "export";
 import crypto from "crypto";
+import {addTagToDatabase, removeTagFromDatabase} from "./mysql-rds.mjs";
 
 const COST = 4096;
 const SALT_LENGTH = 22;
@@ -106,6 +107,8 @@ async function checkPassword(system: System, username: string, password: string)
 export async function login(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(event);
+
     const body = JSON.parse(event.body) as any;
     const username: string = body['username'] || "";
     const password: string = body['password'] || "";
@@ -153,6 +156,7 @@ export async function changePassword(event: APIGatewayProxyEventV2WithRequestCon
     console.log(event);
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(event);
 
     const body = JSON.parse(event.body) as any;
     const username = body['username'] || "";
@@ -184,6 +188,7 @@ export async function signup(event: APIGatewayProxyEventV2WithRequestContext<any
     console.log(event);
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(event);
 
     const body = JSON.parse(event.body) as any;
     const username = body['username'] || "";
@@ -226,15 +231,60 @@ export async function logout(event: APIGatewayProxyEventV2WithRequestContext<any
     console.log(event);
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(event);
+
     const cookie = makeLogoutCookie(event.headers.origin.includes("://localhost:"));
     const secCookie = makeSecureLogoutCookie(event.headers.origin.includes("://localhost:"));
     return { "statusCode": 200, cookies: [cookie, secCookie], body: JSON.stringify({}) };
+}
+
+export async function addTag(event: APIGatewayProxyEventV2WithRequestContext<any>) {
+    console.log(event);
+    const system = await findSystem("private");
+    if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(event);
+
+    const user = getUserFromEvent(event);
+    if (!user) return { statusCode: 403 };
+
+    const bggid = parseInt(event.queryStringParameters.bggid || "0");
+    if (!bggid) return { statusCode: 400 };
+    const tag = event.queryStringParameters.tag;
+    if (!tag) return { statusCode: 400 };
+
+    const nowTags = await system.asyncReturnWithConnection(async conn => await addTagToDatabase(conn, user, bggid, tag));
+    return {
+        statusCode: 200,
+        body: JSON.stringify(nowTags)
+    }
+}
+
+export async function removeTag(event: APIGatewayProxyEventV2WithRequestContext<any>) {
+    console.log(event);
+    const system = await findSystem("private");
+    if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(event);
+
+    const user = getUserFromEvent(event);
+    if (!user) return { statusCode: 403 };
+
+    const bggid = parseInt(event.queryStringParameters.bggid || "0");
+    if (!bggid) return { statusCode: 400 };
+    const tag = event.queryStringParameters.tag;
+    if (!tag) return { statusCode: 400 };
+
+    const nowTags = await system.asyncReturnWithConnection(async conn => await removeTagFromDatabase(conn, user, bggid, tag));
+    return {
+        statusCode: 200,
+        body: JSON.stringify(nowTags)
+    }
 }
 
 export async function updatePersonal(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(event);
 
     const user = getUserFromEvent(event);
     if (user) {
@@ -288,6 +338,7 @@ export async function personal(event: APIGatewayProxyEventV2WithRequestContext<a
     console.log(JSON.stringify(event));
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
+    await system.incrementApiCounter(event);
 
     const user = getUserFromEvent(event);
     if (user) {

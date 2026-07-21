@@ -1,12 +1,13 @@
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
 import {GeeklistCheck} from "export";
-import {getUserFromEvent, sleep} from "./library.mjs";
+import {getGeekId, getUserFromEvent, sleep} from "./library.mjs";
 import {XMLParser} from "fast-xml-parser";
 import {InvokeCommand, InvokeCommandInput, LambdaClient} from "@aws-sdk/client-lambda";
 import {fromUtf8, toUtf8} from "@aws-sdk/util-utf8-node";
-import {retrieveGeekGames} from "./selector.mjs";
 import {GeekGameRow} from "./interfaces.mjs";
+import {retrieveGeekIdGames} from "./mysql-rds.mjs";
+import {getSecureUserData} from "./auth.mjs";
 
 export type PUBLIC_PRIVATE = "public" | "private";
 
@@ -17,7 +18,8 @@ export async function check(data: GeeklistData):
     await system.incrementApiCounter(undefined);
 
     const bggids = [...new Set(data.items.map(i => i.bggid))];
-    const geekData = await system.asyncReturnWithConnection(conn => retrieveGeekGames(conn, bggids, data.geek, undefined));
+    const geekId: number = await system.asyncReturnWithConnection(async conn => await getGeekId(conn, data.geek));
+    const geekData = await system.asyncReturnWithConnection(conn => retrieveGeekIdGames(conn, bggids, data.geek, geekId, undefined));
     const index: Record<string, GeekGameRow> = {};
     geekData.forEach(gg => index[gg.bggid.toString()] = gg);
     return {
@@ -157,7 +159,6 @@ export async function downloader(event: APIGatewayProxyEventV2WithRequestContext
     const gl = doc.geeklist;
     const items: GeeklistItem[] = [];
     for (const item of gl.item) {
-        // console.log(JSON.stringify(item));
         if (item["@_subtype"] === "boardgame") {
             const ni: GeeklistItem = {
                 name: item["@_objectname"],

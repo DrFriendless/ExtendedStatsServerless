@@ -15,7 +15,7 @@ import {
     loadExpansionData,
     doRetrieveGameNames,
     patchGeekData,
-    listCategoriesAndMechanics
+    listCategoriesAndMechanics, attachTags
 } from "./mysql-rds.mjs";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
@@ -261,6 +261,7 @@ interface ProcessedRecRow {
     score2: number;
     bggRating: number;
     bggRanking: number;
+    tags: string[] | undefined;
 }
 
 export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<Hotness | HttpResponse> {
@@ -268,7 +269,6 @@ export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     const userData = await getSecureUserData(system, event);
-    const userConfig = userData ? new UserConfig(this.userData.data) : undefined;
 
     const geek = event.queryStringParameters.geek;
     if (!geek) {
@@ -309,10 +309,10 @@ export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext
         for (const r of yourPlays) {
             yourPlaysByGame[r.bggid.toString()] = r.q;
         }
-        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekId, userConfig);
+        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekId, userData?.user);
         mostPlayed.forEach(mp => mp.yourPlays = yourPlaysByGame[mp.bggid.toString()] || 0);
         mostPlayed.sort((mp1, mp2) => mp2.plays - mp1.plays);
-        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekId, userConfig);
+        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekId, userData?.user);
         mostPlayedNew.forEach(mp => mp.yourPlays = yourPlaysByGame[mp.bggid.toString()] || 0);
         mostPlayedNew.sort((mp1, mp2) => mp2.plays - mp1.plays);
         return { year, geek, mostPlayed, mostPlayedNew };
@@ -323,6 +323,7 @@ export async function getRecommendations(event: APIGatewayProxyEventV2WithReques
     const system = await findSystem("private");
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
+    const userData = await getSecureUserData(system, event);
 
     const geek = event.queryStringParameters.geek;
     if (!geek) {
@@ -353,12 +354,16 @@ export async function getRecommendations(event: APIGatewayProxyEventV2WithReques
                 score2,
                 score0,
                 bggRanking: row.rank,
-                bggRating: row.average
-            }
+                bggRating: row.average,
+                tags: undefined
+            } as ProcessedRecRow;
         });
         scoredData.sort((d1, d2) => d2.score - d1.score);
-        return scoredData.slice(0, 500);
+        const result = scoredData.slice(0, 500);
+        if (userData) await attachTags(conn, userData.user, scoredData);
+        return result;
     });
+
 }
 
 function dotProduct(a: number[], b: number[]) {

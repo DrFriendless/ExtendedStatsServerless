@@ -4,7 +4,7 @@ import {getGeekId} from "./library.mjs";
 import {VarBindings} from "./varbindings.mjs";
 import {GameDesignersTableRow, GamePublishersTableRow, GeekGameRow, GeekGamesTableRow} from "./interfaces.mjs";
 import {SelectorMetadataSet} from "./selector-metadata.mjs";
-import {UserConfig} from "extstats-core";
+import {retrieveGeekIdGames} from "./mysql-rds.mjs";
 
 async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars: VarBindings, metadata: SelectorMetadataSet):
     Promise<number[]> {
@@ -255,16 +255,15 @@ function evaluateSimpleArg(arg: Arg, vars: VarBindings): string | number {
 
 /**
  * Evaluate the expression to find out what games it represents, then retrieve them.
- * @param conn
- * @param expr
- * @param vars
  */
-export async function evaluateSimple(conn: mysql.Connection, expr: Expression, vars: VarBindings): Promise<GeekGameSelectResult> {
+export async function evaluateSimple(conn: mysql.Connection, expr: Expression, vars: VarBindings, secureUser: string | undefined): Promise<GeekGameSelectResult> {
     const metadata = new SelectorMetadataSet();
     const ids1 = await evaluateExpression(conn, expr, vars, metadata);
     const ids = await getValidIds(conn, ids1);
     metadata.restrictTo(ids);
-    return { geekGames: await retrieveGeekGames(conn, ids, vars.lookup("ME"), vars.getUserConfig()), metadata } as GeekGameSelectResult;
+    const geek = vars.lookup("ME");
+    const geekId = await getGeekId(conn, geek);
+    return { geekGames: await retrieveGeekIdGames(conn, ids, geek, geekId, secureUser), metadata } as GeekGameSelectResult;
 }
 
 export async function evaluateSimpleGames(conn: mysql.Connection, expr: Expression, vars: VarBindings): Promise<number[]> {
@@ -286,58 +285,10 @@ async function getValidIds(conn: mysql.Connection, ids: number[]): Promise<numbe
     }
 }
 
-export async function retrieveGeekIdGames(conn: mysql.Connection, ids: number[], geek: string, geekId: number, userData: UserConfig | undefined): Promise<GeekGameRow[]> {
-    let ts4gs: Record<string, string[]> = {}
-    if (userData) {
-        ts4gs = userData.get("tagalogue.tagsbygame", {}) || {};
-    }
-    const sqlOne = "select * from geekgames where geekid = ? and game = ?";
-    const sqlMany = "select * from geekgames where geekid = ? and game in (?)";
-    if (ids.length === 0) return [];
-    if (ids.length === 1) {
-        return (await conn.query(sqlOne, [geekId, ids[0]]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg, ts4gs));
-    } else {
-        return (await conn.query(sqlMany, [geekId, ids]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg, ts4gs));
-    }
-}
-
-export async function retrieveGeekGames(conn: mysql.Connection, ids: number[], geek: string, userData: UserConfig | undefined): Promise<GeekGameRow[]> {
-    const sqlOne = "select * from geekgames where geekid = ? and game = ?";
-    const sqlMany = "select * from geekgames where geekid = ? and game in (?)";
-    if (ids.length === 0) return [];
-    const geekId = await getGeekId(conn, geek);
-    let ts4gs: Record<string, string[]> = {}
-    if (userData) {
-        ts4gs = userData.get("tagalogue.tagsbygame", {}) || {};
-    }
-    if (ids.length === 1) {
-        return (await conn.query(sqlOne, [geekId, ids[0]]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg, ts4gs));
-    } else {
-        return (await conn.query(sqlMany, [geekId, ids]) as GeekGamesTableRow[]).map(gg => extractGeekGame(geek, gg, ts4gs));
-    }
-}
-
 export interface GeekGameSelectResult {
     metadata: SelectorMetadataSet;
     geekGames: GeekGameRow[];
 }
 
-function extractGeekGame(geek: string, row: GeekGamesTableRow, tagsForGames: Record<string, string[]>): GeekGameRow {
-    return {
-        geek,
-        geekid: row["geekid"],
-        bggid: row["game"],
-        rating: row["rating"],
-        owned: row['owned'] > 0,
-        prevOwned: row['prevowned'] > 0,
-        wantToBuy: row['wanttobuy'] > 0,
-        wantToPlay: row['wanttoplay'] > 0,
-        preordered: row['preordered'] > 0,
-        wantInTrade: row['want'] > 0,
-        wish: row['wish'],
-        forTrade: row['trade'] > 0,
-        normRating: row.normrating,
-        tags: tagsForGames[row["game"].toString()] || []
-    };
-}
+
 

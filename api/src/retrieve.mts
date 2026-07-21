@@ -2,15 +2,16 @@ import * as graphql from "graphql";
 import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
 import * as mysql from "promise-mysql";
 import {
+    attachTags,
     doRetrieveDesigners,
     doRetrieveGames,
-    doRetrieveGamesShort, doRetrieveGeekGames, extractDesignerData,
+    doRetrieveGamesShort, extractDesignerData,
     getMonthlyCounts,
-    getMonthlyPlays
+    getMonthlyPlays, retrieveGeekIdGames
 } from "./mysql-rds.mjs";
 import {getGeekId, getGeekIds} from "./library.mjs";
 import { parse } from "./parser.mjs";
-import {evaluateSimple, evaluateSimpleGames, GeekGameSelectResult, retrieveGeekGames} from "./selector.mjs";
+import {evaluateSimple, evaluateSimpleGames, GeekGameSelectResult} from "./selector.mjs";
 import {VarBindings} from "./varbindings.mjs";
 import DataLoader from "dataloader";
 import {
@@ -89,6 +90,7 @@ function buildGameDataType(loaders: Loaders) {
             w: {type: graphql.GraphQLFloat!},
             isExpansion: {type: graphql.GraphQLBoolean!},
             e: {type: graphql.GraphQLBoolean!},
+            tags: {type: ListOfString},
             designers: {
                 type: new graphql.GraphQLList(DesignerType!),
                 resolve:
@@ -390,7 +392,7 @@ function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
                     type: buildMultiGeekPlaysType(gameDataType, geekGameType, playsWithDateType),
                     resolve: async (parent: unknown, args) => {
                         return await loaders.system.asyncReturnWithConnection(
-                            async conn => playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000)
+                            async conn => playsQueryForRetrieve(conn, args.geeks, !!args.first, args.startYMD || 0, args.endYMD || 30000000, userData?.user)
                         );
                     }
                 },
@@ -405,7 +407,8 @@ function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
                                 const ndGames = await mostNickelsAndDimes(conn, args.count);
                                 const ndIndex = makeIndex(ndGames);
                                 const games = ndGames.map(x => x.bggid);
-                                const gds = await doRetrieveGames(conn, games);
+                                const gds: GameData[] = await doRetrieveGames(conn, games);
+                                if (userData) await attachTags(conn, userData.user, gds);
                                 return gds.map(async gd => {
                                     const nd = ndIndex[gd.bggid.toString()] || { bggid: gd.bggid, nickels: 0, dimes: 0 };
                                     return { game: gd, ...nd } as NickelDimeData;
@@ -424,24 +427,28 @@ function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
                         return await loaders.system.asyncReturnWithConnection(
                             async conn => {
                                 const geekid = await getGeekId(conn, args.geek);
-                                const games = await mostPlayedUnplayed(conn, args.geek, args.count);
-                                const gds = await doRetrieveGames(conn, games);
+                                const games: number[] = await mostPlayedUnplayed(conn, args.geek, args.count);
+                                const gds: GameData[] = await doRetrieveGames(conn, games);
+                                if (userData) await attachTags(conn, userData.user, gds);
                                 const gi: Record<string, GameData> = {};
                                 gds.forEach(gd => gi[gd.bggid.toString()] = gd);
-                                const ggs = await doRetrieveGeekGames(conn, args.geek, games, undefined);
+                                const ggs = await retrieveGeekIdGames(conn, games, args.geek, geekid, userData?.user);
                                 const index: Record<string, ExtendedGeekGame> = {};
                                 ggs.forEach(gg => index[gg.bggid.toString()] = gg);
                                 // fill in fake GG information
-                                return games.map(async bggid => {
+                                return games.map(bggid => {
                                     const gg = index[bggid.toString()];
-                                    return gg ? gg : {
+                                    return gg ? {
+                                        ...gg,
+                                        tags: gi[bggid].tags
+                                    } : {
                                         geek: args.geek,
                                         geekid,
                                         bggid,
                                         ...FAKE_GEEK_GAME,
-                                        game: gi[bggid],
+                                        game: gi[bggid]
                                     }
-                                })
+                                });
                             }
                         );
                     }
@@ -455,7 +462,9 @@ function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
                     resolve: async (parent: unknown, args) => {
                         return await loaders.system.asyncReturnWithConnection(
                             async conn => {
-                                return await doRetrieveGames(conn, await mostUnusualOwned(conn, args.geek, args.count));
+                                const games: GameData[] = await doRetrieveGames(conn, await mostUnusualOwned(conn, args.geek, args.count));
+                                if (userData) await attachTags(conn, userData.user, games);
+                                return games;
                             }
                         );
                     }
@@ -480,7 +489,7 @@ function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
                     type: buildGeekGamesType(gameDataType, geekGameType),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
-                            async conn => geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData)))
+                            async conn => geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData), userData?.user))
                 },
                 geekgames2: {
                     args: {
@@ -490,7 +499,7 @@ function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
                     type: buildGeekGamesTypeShort(gameDataTypeShort, geekGameTypeShort),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
-                            async conn => shorten2(await geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData))))
+                            async conn => shorten2(await geekGamesQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData), userData?.user)))
                 },
                 years: {
                     args: {
@@ -509,7 +518,7 @@ function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
                     type: buildMonthlyPlaysAndCountsType(loaders, gameDataType, geekGameType),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
-                            async conn => monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData)))
+                            async conn => monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData), userData?.user))
                 },
                 monthly2: {
                     args: {
@@ -519,7 +528,7 @@ function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
                     type: buildShortMonthlyPlaysAndCountsType(loaders, gameDataTypeShort, geekGameTypeShort),
                     resolve: async (parent: unknown, args) =>
                         await loaders.system.asyncReturnWithConnection(
-                            async conn => shorten(await monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData))))
+                            async conn => shorten(await monthlyPlaysQueryForRetrieve(conn, args.selector, new VarBindings(args.vars, userData), userData?.user)))
                 }
             }
         })
@@ -630,8 +639,8 @@ interface MonthlyPlaysAndCountsShort {
     geekGames: ExtendedGeekGameShort[]
 }
 
-async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBindings): Promise<MonthlyPlaysAndCounts> {
-    const evalResult: GeekGameSelectResult = await selectGames(conn, selector, varBindings);
+async function monthlyPlaysQueryForRetrieve(conn: mysql.Connection, selector: string, varBindings: VarBindings, secureUser: string | undefined): Promise<MonthlyPlaysAndCounts> {
+    const evalResult: GeekGameSelectResult = await selectGames(conn, selector, varBindings, secureUser);
     const geekGames = evalResult.geekGames.map(gg => gg.bggid);
     const geek = varBindings.lookup("ME");
     const plays: CoreMonthlyPlays[] = (await getMonthlyPlays(conn, geek))
@@ -661,12 +670,12 @@ async function selectGamesOnly(conn: mysql.Connection, selector: string, vars: V
     return evaluateSimpleGames(conn, parse(selector), vars);
 }
 
-async function selectGames(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<GeekGameSelectResult> {
-    return evaluateSimple(conn, parse(selector), vars);
+async function selectGames(conn: mysql.Connection, selector: string, vars: VarBindings, secureUser: string | undefined): Promise<GeekGameSelectResult> {
+    return evaluateSimple(conn, parse(selector), vars, secureUser);
 }
 
-async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<GeekGameSelectWithGames> {
-    const evalResult = await selectGames(conn, selector, vars);
+async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: string, vars: VarBindings, secureUser: string | undefined): Promise<GeekGameSelectWithGames> {
+    const evalResult = await selectGames(conn, selector, vars, secureUser);
     await addLastPlayOfGamesForGeek(conn, evalResult.geekGames as (GeekGameRow & ShouldPlayAdditionalData)[]);
     const gids = evalResult.geekGames.map(gg => gg.bggid);
     const games = await doRetrieveGames(conn, gids);
@@ -675,7 +684,11 @@ async function geekGamesQueryForRetrieve(conn: mysql.Connection, selector: strin
 
 async function gamesQueryForRetrieve(conn: mysql.Connection, selector: string, vars: VarBindings): Promise<GameData[]> {
     const evalResult = await selectGamesOnly(conn, selector, vars);
-    return await doRetrieveGames(conn, evalResult);
+    const gd = await doRetrieveGames(conn, evalResult);
+    if (vars.hasUserData()) {
+        await attachTags(conn, vars.getUser(), gd);
+    }
+    return gd;
 }
 
 async function geekYearsQueryForRetrieve(conn: mysql.Connection, geek: string): Promise<number[]> {
@@ -774,7 +787,8 @@ async function mostUnusualOwned(conn: mysql.Connection, geek: string, count: num
     return (await conn.query(sql, [geekId])).map((row: { game: number }) => row.game);
 }
 
-async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], first: boolean, startInc: number, endInc: number): Promise<PlaysRetrieveResult> {
+async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], first: boolean, startInc: number, endInc: number,
+                                     secureUser: string | undefined): Promise<PlaysRetrieveResult> {
     const geekNameIds: { [id: number]: string } = await getGeekIds(conn, geeks);
     if (Object.values(geekNameIds).length === 0) {
         return { geeks: [], plays: [], games: [], geekgames: [] };
@@ -835,9 +849,10 @@ async function playsQueryForRetrieve(conn: mysql.Connection, geeks: string[], fi
         }
     }
     const games: GameData[] = await doRetrieveGames(conn, gameIds);
+    if (secureUser) await attachTags(conn, secureUser, games);
     const geekgames: GeekGameRow[] = [];
-    for (const geek of Object.values<string>(geekNameIds)) {
-        const ggs: GeekGameRow[] = await retrieveGeekGames(conn, gameIds, geek, undefined);
+    for (const geek of Object.entries(geekNameIds)) {
+        const ggs: GeekGameRow[] = await retrieveGeekIdGames(conn, gameIds, geek[1], parseInt(geek[0]), secureUser);
         geekgames.push(...ggs);
     }
     return { geeks: Object.values<string>(geekNameIds), plays: basePlays, games, geekgames };
@@ -857,7 +872,6 @@ export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<a
 
     // give the selectors access to the authenticated user's private data
     const userData = await getSecureUserData(system, event);
-    console.log(userData);
     const schema = buildSchema(loaders, userData);
     let query: string | undefined = undefined;
     let operationName: string | undefined;
