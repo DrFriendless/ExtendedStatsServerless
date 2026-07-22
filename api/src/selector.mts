@@ -143,30 +143,29 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
         }
         case "tagged": {
             if (!vars.hasUserData()) return [];
-            const userConfig = vars.getUserConfig();
-            const ts4gs: Record<string, string[]> = userConfig.get("tagalogue.tagsbygame", {});
-            const taggedIds: number[] = [];
-            for (const key in ts4gs) {
-                const v = ts4gs[key];
-                if (v && v.length > 0) {
-                    taggedIds.push(parseInt(key));
-                }
-            }
-            return taggedIds;
+            const geekId = await getGeekId(conn, vars.getUser());
+            const sql = "select game from geekgames where geekid = 1 and tags is not null and tags->'$[last]' is not null";
+            return (await conn.query(sql, [geekId]) as GeekGamesTableRow[]).map(row => row["game"]);
         }
         case "tag": {
             if (!vars.hasUserData()) return [];
-            const userConfig = vars.getUserConfig();
+            const geekId = await getGeekId(conn, vars.getUser());
+            const sql = "select game from geekgames where geekid = ? and ? member of(tags)";
             const tag = getStringFromArgs(expr.args[0] as Arg, vars);
-            const ts4gs: Record<string, string[]> = userConfig.get("tagalogue.tagsbygame", {});
-            const taggedIds: number[] = [];
-            for (const key in ts4gs) {
-                const v = ts4gs[key];
-                if (v && v.indexOf(tag) >= 0) {
-                    taggedIds.push(parseInt(key));
-                }
-            }
-            return taggedIds;
+            return (await conn.query(sql, [geekId, tag]) as GeekGamesTableRow[]).map(row => row["game"]);
+        }
+        case "taggroup": {
+            if (!vars.hasUserData()) return [];
+            const geekId = await getGeekId(conn, vars.getUser());
+            const groupName = getStringFromArgs(expr.args[0] as Arg, vars);
+            console.log(`taggroup ${geekId} ${groupName}`);
+            const userConfig = vars.getUserConfig();
+            const groups: {name: string, tags: string[]}[] = userConfig.get("tagalogue.taggroups", []);
+            const group = groups.filter(g => g.name === groupName);
+            console.log(JSON.stringify(group));
+            if (group.length === 0 || group[0].tags.length === 0) return [];
+            const sql = "select game from geekgames where tags is not null and geekid = ? and JSON_OVERLAPS(tags, ?)";
+            return (await conn.query(sql, [geekId, JSON.stringify(group[0].tags)]) as GeekGamesTableRow[]).map(row => row["game"]);
         }
         case "category" : {
             const cat = getStringFromArgs(expr.args[0] as Arg, vars);
