@@ -75,7 +75,7 @@ export async function deleteComment(event: APIGatewayProxyEventV2WithRequestCont
     console.log(event);
     const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
-    if (!system.user) {
+    if (!system.secureUser) {
         return {
             statusCode: 401,
             body: JSON.stringify({ error: "You must be logged in to do this."})
@@ -98,7 +98,7 @@ export async function deleteComment(event: APIGatewayProxyEventV2WithRequestCont
             body: JSON.stringify({ error: "That comment does not exist."})
         }
     }
-    if (found[0].poster !== system.user) {
+    if (found[0].poster !== system.secureUser) {
         return {
             statusCode: 403,
             body: JSON.stringify({ error: "That comment doesn't belong to you."})
@@ -119,7 +119,7 @@ export async function saveComment(event: APIGatewayProxyEventV2WithRequestContex
     console.log(event);
     const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
-    if (!system.user) {
+    if (!system.secureUser) {
         return {
             statusCode: 401,
             body: JSON.stringify({ error: "You must be logged in to do this."})
@@ -133,7 +133,7 @@ export async function saveComment(event: APIGatewayProxyEventV2WithRequestContex
 
     const sql = "insert into blog_comments (post_url, poster, comment, date, reply_to, deleted, post_title) values (?, ?, ?, now(), ?, 0, ?)";
     const id: number = await system.asyncReturnWithConnection(async conn => {
-        const r: OkPacket = await conn.query(sql, [ url, system.user, comment, replyTo, post_title ]);
+        const r: OkPacket = await conn.query(sql, [ url, system.secureUser, comment, replyTo, post_title ]);
         return r.insertId;
     });
 
@@ -145,7 +145,7 @@ export async function updateComment(event: APIGatewayProxyEventV2WithRequestCont
     Promise<{ id: number, posts: BlogComment[] } | HttpResponse> {
     const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
-    if (!system.user) {
+    if (!system.secureUser) {
         return {
             statusCode: 401,
             body: JSON.stringify({ error: "You must be logged in to do this."})
@@ -169,7 +169,7 @@ export async function updateComment(event: APIGatewayProxyEventV2WithRequestCont
             body: JSON.stringify({ error: "That comment does not exist."})
         }
     }
-    if (found[0].poster !== system.user) {
+    if (found[0].poster !== system.secureUser) {
         return {
             statusCode: 403,
             body: JSON.stringify({ error: "That comment doesn't belong to you."})
@@ -178,7 +178,7 @@ export async function updateComment(event: APIGatewayProxyEventV2WithRequestCont
 
     const sqlUpdate = "update blog_comments set comment = ? where id = ? and poster = ?";
     await system.asyncReturnWithConnection(async conn => {
-        const r = await conn.query(sqlUpdate, [ comment, id, system.user ]);
+        const r = await conn.query(sqlUpdate, [ comment, id, system.secureUser ]);
     });
 
     const posts = await retrieveCommentsForUrlInternal(system, found[0].post_url);

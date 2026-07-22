@@ -1,6 +1,5 @@
 import * as mysql from 'promise-mysql';
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
-import {getUserFromSecureCookie} from "./auth.mjs";
 
 export async function count(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
     return (await conn.query(sql, params))[0]["count(*)"];
@@ -52,19 +51,6 @@ export function getCookiesFromEvent(event: APIGatewayProxyEventV2WithRequestCont
         }
     }
     return list;
-}
-
-export function getUserFromEvent(event: APIGatewayProxyEventV2WithRequestContext<any>): string | undefined {
-    if (!event || !event.cookies) return undefined;
-    for (const cookie of event.cookies) {
-        const parts = cookie.split('=');
-        const key = parts.shift().trim();
-        const value = decodeURI(parts.join('='));
-        if (key === 'extstatssec') {
-            return getUserFromSecureCookie(value);
-        }
-    }
-    return undefined;
 }
 
 export async function sleep(waitTimeInMs: number){

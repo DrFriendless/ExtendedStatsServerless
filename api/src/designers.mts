@@ -5,7 +5,7 @@ import {makeIndex} from "extstats-core";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 
 export async function getDesigners(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | DesignerResult[]> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 

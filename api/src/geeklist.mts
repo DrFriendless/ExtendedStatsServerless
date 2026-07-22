@@ -1,19 +1,18 @@
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
 import {GeeklistCheck} from "export";
-import {getGeekId, getUserFromEvent, sleep} from "./library.mjs";
+import {getGeekId, sleep} from "./library.mjs";
 import {XMLParser} from "fast-xml-parser";
 import {InvokeCommand, InvokeCommandInput, LambdaClient} from "@aws-sdk/client-lambda";
 import {fromUtf8, toUtf8} from "@aws-sdk/util-utf8-node";
 import {GeekGameRow} from "./interfaces.mjs";
 import {retrieveGeekIdGames} from "./mysql-rds.mjs";
-import {getSecureUserData} from "./auth.mjs";
 
 export type PUBLIC_PRIVATE = "public" | "private";
 
 export async function check(data: GeeklistData):
     Promise<GeeklistCheck | HttpResponse> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", undefined);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(undefined);
 
@@ -113,7 +112,7 @@ interface GeeklistData {
 
 export async function downloader(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | GeeklistCheck> {
     const TRADE_CODE = /^[1-9][0-9]{7}-[A-Z0-9_]{5}$/;
-    const system = await findSystem("public");
+    const system = await findSystem("public", event);
     if (isHttpResponse(system)) return system;
     console.log(JSON.stringify(event));
 
@@ -139,7 +138,7 @@ export async function downloader(event: APIGatewayProxyEventV2WithRequestContext
         }
     }
 
-    const geek = getUserFromEvent(event);
+    const geek = system.secureUser;
     const trade = "true" === event.queryStringParameters.trade.toString();
 
     const url = `https://boardgamegeek.com/xmlapi/geeklist/${geeklist}?comments=${trade ? 1 : 0}`;

@@ -19,7 +19,7 @@ import {
 } from "./mysql-rds.mjs";
 import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
-import {getGeekId, getUserFromEvent} from "./library.mjs";
+import {getGeekId} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {MostPlaysRow} from "./interfaces.mjs";
 import {
@@ -34,20 +34,16 @@ import {
     WarTableRow
 } from "export";
 import {ExpansionData, UserConfig} from "extstats-core";
-import {loadAuth} from "./authdb.mjs";
 import {SendMessageCommand, SendMessageCommandOutput, SQSClient} from "@aws-sdk/client-sqs";
-import {getSecureUserData} from "./auth.mjs";
 
 export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | CatalistMetadata> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
     let tags: string[] = [];
-    const user = getUserFromEvent(event);
-    if (user) {
-        const sData: string = (await loadAuth(system, user))?.configuration || "{}";
-        const uc = new UserConfig(JSON.parse(sData));
+    if (system.secureUserData) {
+        const uc = new UserConfig(system.secureUserData.data);
         const tagGroups = uc.get("tagalogue.taggroups", []);
         for (const tg of tagGroups) {
             for (const t of tg.tags) {
@@ -61,7 +57,7 @@ export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithReque
 }
 
 export async function getUpdates(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | { forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
@@ -72,21 +68,21 @@ export async function getUpdates(event: APIGatewayProxyEventV2WithRequestContext
 }
 
 export async function markForUpdate(event: APIGatewayProxyEventV2WithRequestContext<any>) {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     return await markUrlForUpdate(system, JSON.parse(event.body).url);
 }
 
 export async function updateOld(event: APIGatewayProxyEventV2WithRequestContext<any>) {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     return await markGeekForUpdate(system, event.queryStringParameters.geek);
 }
 
-export async function recalculatePlays(event: APIGatewayProxyEvent) {
-    const system = await findSystem("public");
+export async function recalculatePlays(event: APIGatewayProxyEventV2WithRequestContext<any>) {
+    const system = await findSystem("public", event);
     if (isHttpResponse(system)) return system;
     // can't do this as we are public
     // await system.incrementApiCounter();
@@ -111,7 +107,7 @@ export async function recalculatePlays(event: APIGatewayProxyEvent) {
 }
 
 export async function getGeekSummary(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | GeekSummary> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     return await gatherGeekSummary(system, event.queryStringParameters.geek);
@@ -119,14 +115,14 @@ export async function getGeekSummary(event: APIGatewayProxyEventV2WithRequestCon
 
 export async function incFAQCount(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | FAQCount[]> {
     console.log(event);
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     return await updateFAQCount(system, JSON.parse(event.body) as number[]);
 }
 
 export async function adminGatherSystemStats(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | SystemStats> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     return await gatherSystemStats(system);
@@ -134,14 +130,14 @@ export async function adminGatherSystemStats(event: APIGatewayProxyEventV2WithRe
 
 // Lambda to retrieve the list of users
 export async function getUserList(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | string[]> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     return await listUsers(system);
 }
 
 export async function getUserCheckList(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
@@ -180,7 +176,7 @@ export async function getUserCheckList(event: APIGatewayProxyEventV2WithRequestC
 
 // Lambda to retrieve the data for the war table.
 export async function getWarTable(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | WarTableRow[]> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     const rows = await listWarTable(system);
@@ -192,7 +188,7 @@ export async function getWarTable(event: APIGatewayProxyEventV2WithRequestContex
 }
 
 export async function getNews(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<NewsItem[] | HttpResponse> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     return await system.asyncReturnWithConnection(async conn => await doGetNews(conn));
@@ -201,7 +197,7 @@ export async function getNews(event: APIGatewayProxyEventV2WithRequestContext<an
 export async function getRankings(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<RankingTableRow[] | HttpResponse> {
     console.log(event);
     if (event) {
-        const system = await findSystem("private");
+        const system = await findSystem("private", event);
         if (isHttpResponse(system)) return system;
         await system.incrementApiCounter(event);
         return await rankGames(system);
@@ -211,11 +207,11 @@ export async function getRankings(event: APIGatewayProxyEventV2WithRequestContex
 }
 
 export async function getDisambiguationData(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<DisambiguationData | HttpResponse> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
-    const geek = getUserFromEvent(event);
+    const geek = system.secureUser;
     if (!geek) {
         return {
             statusCode: 400,
@@ -265,10 +261,9 @@ interface ProcessedRecRow {
 }
 
 export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<Hotness | HttpResponse> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
-    const userData = await getSecureUserData(system, event);
 
     const geek = event.queryStringParameters.geek;
     if (!geek) {
@@ -309,10 +304,10 @@ export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext
         for (const r of yourPlays) {
             yourPlaysByGame[r.bggid.toString()] = r.q;
         }
-        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekId, userData?.user);
+        const mostPlayed: MostPlayedEntry[] = await patchGeekData(conn, mpRows, geek, geekId, system.secureUser);
         mostPlayed.forEach(mp => mp.yourPlays = yourPlaysByGame[mp.bggid.toString()] || 0);
         mostPlayed.sort((mp1, mp2) => mp2.plays - mp1.plays);
-        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekId, userData?.user);
+        const mostPlayedNew: MostPlayedEntry[] = await patchGeekData(conn, mpnRows, geek, geekId, system.secureUser);
         mostPlayedNew.forEach(mp => mp.yourPlays = yourPlaysByGame[mp.bggid.toString()] || 0);
         mostPlayedNew.sort((mp1, mp2) => mp2.plays - mp1.plays);
         return { year, geek, mostPlayed, mostPlayedNew };
@@ -320,10 +315,9 @@ export async function getHotness(event: APIGatewayProxyEventV2WithRequestContext
 }
 
 export async function getRecommendations(event: APIGatewayProxyEventV2WithRequestContext<any> | undefined): Promise<ProcessedRecRow[] | HttpResponse> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
-    const userData = await getSecureUserData(system, event);
 
     const geek = event.queryStringParameters.geek;
     if (!geek) {
@@ -360,7 +354,7 @@ export async function getRecommendations(event: APIGatewayProxyEventV2WithReques
         });
         scoredData.sort((d1, d2) => d2.score - d1.score);
         const result = scoredData.slice(0, 500);
-        if (userData) await attachTags(conn, userData.user, scoredData);
+        if (system.secureUser) await attachTags(conn, system.secureUser, scoredData);
         return result;
     });
 

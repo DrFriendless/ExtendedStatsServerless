@@ -1,4 +1,3 @@
-import {getCookiesFromEvent, getUserFromEvent} from "./library.mjs";
 import {findSystem, HttpResponse, isHttpResponse, System} from "./system.mjs";
 import utf8 from 'utf8';
 import {scryptSync} from "node:crypto";
@@ -75,7 +74,7 @@ function makeSecureLogoutCookie(test: boolean) {
     }
 }
 
-async function checkPassword(system: System, username: string, password: string): Promise<HttpResponse | AuthTableRow> {
+export async function checkPassword(system: System, username: string, password: string): Promise<HttpResponse | AuthTableRow> {
     const existing = await loadAuth(system, username);
     if (!existing) {
         return {
@@ -105,7 +104,7 @@ async function checkPassword(system: System, username: string, password: string)
  * @param event
  */
 export async function login(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
@@ -154,7 +153,7 @@ function extractSalt(encodedPassword: string): { salt: string, p: string } {
 
 export async function changePassword(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
@@ -186,7 +185,7 @@ export async function changePassword(event: APIGatewayProxyEventV2WithRequestCon
 
 export async function signup(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
@@ -229,7 +228,7 @@ export async function signup(event: APIGatewayProxyEventV2WithRequestContext<any
 
 export async function logout(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
     console.log(event);
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
@@ -240,19 +239,25 @@ export async function logout(event: APIGatewayProxyEventV2WithRequestContext<any
 
 export async function addTag(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
+    console.log(system);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
-    const user = getUserFromEvent(event);
-    if (!user) return { statusCode: 403 };
+    console.log(system.secureUser);
+    if (!system.secureUser) return {
+        statusCode: 403,
+        message: "You must provide authentication for this operation."
+    };
 
     const bggid = parseInt(event.queryStringParameters.bggid || "0");
     if (!bggid) return { statusCode: 400 };
     const tag = event.queryStringParameters.tag;
     if (!tag) return { statusCode: 400 };
+    console.log(`addTag ${bggid} ${tag}`);
 
-    const nowTags = await system.asyncReturnWithConnection(async conn => await addTagToDatabase(conn, user, bggid, tag));
+    const nowTags = await system.asyncReturnWithConnection(async conn => await addTagToDatabase(conn, system.secureUser, bggid, tag));
+    console.log(nowTags);
     return {
         statusCode: 200,
         body: JSON.stringify(nowTags)
@@ -261,19 +266,21 @@ export async function addTag(event: APIGatewayProxyEventV2WithRequestContext<any
 
 export async function removeTag(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
-    const user = getUserFromEvent(event);
-    if (!user) return { statusCode: 403 };
+    if (!system.secureUser) return {
+        statusCode: 403,
+        message: "You must provide authentication for this operation."
+    };
 
     const bggid = parseInt(event.queryStringParameters.bggid || "0");
     if (!bggid) return { statusCode: 400 };
     const tag = event.queryStringParameters.tag;
     if (!tag) return { statusCode: 400 };
 
-    const nowTags = await system.asyncReturnWithConnection(async conn => await removeTagFromDatabase(conn, user, bggid, tag));
+    const nowTags = await system.asyncReturnWithConnection(async conn => await removeTagFromDatabase(conn, system.secureUser, bggid, tag));
     return {
         statusCode: 200,
         body: JSON.stringify(nowTags)
@@ -282,13 +289,12 @@ export async function removeTag(event: APIGatewayProxyEventV2WithRequestContext<
 
 export async function updatePersonal(event: APIGatewayProxyEventV2WithRequestContext<any>) {
     console.log(event);
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
-    const user = getUserFromEvent(event);
-    if (user) {
-        const resp = await doUpdateUserConfig(system, user, JSON.parse(event.body || "{}"));
+    if (system.secureUser) {
+        const resp = await doUpdateUserConfig(system, system.secureUser, JSON.parse(event.body || "{}"));
         if (resp) return resp;
         return { statusCode: 200 };
     } else {
@@ -306,7 +312,7 @@ async function confirmTask(system: System, task: AuthTask) {
 
 export async function confirm(event: { Payload: {id: string, username: string, codes: string[]}[] }) {
     console.log(event);
-    const system = await findSystem("private");
+    const system = await findSystem("private", undefined);
     console.log(system);
     if (isHttpResponse(system)) return system;
     console.log(JSON.stringify(event.Payload));
@@ -336,24 +342,18 @@ async function getUserDataForUsername(system: System, username: string): Promise
 
 export async function personal(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse> {
     console.log(JSON.stringify(event));
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
 
-    const user = getUserFromEvent(event);
-    if (user) {
-        const authRow = await loadAuth(system, user);
-        if (!authRow) {
-            return { "statusCode": 403, body: "{}" };
-        } else {
-            const test = !!event.headers.referer && event.headers.referer.indexOf("://localhost:") >= 0;
-            const idCookie = makeIdCookie(user, test);
-            const secureIdCookie = makeSecureIdCookie(user, test);
-            const chatterCookie = await makeChatterCookie(user, test);
-            console.log([ test, idCookie, chatterCookie ]);
-            // to set multiple cookies, use a string[] rather than a string.
-            return { "statusCode": 200, cookies: [ idCookie, secureIdCookie, chatterCookie ], body: authRow.configuration || "{}" };
-        }
+    if (system.secureUser) {
+        const test = !!event.headers.referer && event.headers.referer.indexOf("://localhost:") >= 0;
+        const idCookie = makeIdCookie(system.secureUser, test);
+        const secureIdCookie = makeSecureIdCookie(system.secureUser, test);
+        const chatterCookie = await makeChatterCookie(system.secureUser, test);
+        console.log([ test, idCookie, chatterCookie ]);
+        // to set multiple cookies, use a string[] rather than a string.
+        return { "statusCode": 200, cookies: [ idCookie, secureIdCookie, chatterCookie ], body: JSON.stringify(system.secureUserData.data || {}) };
     } else {
         return { "statusCode": 403, body: "{}" };
     }
@@ -365,40 +365,7 @@ export interface SecureUserData {
     data: any;
 }
 
-export async function getSecureUserData(system: System, event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<SecureUserData | undefined> {
-    let userData: SecureUserData | undefined = undefined;
-    const cookies = getCookiesFromEvent(event);
-    const secureCookie = cookies['extstatssec'];
-    // const insecureCookie = cookies['extstatsid'];
-    let authHeader: string | undefined = undefined;
-    for (const h in event.headers) {
-        if (h.toLowerCase() === "authorization") {
-            authHeader = event.headers[h];
-            break;
-        }
-    }
-    console.log(`authHeader ${authHeader}`);
-    if (authHeader && authHeader.startsWith("Basic ")) {
-        authHeader = authHeader.substring(6);
-        const enc = Buffer.from(authHeader, 'base64').toString('ascii');
-        if (enc.indexOf(':') > 0) {
-            const pos = enc.indexOf(':');
-            const user = enc.substring(0, pos);
-            const p = enc.substring(pos+1);
-            const auth = await checkPassword(system, user, p);
-            if (!isHttpResponse(auth)) {
-                const sData: string = auth.configuration || "{}";
-                userData = { user, data: JSON.parse(sData) };
-            }
-        }
-    }
-    if (!userData && secureCookie) {
-        const user = getUserFromSecureCookie(secureCookie);
-        const sData: string = (await loadAuth(system, user))?.configuration || "{}";
-        userData = { user, data: JSON.parse(sData) };
-    }
-    return userData;
-}
+
 
 export function getUserFromSecureCookie(secureCookie: string): string {
     const encryptedCookie = Buffer.from(secureCookie, 'base64');

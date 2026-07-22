@@ -1,13 +1,17 @@
 import * as mysql from "promise-mysql";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
-import {getUserFromEvent} from "./library.mjs";
 import {PUBLIC_PRIVATE} from "./geeklist.mjs";
 import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
+import {getCookiesFromEvent} from "./library.mjs";
+import {loadAuth} from "./authdb.mjs";
+import {checkPassword, getUserFromSecureCookie, SecureUserData} from "./auth.mjs";
 
-export async function findSystem(pp: PUBLIC_PRIVATE, event: APIGatewayProxyEventV2WithRequestContext<any> | undefined = undefined): Promise<System | HttpResponse> {
+export async function findSystem(pp: PUBLIC_PRIVATE, event: APIGatewayProxyEventV2WithRequestContext<any> | undefined): Promise<System | HttpResponse> {
     const sys = new System();
-    if (event) sys.user = getUserFromEvent(event);
-    return await sys.loadSecrets(pp);
+    const s0 = await sys.loadSecrets(pp);
+    if (isHttpResponse(s0)) return s0;
+    await sys.loadSecureUserData(event);
+    return sys;
 }
 
 const BGG_SECRETS = "extstats/bgg";
@@ -18,7 +22,8 @@ export class System {
     private mysqlPassword: string | undefined;
     private mysqlDatabase: string | undefined;
     geeklistToken: string | undefined;
-    user: string | undefined;
+    secureUser: string | undefined;
+    secureUserData: SecureUserData | undefined;
     downloaderQueue: string | undefined;
     AWS_REGION: string | undefined;
 
@@ -94,6 +99,43 @@ export class System {
         if (mcp) {
             await this.asyncWithConnection(async conn => conn.query("update counters set mcp = mcp + 1"));
         }
+    }
+
+    async loadSecureUserData(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<void> {
+        let userData: SecureUserData | undefined = undefined;
+        const cookies = getCookiesFromEvent(event);
+        const secureCookie = cookies['extstatssec'];
+        let authHeader: string | undefined = undefined;
+        for (const h in (event?.headers || {})) {
+            console.log(h);
+            console.log(event.headers[h]);
+            if (h.toLowerCase() === "authorization") {
+                authHeader = event.headers[h];
+                break;
+            }
+        }
+        console.log(`authHeader ${authHeader}`);
+        if (authHeader && authHeader.startsWith("Basic ")) {
+            authHeader = authHeader.substring(6);
+            const enc = Buffer.from(authHeader, 'base64').toString('ascii');
+            if (enc.indexOf(':') > 0) {
+                const pos = enc.indexOf(':');
+                const user = enc.substring(0, pos);
+                const p = enc.substring(pos+1);
+                const auth = await checkPassword(this, user, p);
+                if (!isHttpResponse(auth)) {
+                    const sData: string = auth.configuration || "{}";
+                    userData = { user, data: JSON.parse(sData) };
+                }
+            }
+        }
+        if (!userData && secureCookie) {
+            const user = getUserFromSecureCookie(secureCookie);
+            const sData: string = (await loadAuth(this, user))?.configuration || "{}";
+            userData = { user, data: JSON.parse(sData) };
+        }
+        this.secureUserData = userData;
+        this.secureUser = this.secureUserData?.user;
     }
 }
 

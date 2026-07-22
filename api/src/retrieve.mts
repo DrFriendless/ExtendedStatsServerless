@@ -28,7 +28,7 @@ import {GameData, MonthlyPlayCount, MonthlyPlays, NickelDimeData, PlaysWithDate}
 import {SelectorMetadataSet} from "./selector-metadata.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
 import {makeIndex} from "extstats-core";
-import {getSecureUserData, SecureUserData} from "./auth.mjs";
+import {SecureUserData} from "./auth.mjs";
 
 class GameDataShort {
 }
@@ -865,13 +865,13 @@ interface NamedQuery {
 
 export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | object> {
     console.log(JSON.stringify(event));
-    const system = await findSystem("private");
+    const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
     await system.incrementApiCounter(event);
     const loaders = createLoaders(system);
 
     // give the selectors access to the authenticated user's private data
-    const userData = await getSecureUserData(system, event);
+    const userData = system.secureUserData;
     const schema = buildSchema(loaders, userData);
     let query: string | undefined = undefined;
     let operationName: string | undefined;
