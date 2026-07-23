@@ -107,14 +107,11 @@ export class System {
         const secureCookie = cookies['extstatssec'];
         let authHeader: string | undefined = undefined;
         for (const h in (event?.headers || {})) {
-            console.log(h);
-            console.log(event.headers[h]);
             if (h.toLowerCase() === "authorization") {
                 authHeader = event.headers[h];
                 break;
             }
         }
-        console.log(`authHeader ${authHeader}`);
         if (authHeader && authHeader.startsWith("Basic ")) {
             authHeader = authHeader.substring(6);
             const enc = Buffer.from(authHeader, 'base64').toString('ascii');

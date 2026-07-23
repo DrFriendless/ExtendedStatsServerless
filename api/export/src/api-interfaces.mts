@@ -334,6 +334,7 @@ export interface DesignerResult {
 
 export interface CatalistMetadata {
     tags: string[];
+    taggroups: string[];
     mechanics: string[];
     categories: string[];
 }

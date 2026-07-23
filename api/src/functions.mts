@@ -17,7 +17,6 @@ import {
     patchGeekData,
     listCategoriesAndMechanics, attachTags
 } from "./mysql-rds.mjs";
-import {APIGatewayProxyEvent} from "aws-lambda";
 import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
 import {getGeekId} from "./library.mjs";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
@@ -42,18 +41,21 @@ export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithReque
     await system.incrementApiCounter(event);
 
     let tags: string[] = [];
+    let taggroups: string[] = [];
     if (system.secureUserData) {
         const uc = new UserConfig(system.secureUserData.data);
         const tagGroups = uc.get("tagalogue.taggroups", []);
         for (const tg of tagGroups) {
+            taggroups.push(tg.name);
             for (const t of tg.tags) {
                 if (tags.indexOf(t) < 0) tags.push(t);
             }
         }
         tags.sort();
+        taggroups.sort();
     }
     const cm = await listCategoriesAndMechanics(system);
-    return { ...cm, tags };
+    return { ...cm, tags, taggroups };
 }
 
 export async function getUpdates(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | { forGeek: ToProcessSummary[], forSystem: Record<string, number> }> {

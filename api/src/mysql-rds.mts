@@ -87,11 +87,31 @@ export async function retrieveGeekIdGames(conn: mysql.Connection, ids: number[],
     if (secureUser) {
         await attachTags(conn, secureUser, rows);
     }
-    return rows;
+    const index: Record<string, GeekGameRow> = {};
+    for (const gg of rows) index[gg.bggid.toString()] = gg;
+    return ids.map(id => index[id.toString()] || fakeGeekGameRow(geek, geekId, id));
+}
+
+function fakeGeekGameRow(geek: string, geekId: number, bggid: number): GeekGameRow {
+    return {
+        geek,
+        geekid: geekId,
+        bggid: bggid,
+        rating: -1,
+        owned: false,
+        prevOwned: false,
+        wantToBuy: false,
+        wantToPlay: false,
+        preordered: false,
+        wantInTrade: false,
+        wish: 0,
+        forTrade: false,
+        normRating: -1,
+        tags: undefined
+    };
 }
 
 function extractGeekGame(geek: string, row: GeekGamesTableRow): GeekGameRow {
-    // The tags
     return {
         geek,
         geekid: row["geekid"],
@@ -245,9 +265,10 @@ export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {
     return (await conn.query(sql)).map((it: any) => it as NewsItem);
 }
 
-export async function attachTags(conn: mysql.Connection, geek: string, games: { bggid: number, tags: string[] | undefined }[]) {
-    const geekId = await getGeekId(conn, geek);
+export async function attachTags(conn: mysql.Connection, secureUser: string, games: { bggid: number, tags: string[] | undefined }[]) {
+    const geekId = await getGeekId(conn, secureUser);
     console.log(`attachTags geekId ${geekId}`);
+    console.log(JSON.stringify(games));
     const getTagsSql = "select game bggid, tags from geekgames where tags is not null and geekId = ?";
     const index: Record<string, { bggid: number, tags: string[] | undefined }> = {};
     for (const g of games) {
@@ -259,6 +280,7 @@ export async function attachTags(conn: mysql.Connection, geek: string, games: { 
             index[row.bggid.toString()].tags = JSON.parse(row.tags);
         }
     }
+    console.log(JSON.stringify(games));
 }
 
 export async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<MonthlyPlays[]> {

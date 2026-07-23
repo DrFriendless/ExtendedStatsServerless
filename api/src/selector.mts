@@ -158,11 +158,9 @@ async function evaluateExpression(conn: mysql.Connection, expr: Expression, vars
             if (!vars.hasUserData()) return [];
             const geekId = await getGeekId(conn, vars.getUser());
             const groupName = getStringFromArgs(expr.args[0] as Arg, vars);
-            console.log(`taggroup ${geekId} ${groupName}`);
             const userConfig = vars.getUserConfig();
             const groups: {name: string, tags: string[]}[] = userConfig.get("tagalogue.taggroups", []);
             const group = groups.filter(g => g.name === groupName);
-            console.log(JSON.stringify(group));
             if (group.length === 0 || group[0].tags.length === 0) return [];
             const sql = "select game from geekgames where tags is not null and geekid = ? and JSON_OVERLAPS(tags, ?)";
             return (await conn.query(sql, [geekId, JSON.stringify(group[0].tags)]) as GeekGamesTableRow[]).map(row => row["game"]);
