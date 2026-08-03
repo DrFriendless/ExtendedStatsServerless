@@ -5,7 +5,7 @@ import {
     DisambiguationData,
     FAQCount,
     GeeklistCheck,
-    GeekSummary,
+    GeekSummary, HostingResult,
     Hotness,
     NewsItem,
     ProcessedRecRow, Publisher,
@@ -291,7 +291,7 @@ export class ExtstatsApi {
         });
     }
 
-    async addTag(bggid: number, tag: string, username?: string, password?: string): Promise<string[]> {
+    async addTag(bggid: number, tag: string, username: string, password: string): Promise<string[]> {
         const authHeaders = this.authHeaders(username, password);
         const resp = await fetch(`${this.baseUrl}/u/addTag?bggid=${bggid}&tag=${encodeURIComponent(tag)}`, {
             headers: {
@@ -304,7 +304,7 @@ export class ExtstatsApi {
         return await resp.json() as string[];
     }
 
-    async removeTag(bggid: number, tag: string, username?: string, password?: string): Promise<string[]> {
+    async removeTag(bggid: number, tag: string, username: string, password: string): Promise<string[]> {
         const authHeaders = this.authHeaders(username, password);
         const resp = await fetch(`${this.baseUrl}/u/removeTag?bggid=${bggid}&tag=${encodeURIComponent(tag)}`, {
             headers: {
@@ -422,5 +422,17 @@ export class ExtstatsApi {
             },
             method: "GET"
         })).json()) as CatalistMetadata;
+    }
+
+    async getHostingSummary(host: string, otherPlayers: string[] | undefined, username?: string, password?: string): Promise<HostingResult> {
+        const authHeaders = this.authHeaders(username, password);
+        const params = `geek=${host}&otherPlayers=${encodeURIComponent((otherPlayers || []).join(","))}`;
+        return (await (await fetch(`${this.baseUrl}/hosting?${params}`, {
+            headers: {
+                "Accept": "application/json",
+                ...authHeaders
+            },
+            method: "GET"
+        })).json()) as HostingResult;
     }
 }

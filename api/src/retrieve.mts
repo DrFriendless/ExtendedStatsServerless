@@ -41,7 +41,7 @@ interface Loaders {
     gameDesigners: DataLoader<number, DesignerData[]>;
 }
 
-function createLoaders(system: System): Loaders {
+export function createLoaders(system: System): Loaders {
     return {
         system: system,
         games: new DataLoader((ids: number[]) => batchGetGames(system, ids)),
@@ -368,7 +368,7 @@ function buildShortMonthlyPlaysAndCountsType(loaders: Loaders, gameDataType: Gra
     });
 }
 
-function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
+export function buildSchema(loaders: Loaders, userData: SecureUserData | undefined) {
     const gameDataType: GraphQLObjectType<GameData> = buildGameDataType(loaders);
     const nickelDimeDataType: GraphQLObjectType<NickelDimeData> = buildNickelDimeGameDataType(loaders, gameDataType);
     const gameDataTypeShort: GraphQLObjectType<GameDataShort> = buildGameDataTypeShort(loaders);
@@ -670,7 +670,7 @@ async function selectGamesOnly(conn: mysql.Connection, selector: string, vars: V
     return evaluateSimpleGames(conn, parse(selector), vars);
 }
 
-async function selectGames(conn: mysql.Connection, selector: string, vars: VarBindings, secureUser: string | undefined): Promise<GeekGameSelectResult> {
+export async function selectGames(conn: mysql.Connection, selector: string, vars: VarBindings, secureUser: string | undefined): Promise<GeekGameSelectResult> {
     return evaluateSimple(conn, parse(selector), vars, secureUser);
 }
 

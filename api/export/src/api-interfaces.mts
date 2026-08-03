@@ -348,3 +348,22 @@ export interface Publisher {
     bggid: number;
     name: string;
 }
+
+export interface HostingResultOpinion {
+    rating: number;
+    plays: number;
+}
+
+export interface HostingResultGame {
+    bggid: number;
+    tags: string[] | undefined;
+    name: string;
+    minPlayers: number;
+    maxPlayers: number;
+    weight: number;
+    opinions: Record<string, HostingResultOpinion>
+}
+
+export interface HostingResult {
+    games: HostingResultGame[];
+}

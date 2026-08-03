@@ -55,12 +55,13 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_updateComment`, handler: "blog.updateComment", route: "updateComment", method: "POST" },
     { name: `${COMPONENT}_deleteComment`, handler: "blog.deleteComment", route: "deleteComment", method: "POST" },
     { name: `${COMPONENT}_geeklist`, handler: "geeklist.downloader", route: "geeklist", method: "POST", pp: "public" },
-    { name: `${COMPONENT}_recommendations`, handler: "functions.getRecommendations", route: "recommendations", method: "POST" },
+    { name: `${COMPONENT}_recommendations`, handler: "functions.getRecommendations", route: "recommendations", method: "POST", memSize: 256 },
     { name: `${COMPONENT}_hotness`, handler: "functions.getHotness", route: "hotness", method: "GET" },
     { name: `${COMPONENT}_designers`, handler: "designers.getDesigners", route: "designers", method: "GET" },
     { name: `${COMPONENT}_catalistMetadata`, handler: "functions.getCatalistMetadata", route: "catalistMetadata", method: "GET" },
     { name: `${COMPONENT}_recalculatePlays`, handler: "functions.recalculatePlays", route: "recalculatePlays", method: "POST", pp: "public" },
     { name: `${COMPONENT}_u`, handler: "u.handler", route: "u/{proxy+}", method: "ANY" },
+    { name: `${COMPONENT}_hosting`, handler: "hosting.hosting", route: "hosting", method: "GET" },
 ];
 
 export const LAMBDA_ONLY_SPECS: LambdaOnlySpec[] = [
