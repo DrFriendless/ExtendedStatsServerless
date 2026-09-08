@@ -1,5 +1,7 @@
 // data shared by both the CDK script and the post-stack SDK script.
 
+import {Duration} from "aws-cdk-lib";
+
 export const DEPLOYMENT_BUCKET = "extstats-deployment";
 export const CACHE_BUCKET = "extstats-cache";
 export const COMPONENT = "downloader";
@@ -12,6 +14,7 @@ export interface LambdaSpec {
     duration: number;
     mem: number;
     maxConcurrency: number | undefined;
+    durableConfig?: { executionTimeout: Duration };
 }
 
 export const LAMBDA_SPECS: LambdaSpec[] = [
@@ -24,5 +27,9 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_processDesigner`, handler: "functions.processDesigner", duration: 40, mem: 128, maxConcurrency: undefined },
     { name: `${COMPONENT}_processPublisher`, handler: "functions.processPublisher", duration: 40, mem: 128, maxConcurrency: undefined },
     { name: `${COMPONENT}_processBGGTop50`, handler: "functions.processBGGTop50", duration: 40, mem: 128, maxConcurrency: undefined },
+    { name: `${COMPONENT}_bggDownload`, handler: "bgg.handler", duration: 900, mem: 128, maxConcurrency: 1,
+    durableConfig: { executionTimeout: Duration.minutes(15) }},
+    { name: `${COMPONENT}_bggTest`, handler: "bgg.test", duration: 40, mem: 128, maxConcurrency: undefined,
+    durableConfig: { executionTimeout: Duration.minutes(15) }},
 ];
 

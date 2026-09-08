@@ -14,7 +14,7 @@ import {Rule} from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import {CACHE_BUCKET, COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS} from "./metadata.mts";
 
-const RUNTIME = lambda.Runtime.NODEJS_22_X;
+const RUNTIME = lambda.Runtime.NODEJS_24_X;
 
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 
@@ -26,8 +26,10 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-  defineLambda(name: string, handler: string, role: iam.IRole, duration: number, mem: number = 128, maxConcurrency: number | undefined): lambda.Function {
+  defineLambda(name: string, handler: string, role: iam.IRole, duration: number, mem: number = 128,
+               maxConcurrency: number | undefined, durableConfig: { executionTimeout: Duration } | undefined): lambda.Function {
     const code = lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip");
+    const dc = durableConfig ? { durableConfig } : {};
     let opts: lambda.FunctionProps = {
       functionName: name,
       runtime: RUNTIME,
@@ -36,7 +38,8 @@ export class DownloadStack extends cdk.Stack {
       code: code,
       timeout: Duration.seconds(duration),
       reservedConcurrentExecutions: maxConcurrency,
-      memorySize: mem
+      memorySize: mem,
+      ...dc
     }
     const f = new lambda.Function(this, name, opts);
     Tags.of(f).add("component", COMPONENT);
@@ -58,7 +61,7 @@ export class DownloadStack extends cdk.Stack {
     return topic;
   }
 
-  defineDownloaderRole(outputQueue: sqs.IQueue, cacheBucket: s3.Bucket, topic: sns.Topic): iam.IRole {
+  defineDownloaderRole(outputQueue: sqs.IQueue, bggQueue: sqs.IQueue, cacheBucket: s3.Bucket, topic: sns.Topic): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
     bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
@@ -88,12 +91,27 @@ export class DownloadStack extends cdk.Stack {
     policies[`policy_downloader_queue`] = new iam.PolicyDocument({
       statements: [sendToOutputQueue]
     });
+    if (bggQueue) {
+      const sendToBGGQueue = new iam.PolicyStatement();
+      sendToBGGQueue.addActions("sqs:SendMessage");
+      sendToBGGQueue.addResources(bggQueue.queueArn);
+      policies[`policy_bgg_queue`] = new iam.PolicyDocument({
+        statements: [sendToBGGQueue]
+      });
+    }
 
     const sendToSNS = new iam.PolicyStatement();
     sendToSNS.addActions("sns:Publish");
     sendToSNS.addResources(topic.topicArn);
     policies[`policy_downloader_sns`] = new iam.PolicyDocument({
       statements: [sendToSNS]
+    });
+
+    const durableLambda = new iam.PolicyStatement();
+    durableLambda.addActions("lambda:CheckpointDurableExecution", "lambda:SendDurableExecutionCallbackSuccess", "lambda:SendDurableExecutionCallbackFailure");
+    durableLambda.addResources("*");
+    policies[`policy_downloader_durable`] = new iam.PolicyDocument({
+      statements: [durableLambda]
     });
 
     const useCacheBucket1 = new iam.PolicyStatement();
@@ -132,7 +150,14 @@ export class DownloadStack extends cdk.Stack {
   definePlaysQueue(): sqs.IQueue {
     return new sqs.Queue(this, "playsQueue", {
       queueName: "downloaderPlaysQueue",
-      visibilityTimeout: Duration.seconds(120),
+      visibilityTimeout: Duration.seconds(900),
+    });
+  }
+
+  defineBGGQueue(): sqs.IQueue {
+    return new sqs.Queue(this, "bggQueue2", {
+      queueName: "downloaderBGGQueue",
+      visibilityTimeout: Duration.seconds(900),
     });
   }
 
@@ -193,20 +218,24 @@ export class DownloadStack extends cdk.Stack {
     const outputQueue = this.defineOutputQueue();
     const playsQueue = this.definePlaysQueue();
     const retryQueue = this.defineRetryQueue();
+    const bggQueue = this.defineBGGQueue();
 
     const snsTopic = this.defineSnsTopic(process.env.SNS_TOPIC, process.env.SNS_EMAIL);
-    const role = this.defineDownloaderRole(outputQueue, cacheBucket, snsTopic);
+    const role = this.defineDownloaderRole(outputQueue, bggQueue, cacheBucket, snsTopic);
     let playsLambda: lambda.IFunction = undefined;
+    let bggLambda: lambda.IFunction = undefined;
     let userListLambda: lambda.IFunction = undefined;
     let metadataLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
-      const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency);
+      const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency, spec.durableConfig);
       if (spec.name.endsWith("_processPlayed")) {
         playsLambda = f;
       } else if (spec.name.endsWith("_processUserList")) {
         userListLambda = f;
       } else if (spec.name.endsWith("_processMetadata")) {
         metadataLambda = f;
+      } else if (spec.name.endsWith("_bggDownload")) {
+        bggLambda = f;
       }
     }
     if (playsLambda) {
@@ -218,6 +247,16 @@ export class DownloadStack extends cdk.Stack {
       });
     } else {
       console.log("There isn't any plays lambda");
+    }
+    if (bggLambda && bggQueue) {
+      const mapping = new sources.SqsEventSource(bggQueue, {batchSize: 1, enabled: false});
+      bggLambda.latestVersion.addEventSource(mapping);
+      new cdk.CfnOutput(this, 'bggDownloaderMapping', {
+        value: mapping.eventSourceMappingId,
+        exportName: 'downloader-BGGDownloaderMappingUUID'
+      });
+    } else {
+      console.log("There isn't any BGG lambda or queue");
     }
     if (userListLambda) {
       this.defineRuleToUpdateUserList(userListLambda);
@@ -240,6 +279,10 @@ export class DownloadStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'downloaderPlaysQueue', {
       value: playsQueue.queueUrl,
       exportName: 'downloader-PlaysQueueURL'
+    });
+    new cdk.CfnOutput(this, 'downloaderBGGQueue', {
+      value: bggQueue.queueUrl,
+      exportName: 'downloader-BGGQueueURL'
     });
     new cdk.CfnOutput(this, 'downloaderRetryQueue', {
       value: retryQueue.queueUrl,

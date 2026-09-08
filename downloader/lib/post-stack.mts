@@ -10,12 +10,14 @@ import {PutParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 
 const CREDENTIALS = { region: REGION, profile: PROFILE };
 
-async function updateCode(client: LambdaClient, funcName: string) {
+async function updateCode(client: LambdaClient, funcName: string, durable: boolean) {
+    const durableOpts = durable ? { Version: "$LATEST" } : {};
     const command = new UpdateFunctionCodeCommand({
         S3Bucket: DEPLOYMENT_BUCKET,
         S3Key: `${COMPONENT}.zip`,
         FunctionName: funcName,
-        Publish: true
+        Publish: true,
+        ...durableOpts
     });
     const r = await client.send(command);
     console.log(`${r.FunctionArn} ${r.LastModified}`);
@@ -25,7 +27,7 @@ async function updateCode(client: LambdaClient, funcName: string) {
 console.log("Telling Lambdas they have new code");
 const lClient = new LambdaClient(CREDENTIALS);
 for (const spec of LAMBDA_SPECS) {
-    await updateCode(lClient, spec.name);
+    await updateCode(lClient, spec.name, !!spec.durableConfig);
 }
 
 // set the retention period on the log groups
@@ -66,6 +68,17 @@ for (const e of response.Exports) {
         });
         const r2 = await ssmClient.send(ssmCmd);
         console.log(r2.$metadata.httpStatusCode);
+    } else if (e.Name === "downloader-BGGQueueURL") {
+        // put the queue URL where other lambdas can find it
+        console.log("Updating BGG queue URL in Parameter Store");
+        const ssmCmd = new PutParameterCommand({
+            Name: "/extstats/downloader/bggqueue",
+            Value: e.Value,
+            Overwrite: true,
+            Type: "String"
+        });
+        const r2 = await ssmClient.send(ssmCmd);
+        console.log(r2.$metadata.httpStatusCode);
     } else if (e.Name === "downloader-RetryQueueURL") {
         // put the queue URL where insideq can find it
         console.log("Updating retry queue URL in Parameter Store");
@@ -86,6 +99,16 @@ for (const e of response.Exports) {
         });
         const r3 = await lClient.send(lCmd);
         console.log(r3.$metadata.httpStatusCode);
+    } else if (e.Name === "downloader-BGGDownloaderMappingUUID") {
+        // turn on the BGG downloader lambda processing from its queue
+        // console.log("Remenber to turn on BGG downloader queue");
+        console.log("Turning on BGG downloader queue");
+        const lCmd = new UpdateEventSourceMappingCommand({
+            Enabled: true,
+            UUID: e.Value
+        });
+        const r3 = await lClient.send(lCmd);
+        console.log(r3.$metadata.httpStatusCode);
     } else if (e.Name === "downloader-topicARN") {
         console.log("Updating SNS topic URL in Parameter Store");
         const ssmCmd = new PutParameterCommand({
@@ -100,7 +123,6 @@ for (const e of response.Exports) {
         console.log(e.Name);
     }
 }
-// turn on the plays lambda processing from the plays queue
 console.log("Set plays cache bucket");
 const ssmCmd = new PutParameterCommand({
     Name: "/extstats/downloader/cache",

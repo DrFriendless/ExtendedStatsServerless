@@ -1,4 +1,4 @@
-import {GetParameterCommand, GetParametersByPathCommand, SSMClient} from "@aws-sdk/client-ssm";
+import {GetParameterCommand, GetParametersByPathCommand, SSMClient, PutParameterCommand} from "@aws-sdk/client-ssm";
 import {PublishCommand, SNSClient} from "@aws-sdk/client-sns";
 import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
 
@@ -17,6 +17,8 @@ export class System {
     snsTopic: string;
     metadataFile: string;
     downloaderQueue: string;
+    bggQueue: string | undefined;
+    lastRequestTime: number;
     playsQueue: string;
     usersFile: string;
     systemLogGroup: string;
@@ -25,6 +27,32 @@ export class System {
     extrasToken: string;
     playsToken: string;
     collectionToken: string;
+
+    async loadBGGQueueUserParameters(): Promise<System | HttpResponse> {
+        this.bggQueue = await this.getParameter("/extstats/downloader/bggqueue");
+        return this;
+    }
+
+    async loadBGGQueueOwnParameters(): Promise<System | HttpResponse> {
+        const s = await this.getParameter("/extstats/downloader/lastRequestTime");
+        this.lastRequestTime = s ? parseInt(s) : 0;
+        return this;
+    }
+
+    async updateLastRequestTime(lastRequestTime: number): Promise<void> {
+        const ssmClient = new SSMClient({
+            apiVersion: '2014-11-06',
+            region: process.env.AWS_REGION
+        });
+        const response = await ssmClient.send(
+            new PutParameterCommand({
+                Value: lastRequestTime.toString(),
+                Name: "/extstats/downloader/lastRequestTime",
+                Overwrite: true
+            })
+        );
+        console.log(response);
+    }
 
     async loadSecrets(): Promise<System | HttpResponse> {
         const ssmClient = new SSMClient({
