@@ -2,6 +2,7 @@
 
 export const DEPLOYMENT_BUCKET = "extstats-deployment";
 export const COMPONENT = "api";
+export const RUST_CODE = "extstats-rust";
 export const REGION = "ap-southeast-2";
 export const PROFILE = "drfriendless";
 
@@ -16,6 +17,15 @@ export interface LambdaSpec {
     memSize?: number;
 }
 
+export interface RustLambdaSpec {
+    name: string;
+    manifestPath: string;
+    route: string;
+    method: "GET" | "POST" | "ANY";
+    // the name of the output from the stack that gives us the function ARN
+    key: string;
+}
+
 export interface LambdaOnlySpec {
     name: string;
     handler: string;
@@ -27,7 +37,13 @@ export interface ExpressSpec {
     method: "GET" | "POST";
 }
 
+// assumed to be in stack RustApiStack
+export const RUST_SPECS: RustLambdaSpec[] = [
+    { name: `${COMPONENT}_autocomplete`, manifestPath: "./lambda/extstats-rust", route: "rust1", method: "GET", key: "rustfindgeeks" },
+];
+
 export const LAMBDA_SPECS: LambdaSpec[] = [
+    { name: `${COMPONENT}_findgeeks`, handler: "functions.findGeeks", route: "node1", method: "GET" },
     { name: `${COMPONENT}_wartable`, handler: "functions.getWarTable", route: "warTable", method: "GET" },
     { name: `${COMPONENT}_updates`, handler: "functions.getUpdates", route: "updates", method: "GET" },
     { name: `${COMPONENT}_geek`, handler: "functions.getGeekSummary", route: "geek", method: "GET" },

@@ -7,11 +7,11 @@
   },
   "type": "module",
   "dependencies": {
-    "@aws-sdk/client-apigatewaymanagementapi": "^3.1099.0",
-    "@aws-sdk/client-cloudwatch-logs": "^3.1099.0",
-    "@aws-sdk/client-dynamodb": "^3.1099.0",
-    "@aws-sdk/client-lambda": "^3.1099.0",
-    "@aws-sdk/client-sqs": "^3.1099.0",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.1136.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.1136.0",
+    "@aws-sdk/client-dynamodb": "^3.1136.0",
+    "@aws-sdk/client-lambda": "^3.1136.0",
+    "@aws-sdk/client-sqs": "^3.1136.0",
     "@aws-sdk/util-utf8-node": "^3.259.0",
     "bluebird": "^3.7.2",
     "dataloader": "^2.2.3",
@@ -26,17 +26,18 @@
     "utf8": "^3.0.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-cloudformation": "^3.1099.0",
-    "@aws-sdk/client-secrets-manager": "^3.1099.0",
-    "@aws-sdk/client-ssm": "^3.1099.0",
-    "@aws-sdk/types": "^3.974.2",
-    "@types/aws-lambda": "^8.10.161",
+    "@aws-sdk/client-cloudformation": "^3.1136.0",
+    "@aws-sdk/client-secrets-manager": "^3.1136.0",
+    "@aws-sdk/client-ssm": "^3.1136.0",
+    "@aws-sdk/types": "^3.974.5",
+    "@types/aws-lambda": "^8.10.163",
     "@types/date-arithmetic": "^4.1.4",
     "@types/moo": "^0.5.10",
     "@types/node": "^24.3.0",
     "@types/utf8": "^3.0.3",
-    "aws-cdk-lib": "^2.262.2",
-    "constructs": "^10.8.0",
+    "aws-cdk-lib": "^2.269.0",
+    "cargo-lambda-cdk": "^0.0.36",
+    "constructs": "^10.8.1",
     "typescript": "^5.9.3"
   }
 }

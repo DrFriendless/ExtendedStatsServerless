@@ -19,13 +19,24 @@ import {
     PROFILE,
     LAMBDA_SPECS,
     LAMBDA_ONLY_SPECS,
-    OTHER_LAMBDA_NAMES
+    OTHER_LAMBDA_NAMES, RUST_CODE
 } from "./metadata.mts";
 
 async function updateCode(client: LambdaClient, funcName: string) {
     const command = new UpdateFunctionCodeCommand({
         S3Bucket: DEPLOYMENT_BUCKET,
         S3Key: `${COMPONENT}.zip`,
+        FunctionName: funcName,
+        Publish: true
+    });
+    const r = await client.send(command);
+    console.log(`${r.FunctionArn} ${r.LastModified}`);
+}
+
+async function updateRustCode(client: LambdaClient, funcName: string) {
+    const command = new UpdateFunctionCodeCommand({
+        S3Bucket: DEPLOYMENT_BUCKET,
+        S3Key: `${RUST_CODE}.zip`,
         FunctionName: funcName,
         Publish: true
     });

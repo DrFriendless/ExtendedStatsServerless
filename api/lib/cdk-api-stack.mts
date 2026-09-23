@@ -1,5 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
-import {aws_apigatewayv2, Duration, Tags} from 'aws-cdk-lib';
+import {aws_apigatewayv2, Duration, Fn, Tags} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -16,11 +16,11 @@ import {
   DEPLOYMENT_BUCKET,
   EXPRESS_SPECS,
   LAMBDA_ONLY_SPECS,
-  LAMBDA_SPECS
+  LAMBDA_SPECS, RUST_SPECS
 } from "./metadata.mts";
 import {ApiGatewayv2DomainProperties} from "aws-cdk-lib/aws-route53-targets";
 
-const RUNTIME = lambda.Runtime.NODEJS_22_X;
+const RUNTIME = lambda.Runtime.NODEJS_24_X;
 
 type PUBLIC_PRIVATE = "public" | "private";
 
@@ -275,6 +275,25 @@ export class ApiStack extends cdk.Stack {
     return { connHandler, discoHandler, defaultHandler };
   }
 
+  linkInRustFunctions() {
+    const stackName = "RustApiStack";
+    for (const spec of RUST_SPECS) {
+      const functionArn = Fn.getStackOutput(stackName, spec.key);
+      const f = lambda.Function.fromFunctionArn(this, `${stackName}-${spec.key}`, functionArn);
+      const m = (spec.method === "GET") ? apigw.HttpMethod.GET : (spec.method === "ANY") ? apigw.HttpMethod.ANY : apigw.HttpMethod.POST;
+      const route = spec.route;
+      const r = new aws_apigatewayv2.HttpRoute(this, route, {
+        httpApi: API_GATEWAY,
+        routeKey: apigw.HttpRouteKey.with(`/${route}`, m),
+        integration: new apigwi.HttpLambdaIntegration(`integration_${route}`, f, {
+          timeout: Duration.seconds(29),
+        })
+      });
+      Tags.of(r).add("component", COMPONENT);
+      console.log(`Linked Rust function ${functionArn} to API route ${route}`);
+    }
+  }
+
   createWebSocketsInfrastructure(domainName: string, tableName: string, stageName: string) {
     const table = new ddb.Table(this, 'sockTable', {
       tableName,
@@ -364,6 +383,12 @@ export class ApiStack extends cdk.Stack {
     for (const spec of LAMBDA_ONLY_SPECS) {
       this.defineLambdaOnly(this, spec.name, spec.handler, apiRole);
     }
+
+    this.linkInRustFunctions();
+    new cdk.CfnOutput(this, 'ApiLambdaRole', {
+      value: apiRole.roleArn,
+      exportName: 'api-LambdaRoleArn'
+    });
 
     for (const spec of EXPRESS_SPECS) {
       if (spec.method === "GET") {

@@ -35,6 +35,22 @@ import {
 import {ExpansionData, UserConfig} from "extstats-core";
 import {SendMessageCommand, SendMessageCommandOutput, SQSClient} from "@aws-sdk/client-sqs";
 
+export async function findGeeks(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | string[]> {
+    const system = await findSystem("private", event);
+    if (isHttpResponse(system)) return system;
+    // await system.incrementApiCounter(event);
+
+    const sql = "select username from geeks where LOWER(username) like ? order by 1 limit 10";
+    const f = event.queryStringParameters.fragment || "";
+    const name = f.toLowerCase().replace(/%/g, "");
+    console.log(`findgeeks ${name}}`);
+    return await system.asyncReturnWithConnection(async (conn) => {
+        let ms = await conn.query(sql, name + "%");
+        if (ms.length == 0) ms = await conn.query(sql, "%" + name + "%");
+        return ms.map((row: { [key: string]: any }) => row["username"]);
+    });
+}
+
 export async function getCatalistMetadata(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | CatalistMetadata> {
     const system = await findSystem("private", event);
     if (isHttpResponse(system)) return system;
