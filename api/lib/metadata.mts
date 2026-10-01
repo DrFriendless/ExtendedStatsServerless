@@ -23,6 +23,8 @@ export interface RustLambdaSpec {
     route: string;
     method: "GET" | "POST" | "ANY";
     // the name of the output from the stack that gives us the function ARN
+    var: string;
+    // the key of the function in this stack
     key: string;
 }
 
@@ -39,7 +41,8 @@ export interface ExpressSpec {
 
 // assumed to be in stack RustApiStack
 export const RUST_SPECS: RustLambdaSpec[] = [
-    { name: `${COMPONENT}_autocomplete`, manifestPath: "./lambda/extstats-rust", route: "rust1", method: "GET", key: "rustfindgeeks" },
+    { name: `${COMPONENT}_autocomplete`, manifestPath: "./lambda/extstats-rust", route: "rust1", method: "GET", key: "rustfindgeeks", var: "rustfindgeeks" },
+    { name: `${COMPONENT}_r`, manifestPath: "./lambda/extstats-rust", route: "r/{proxy+}", method: "ANY", key: "r", var: "rustfindgeeks" },
 ];
 
 export const LAMBDA_SPECS: LambdaSpec[] = [

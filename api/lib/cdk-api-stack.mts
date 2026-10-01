@@ -278,7 +278,7 @@ export class ApiStack extends cdk.Stack {
   linkInRustFunctions() {
     const stackName = "RustApiStack";
     for (const spec of RUST_SPECS) {
-      const functionArn = Fn.getStackOutput(stackName, spec.key);
+      const functionArn = Fn.getStackOutput(stackName, spec.var);
       const f = lambda.Function.fromFunctionArn(this, `${stackName}-${spec.key}`, functionArn);
       const m = (spec.method === "GET") ? apigw.HttpMethod.GET : (spec.method === "ANY") ? apigw.HttpMethod.ANY : apigw.HttpMethod.POST;
       const route = spec.route;

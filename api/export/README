@@ -1,1 +1,4 @@
 This is a client library for using this API from web pages.
+
+3.1.0 - link to Rust functions
+3.1.1 - fix bug with recently added auth on addTag and removeTag

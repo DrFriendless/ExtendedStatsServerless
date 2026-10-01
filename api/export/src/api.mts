@@ -151,25 +151,25 @@ export class ExtstatsApi {
     }
 
     async findGeeks(fragment: string): Promise<string[]> {
-        return (await (await fetch(`${this.baseUrl}/findgeeks?fragment=${fragment}`)).json()) as string[];
+        return (await (await fetch(`${this.baseUrl}/r/findgeeks?fragment=${fragment}`)).json()) as string[];
     }
 
     async findDesigners(fragment: string): Promise<Designer[]> {
-        return (await (await fetch(`${this.baseUrl}/finddesigners?fragment=${fragment}`)).json()) as Designer[];
+        return (await (await fetch(`${this.baseUrl}/r/finddesigners?fragment=${fragment}`)).json()) as Designer[];
     }
 
     async findPublishers(fragment: string): Promise<Publisher[]> {
-        return (await (await fetch(`${this.baseUrl}/findpublishers?fragment=${fragment}`)).json()) as Publisher[];
+        return (await (await fetch(`${this.baseUrl}/r/findpublishers?fragment=${fragment}`)).json()) as Publisher[];
     }
 
     async findDesigner(bggid: number): Promise<Designer | undefined> {
-        const text = await (await fetch(`${this.baseUrl}/finddesigner?bggid=${bggid}${this.mcpOpt}`)).text();
+        const text = await (await fetch(`${this.baseUrl}/r/finddesigner?bggid=${bggid}${this.mcpOpt}`)).text();
         if (!text) return undefined;
         return (JSON.parse(text)) as Designer;
     }
 
     async findPublisher(bggid: number): Promise<Publisher | undefined> {
-        const text = await (await fetch(`${this.baseUrl}/findpublisher?bggid=${bggid}${this.mcpOpt}`)).text();
+        const text = await (await fetch(`${this.baseUrl}/r/findpublisher?bggid=${bggid}${this.mcpOpt}`)).text();
         if (!text) return undefined;
         return (JSON.parse(text)) as Publisher;
     }
@@ -291,7 +291,7 @@ export class ExtstatsApi {
         });
     }
 
-    async addTag(bggid: number, tag: string, username: string, password: string): Promise<string[]> {
+    async addTag(bggid: number, tag: string, username?: string, password?: string): Promise<string[]> {
         const authHeaders = this.authHeaders(username, password);
         const resp = await fetch(`${this.baseUrl}/u/addTag?bggid=${bggid}&tag=${encodeURIComponent(tag)}`, {
             headers: {
@@ -304,7 +304,7 @@ export class ExtstatsApi {
         return await resp.json() as string[];
     }
 
-    async removeTag(bggid: number, tag: string, username: string, password: string): Promise<string[]> {
+    async removeTag(bggid: number, tag: string, username?: string, password?: string): Promise<string[]> {
         const authHeaders = this.authHeaders(username, password);
         const resp = await fetch(`${this.baseUrl}/u/removeTag?bggid=${bggid}&tag=${encodeURIComponent(tag)}`, {
             headers: {
