@@ -23,7 +23,7 @@ let CONFIRM_LAMBDA: lambda.IFunction = undefined;
 let ACCESS_DYNAMO: iam.PolicyDocument = undefined;
 let DOWNLOADER_QUEUE: string | undefined;
 
-export const RUNTIME = lambda.Runtime.NODEJS_22_X;
+export const RUNTIME = lambda.Runtime.NODEJS_24_X;
 // bgg - access BoardGameGeek, needs to be public
 // db - access to the database, needs to be private
 // logging - ability to write to CloudWatch logs
