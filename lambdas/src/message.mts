@@ -43,7 +43,7 @@ export async function handler(queueEvent: QueueInput): Promise<void> {
         }
     });
 
-    console.log(JSON.stringify(queueEvent));
+    // console.log(JSON.stringify(queueEvent));
     const system = await findSystem(["message"]);
     if (isHttpResponse(system)) return;
 

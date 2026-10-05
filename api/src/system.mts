@@ -10,7 +10,7 @@ export async function findSystem(pp: PUBLIC_PRIVATE, event: APIGatewayProxyEvent
     const sys = new System();
     const s0 = await sys.loadSecrets(pp);
     if (isHttpResponse(s0)) return s0;
-    await sys.loadSecureUserData(event);
+    await sys.loadSecureUserData(event, pp === "public");
     return sys;
 }
 
@@ -101,7 +101,7 @@ export class System {
         }
     }
 
-    async loadSecureUserData(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<void> {
+    async loadSecureUserData(event: APIGatewayProxyEventV2WithRequestContext<any>, publik: boolean): Promise<void> {
         let userData: SecureUserData | undefined = undefined;
         const cookies = getCookiesFromEvent(event);
         const secureCookie = cookies['extstatssec'];
@@ -126,9 +126,10 @@ export class System {
                 }
             }
         }
+        // public Lambdas can't see the database.
         if (!userData && secureCookie) {
             const user = getUserFromSecureCookie(secureCookie);
-            const sData: string = (await loadAuth(this, user))?.configuration || "{}";
+            const sData: string = publik ? "{}" : (await loadAuth(this, user))?.configuration || "{}";
             userData = { user, data: JSON.parse(sData) };
         }
         this.secureUserData = userData;
