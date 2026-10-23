@@ -156,7 +156,6 @@ async function doEnsureDesigners(conn: mysql.Connection, data: number[] | undefi
         console.log(`No designers for ${gameName}`);
         return;
     }
-    console.log(`Designers for ${gameName} are ${data}`);
     // remove old designers in case it was incorrect
     const cleanSql = "delete from game_designers where game = ?";
     await conn.query(cleanSql, [bggid]);
@@ -618,7 +617,6 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
     let risk = 0;
     let good = 0;
     for (const q of query) {
-        console.log(`${q.url} last scheduled at ${q.last_scheduled}`);
         if (q.processMethod === 'processYear') {
             risk += 7;
         } else if (q.processMethod === 'processCollection') {

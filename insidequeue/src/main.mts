@@ -53,10 +53,8 @@ const METHOD_PROCESS_DESIGNER = "processDesigner";
 const METHOD_PROCESS_PUBLISHER = "processPublisher";
 
 // lambda names we expect to see
-const FUNCTION_PROCESS_USER = "processUser";
+const FUNCTION_PREHANDLE = "prehandle";
 const FUNCTION_PROCESS_COLLECTION = "processCollection";
-const FUNCTION_PROCESS_GAME = "processGame";
-const FUNCTION_PROCESS_DESIGNER = "processDesigner";
 const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
 
 dotenv.config({ path: ".env", quiet: true });
@@ -95,18 +93,16 @@ async function main() {
 
 async function scheduleProcessing(system: System, element: ToProcessElement, retry: boolean) {
     const sch = retry ? "rescheduling" : "scheduling";
-    if (element.processMethod === METHOD_PROCESS_USER) {
-        console.log(`${sch} processUser ${element.geek}`);
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_USER, element);
+
+    if (element.processMethod === METHOD_PROCESS_USER || element.processMethod === METHOD_PROCESS_GAME || element.processMethod === METHOD_PROCESS_DESIGNER || element.processMethod === METHOD_PROCESS_PUBLISHER) {
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PREHANDLE, element);
+        console.log(`${sch} ${element.processMethod} ${element.geek || element.bggid}`);
     } else if (element.processMethod === METHOD_PROCESS_COLLECTION) {
         console.log(`${sch} processCollection ${element.geek}`);
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
     } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
         console.log(`* updating played years for ${element.geek} ${element.geekid}`);
         await updatePlayedYears(system, element.geek, element.geekid, element.id);
-    } else if (element.processMethod === METHOD_PROCESS_GAME) {
-        console.log(`${sch} processGame ${element.bggid}`);
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_GAME, element);
     } else if (element.processMethod === METHOD_PROCESS_YEAR) {
         const fs = element.url.split("=");
         const p2p = {
@@ -119,10 +115,6 @@ async function scheduleProcessing(system: System, element: ToProcessElement, ret
         } as PlaysToProcess;
         console.log(`${sch} processYear ${element.url}`);
         await sendToQueue(system.playsQueue, p2p);
-    } else if (element.processMethod === METHOD_PROCESS_DESIGNER) {
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_DESIGNER, element);
-    } else if (element.processMethod === METHOD_PROCESS_PUBLISHER) {
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_PUBLISHER, element);
     }
 }
 

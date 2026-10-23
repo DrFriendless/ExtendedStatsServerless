@@ -1,4 +1,6 @@
 import {GetParameterCommand, GetParametersByPathCommand, SSMClient, PutParameterCommand} from "@aws-sdk/client-ssm";
+import {SQSClient, ListQueuesCommand} from "@aws-sdk/client-sqs";
+import {S3Client, GetObjectCommand} from "@aws-sdk/client-s3";
 import {PublishCommand, SNSClient} from "@aws-sdk/client-sns";
 import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
 
@@ -18,8 +20,12 @@ export class System {
     metadataFile: string;
     downloaderQueue: string;
     bggQueue: string | undefined;
+    bggQueue1: string | undefined;
+    bggQueue2: string | undefined;
+    playsQueue: string | undefined;
+    retryQueue: string | undefined;
+    outputQueue: string | undefined;
     lastRequestTime: number;
-    playsQueue: string;
     usersFile: string;
     systemLogGroup: string;
     usersToken: string;
@@ -30,6 +36,39 @@ export class System {
 
     async loadBGGQueueUserParameters(): Promise<System | HttpResponse> {
         this.bggQueue = await this.getParameter("/extstats/downloader/bggqueue");
+        return this;
+    }
+
+    async getObjectFromS3(bucket: string, objectKey: string): Promise<string | HttpResponse> {
+        const s3Client = new S3Client({
+            apiVersion: '2014-11-06',
+            region: process.env.AWS_REGION
+        });
+        const resp = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: objectKey }));
+        return await resp.Body.transformToString();
+    }
+
+    async loadBGGQueues(): Promise<System | HttpResponse> {
+        const sqsClient = new SQSClient({
+            apiVersion: '2014-11-06',
+            region: process.env.AWS_REGION
+        });
+        const response = await sqsClient.send(new ListQueuesCommand({ QueueNamePrefix: "downloader", MaxResults: 10 }));
+        for (const url of response.QueueUrls) {
+            if (url.endsWith("BGGQueue")) {
+                this.bggQueue = url;
+            } else if (url.endsWith("BGGQueue1")) {
+                this.bggQueue1 = url;
+            } else if (url.endsWith("BGGQueue2")) {
+                this.bggQueue2 = url;
+            } else if (url.endsWith("PlaysQueue")) {
+                this.playsQueue = url;
+            } else if (url.endsWith("RetryQueue")) {
+                this.retryQueue = url;
+            } else if (url.endsWith("OutputQueue")) {
+                this.outputQueue = url;
+            }
+        }
         return this;
     }
 
@@ -166,5 +205,6 @@ export interface HttpResponse {
 }
 
 export function isHttpResponse(object: any): object is HttpResponse {
+    if (typeof object === "string") return false;
     return object && 'statusCode' in object;
 }

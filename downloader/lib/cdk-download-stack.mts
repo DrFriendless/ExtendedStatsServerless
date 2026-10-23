@@ -61,7 +61,7 @@ export class DownloadStack extends cdk.Stack {
     return topic;
   }
 
-  defineDownloaderRole(outputQueue: sqs.IQueue, bggQueue: sqs.IQueue, cacheBucket: s3.Bucket, topic: sns.Topic): iam.IRole {
+  defineDownloaderRole(outputQueue: sqs.IQueue, bggQueue: sqs.IQueue, bggQueue1: sqs.IQueue, bggQueue2: sqs.IQueue, cacheBucket: s3.Bucket, topic: sns.Topic): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
     bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
@@ -85,20 +85,19 @@ export class DownloadStack extends cdk.Stack {
       statements: [loggingParameters, loggingCloudWatch]
     });
 
-    const sendToOutputQueue = new iam.PolicyStatement();
-    sendToOutputQueue.addActions("sqs:SendMessage");
-    sendToOutputQueue.addResources(outputQueue.queueArn);
-    policies[`policy_downloader_queue`] = new iam.PolicyDocument({
-      statements: [sendToOutputQueue]
+    const sqsStuff = new iam.PolicyStatement();
+    sqsStuff.addActions("sqs:ListQueues");
+    sqsStuff.addResources("*");
+    policies[`policy_sqs_stuff`] = new iam.PolicyDocument({
+      statements: [sqsStuff]
     });
-    if (bggQueue) {
-      const sendToBGGQueue = new iam.PolicyStatement();
-      sendToBGGQueue.addActions("sqs:SendMessage");
-      sendToBGGQueue.addResources(bggQueue.queueArn);
-      policies[`policy_bgg_queue`] = new iam.PolicyDocument({
-        statements: [sendToBGGQueue]
-      });
-    }
+
+    const sendToBGGQueue = new iam.PolicyStatement();
+    sendToBGGQueue.addActions("sqs:SendMessage");
+    sendToBGGQueue.addResources(bggQueue.queueArn, bggQueue1.queueArn, bggQueue2.queueArn, outputQueue.queueArn);
+    policies[`policy_bgg_queue`] = new iam.PolicyDocument({
+      statements: [sendToBGGQueue]
+    });
 
     const sendToSNS = new iam.PolicyStatement();
     sendToSNS.addActions("sns:Publish");
@@ -161,6 +160,20 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
+  defineBGGQueue1(): sqs.IQueue {
+    return new sqs.Queue(this, "bggQueueNewArch1", {
+      queueName: "downloaderBGGQueue1",
+      visibilityTimeout: Duration.seconds(900),
+    });
+  }
+
+  defineBGGQueue2(): sqs.IQueue {
+    return new sqs.Queue(this, "bggQueueNewArch2", {
+      queueName: "downloaderBGGQueue2",
+      visibilityTimeout: Duration.seconds(900),
+    });
+  }
+
   defineRetryQueue(): sqs.IQueue {
     return new sqs.Queue(this, "retryQueue", {
       queueName: "downloaderRetryQueue",
@@ -219,13 +232,16 @@ export class DownloadStack extends cdk.Stack {
     const playsQueue = this.definePlaysQueue();
     const retryQueue = this.defineRetryQueue();
     const bggQueue = this.defineBGGQueue();
+    const bggQueue1 = this.defineBGGQueue1();
+    const bggQueue2 = this.defineBGGQueue2();
 
     const snsTopic = this.defineSnsTopic(process.env.SNS_TOPIC, process.env.SNS_EMAIL);
-    const role = this.defineDownloaderRole(outputQueue, bggQueue, cacheBucket, snsTopic);
+    const role = this.defineDownloaderRole(outputQueue, bggQueue, bggQueue1, bggQueue2, cacheBucket, snsTopic);
     let playsLambda: lambda.IFunction = undefined;
     let bggLambda: lambda.IFunction = undefined;
     let userListLambda: lambda.IFunction = undefined;
     let metadataLambda: lambda.IFunction = undefined;
+    let preLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
       const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency, spec.durableConfig);
       if (spec.name.endsWith("_processPlayed")) {
@@ -236,6 +252,8 @@ export class DownloadStack extends cdk.Stack {
         metadataLambda = f;
       } else if (spec.name.endsWith("_bggDownload")) {
         bggLambda = f;
+      } else if (spec.name.endsWith("_prehandle")) {
+        preLambda = f;
       }
     }
     if (playsLambda) {
@@ -284,6 +302,22 @@ export class DownloadStack extends cdk.Stack {
       value: bggQueue.queueUrl,
       exportName: 'downloader-BGGQueueURL'
     });
+    new cdk.CfnOutput(this, 'downloaderBGGQueue1', {
+      value: bggQueue1.queueUrl,
+      exportName: 'downloader-BGGQueue1URL'
+    });
+    new cdk.CfnOutput(this, 'downloaderBGGQueue1arn', {
+      value: bggQueue1.queueArn,
+      exportName: 'downloader-BGGQueue1ARN'
+    });
+    new cdk.CfnOutput(this, 'downloaderBGGQueue2', {
+      value: bggQueue2.queueUrl,
+      exportName: 'downloader-BGGQueue2URL'
+    });
+    new cdk.CfnOutput(this, 'downloaderBGGQueue2arn', {
+      value: bggQueue2.queueArn,
+      exportName: 'downloader-BGGQueue2ARN'
+    });
     new cdk.CfnOutput(this, 'downloaderRetryQueue', {
       value: retryQueue.queueUrl,
       exportName: 'downloader-RetryQueueURL'
@@ -295,6 +329,10 @@ export class DownloadStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'downloaderTopic', {
       value: snsTopic.topicArn,
       exportName: 'downloader-topicARN'
+    });
+    new cdk.CfnOutput(this, 'downloaderPrelambda', {
+      value: preLambda.functionArn,
+      exportName: 'downloader-prehandle'
     });
   }
 }
