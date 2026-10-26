@@ -9,16 +9,21 @@ import {
     DownloadRequest,
     DownloadResult
 } from "./interfacesv2.mjs";
-import {extractGameDataFromPage, extractUserDataFromPage, NoSuchGameError} from "./extraction.mjs";
 import {
-    dispatchDesignerData,
-    dispatchNoSuchGame,
+    extractGameDataFromPage,
+    extractUserCollectionFromPage,
+    extractUserDataFromPage,
+    NoSuchGameError
+} from "./extraction.mjs";
+import {
+    dispatchDesignerData, dispatchEnsureGames,
+    dispatchNoSuchGame, dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult,
     dispatchProcessUserResult, dispatchPublisherData
 } from "./dispatch.mjs";
 import {between} from "./library.mjs";
-
-
+import {log} from "./logging.mjs";
+import {cleanupCollection, splitCollection} from "./functions.mjs";
 
 export async function completeProcessUser(event: ContinuationDownloadResponse): Promise<void> {
     const system = await loadSystem();
@@ -71,6 +76,50 @@ export async function completeProcessPublisher(event: ContinuationDownloadRespon
     }
 }
 
+export async function completeProcessCollection(event: ContinuationDownloadResponse): Promise<void> {
+    const system = await loadSystem();
+    if (isHttpResponse(system)) {
+        console.log(JSON.stringify(system));
+        return;
+    }
+
+    const cx = await extractContinuationDataSingle(system, event);
+    console.log(JSON.stringify(cx.continuationData));
+    if (cx) {
+        const collection = await extractUserCollectionFromPage(system, cx.continuationData.geek, cx.xml, cx.continuationData.url);
+        if (collection === "InvalidUsername") {
+            console.log(400);
+            // TODO
+        } else if (collection === "RateLimitExceeded") {
+            console.log(429);
+            // TODO
+        } else if (collection === "IncorrectDOM") {
+            log(`Incorrect DOM for URL ${cx.continuationData.url}`);
+            // TODO
+        } else if (collection === "ComeBackLater") {
+            console.log(202);
+            const req = makeDownloadRequest(event.continuationData, "downloader_completeProcessCollection", system.usersToken, event.results[0].url);
+            req.attempts = event.attempts;
+            await sendToBGGQueue1WithDelay(system, req, 3);
+        } else if (collection === "TooBig") {
+            log(`Collection exceeds maximum export size for ${cx.continuationData.geek}`);
+            // TODO
+        } else {
+            const ids = collection.items.map(item => item.gameId);
+            console.log(ids);
+            // make sure that all of these games are in the database
+            // if there are a lot, this lambda might timeout, but next time more of them will be there.
+            await dispatchEnsureGames(system, ids);
+            console.log(`Collection data size ${JSON.stringify(collection).length}`);
+            for (const games of splitCollection(collection)) {
+                console.log(`subcollection data size ${JSON.stringify(games).length}`);
+                await dispatchProcessCollectionUpdateGames(system, games);
+            }
+            await cleanupCollection(system, collection, cx.continuationData.url);
+        }
+    }
+}
+
 export async function completeProcessGame(event: ContinuationDownloadResponse): Promise<void> {
     const system = await loadSystem();
     if (isHttpResponse(system)) {
@@ -93,81 +142,50 @@ export async function completeProcessGame(event: ContinuationDownloadResponse): 
     }
 }
 
+function makeDownloadRequest(continuationData: any, functionName: string, token: string, url: string): ContinuationDownloadRequest {
+    const req: ContinuationDownloadRequest = {
+        type: "continuation",
+        functionName,
+        continuationData,
+        requests: [
+            {bggApiKey: token, url, notBefore: undefined}
+        ],
+        requestId: crypto.randomUUID(),
+        attempts: 0
+    };
+    return req;
+}
+
 export async function prehandle(event: ToProcessElement) {
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
+    await system.loadBGGQueues();
 
     if (event.processMethod === "processUser") {
-        console.log(JSON.stringify(event));
-        await system.loadBGGQueues();
         const url = `https://api.geekdo.com/api/users?username=${encodeURIComponent(event.geek)}`;
-        const req: ContinuationDownloadRequest = {
-            type: "continuation",
-            functionName: "downloader_completeProcessUser",
-            continuationData: {
-                geek: event.geek,
-                // this is the URL we were told to download, which will be used to update the file entry in the DB
-                // however it may not be the URL we actually need to get the data from.
-                url: event.url
-            },
-            requests: [
-                {bggApiKey: system.usersToken, url, notBefore: undefined}
-            ],
-            requestId: crypto.randomUUID()
-        };
+        // the URL in the continuation data is the URL we were told to download,
+        // which will be used to update the file entry in the DB
+        // however it may not be the URL we actually need to get the data from.
+        const req = makeDownloadRequest({ geek: event.geek, url: event.url }, "downloader_completeProcessUser", system.usersToken, url );
         await sendToBGGQueue1(system, req);
     } else if (event.processMethod === "processDesigner") {
-        console.log(JSON.stringify(event));
-        await system.loadBGGQueues();
-        const req: ContinuationDownloadRequest = {
-            type: "continuation",
-            functionName: "downloader_completeProcessDesigner",
-            continuationData: {
-                bggid: event.bggid,
-                url: event.url
-            },
-            requests: [
-                {bggApiKey: system.usersToken, url: event.url, notBefore: undefined}
-            ],
-            requestId: crypto.randomUUID()
-        };
+        const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completeProcessDesigner", system.usersToken, event.url );
         await sendToBGGQueue1(system, req);
     } else if (event.processMethod === "processPublisher") {
-        console.log(JSON.stringify(event));
-        await system.loadBGGQueues();
-        const req: ContinuationDownloadRequest = {
-            type: "continuation",
-            functionName: "downloader_completeProcessPublisher",
-            continuationData: {
-                bggid: event.bggid,
-                url: event.url
-            },
-            requests: [
-                {bggApiKey: system.usersToken, url: event.url, notBefore: undefined}
-            ],
-            requestId: crypto.randomUUID()
-        };
+        const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completePublisher", system.usersToken, event.url );
         await sendToBGGQueue1(system, req);
     } else if (event.processMethod === "processGame") {
+        const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completeProcessGame", system.gamesToken, event.url );
+        await sendToBGGQueue1(system, req);
+    } else if (event.processMethod === "processCollection") {
         console.log(JSON.stringify(event));
-        await system.loadBGGQueues();
-        const req: ContinuationDownloadRequest = {
-            type: "continuation",
-            functionName: "downloader_completeProcessGame",
-            continuationData: {
-                bggid: event.bggid,
-                url: event.url
-            },
-            requests: [
-                {bggApiKey: system.gamesToken, url: event.url, notBefore: undefined}
-            ],
-            requestId: crypto.randomUUID()
-        };
+        // TODO - change to collectionToken
+        const req = makeDownloadRequest({ geek: event.geek, url: event.url }, "downloader_completeProcessCollection", system.usersToken, event.url );
         await sendToBGGQueue1(system, req);
     } else if (event.processMethod !== "processCollection") {
         console.log(JSON.stringify(event));
     } else {
-        // TODO - handle processCollection
+        // TODO - what else is there?
     }
 }
 
@@ -176,6 +194,16 @@ async function sendToBGGQueue1(system: System, payload: DownloadRequest): Promis
     const command = new SendMessageCommand({
         QueueUrl: system.bggQueue1,
         MessageBody: JSON.stringify(payload)
+    });
+    return await sqs.send(command);
+}
+
+async function sendToBGGQueue1WithDelay(system: System, payload: DownloadRequest, delay: number): Promise<any> {
+    const sqs = new SQSClient({ region: process.env.REGION });
+    const command = new SendMessageCommand({
+        QueueUrl: system.bggQueue1,
+        MessageBody: JSON.stringify(payload),
+        DelaySeconds: delay
     });
     return await sqs.send(command);
 }

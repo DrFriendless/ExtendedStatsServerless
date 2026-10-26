@@ -38,5 +38,6 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_completeProcessDesigner`, handler: "newarch.completeProcessDesigner", duration: 10, mem: 128, maxConcurrency: undefined },
     { name: `${COMPONENT}_completeProcessPublisher`, handler: "newarch.completeProcessPublisher", duration: 10, mem: 128, maxConcurrency: undefined },
     { name: `${COMPONENT}_completeProcessGame`, handler: "newarch.completeProcessGame", duration: 10, mem: 128, maxConcurrency: undefined },
+    { name: `${COMPONENT}_completeProcessCollection`, handler: "newarch.completeProcessCollection", duration: 10, mem: 128, maxConcurrency: undefined },
 ];
 

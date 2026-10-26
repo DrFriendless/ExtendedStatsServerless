@@ -59,7 +59,7 @@ export class System {
                 this.bggQueue = url;
             } else if (url.endsWith("BGGQueue1")) {
                 this.bggQueue1 = url;
-            } else if (url.endsWith("BGGQueue2")) {
+            } else if (url.endsWith("BGGQueue2.fifo")) {
                 this.bggQueue2 = url;
             } else if (url.endsWith("PlaysQueue")) {
                 this.playsQueue = url;

@@ -169,8 +169,9 @@ export class DownloadStack extends cdk.Stack {
 
   defineBGGQueue2(): sqs.IQueue {
     return new sqs.Queue(this, "bggQueueNewArch2", {
-      queueName: "downloaderBGGQueue2",
+      queueName: "downloaderBGGQueue2.fifo",
       visibilityTimeout: Duration.seconds(900),
+      fifo: true
     });
   }
 

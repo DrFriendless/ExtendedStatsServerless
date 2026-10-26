@@ -243,7 +243,7 @@ async function tryToProcessCollection(system: System, invocation: FileToProcess)
     return 200;
 }
 
-async function cleanupCollection(system: System, collection: ProcessCollectionResult, url: string) {
+export async function cleanupCollection(system: System, collection: ProcessCollectionResult, url: string) {
     const params: CleanUpCollectionResult = {
         geek: collection.geek,
         items: collection.items.map(item => item.gameId),
@@ -264,7 +264,7 @@ async function markTryAgainTomorrow(system: System, fileDetails: FileToProcess) 
     await dispatchMarkAsTryAgainTomorrow(system, fileDetails);
 }
 
-function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {
+export function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {
     return _.chunk(original.items, MAX_GAMES_PER_CALL)
         .map(items => { return { geek: original.geek, items: items }; });
 }

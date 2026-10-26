@@ -54,8 +54,6 @@ const METHOD_PROCESS_PUBLISHER = "processPublisher";
 
 // lambda names we expect to see
 const FUNCTION_PREHANDLE = "prehandle";
-const FUNCTION_PROCESS_COLLECTION = "processCollection";
-const FUNCTION_PROCESS_PUBLISHER = "processPublisher";
 
 dotenv.config({ path: ".env", quiet: true });
 
@@ -94,12 +92,11 @@ async function main() {
 async function scheduleProcessing(system: System, element: ToProcessElement, retry: boolean) {
     const sch = retry ? "rescheduling" : "scheduling";
 
-    if (element.processMethod === METHOD_PROCESS_USER || element.processMethod === METHOD_PROCESS_GAME || element.processMethod === METHOD_PROCESS_DESIGNER || element.processMethod === METHOD_PROCESS_PUBLISHER) {
+    if (element.processMethod === METHOD_PROCESS_USER || element.processMethod === METHOD_PROCESS_GAME ||
+        element.processMethod === METHOD_PROCESS_DESIGNER || element.processMethod === METHOD_PROCESS_PUBLISHER ||
+        element.processMethod === METHOD_PROCESS_COLLECTION) {
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PREHANDLE, element);
         console.log(`${sch} ${element.processMethod} ${element.geek || element.bggid}`);
-    } else if (element.processMethod === METHOD_PROCESS_COLLECTION) {
-        console.log(`${sch} processCollection ${element.geek}`);
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PROCESS_COLLECTION, element);
     } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
         console.log(`* updating played years for ${element.geek} ${element.geekid}`);
         await updatePlayedYears(system, element.geek, element.geekid, element.id);
@@ -308,7 +305,11 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             break;
         case "CollectionResultMessage":
             console.log(`CollectionResultMessage ${message.result.geek} ${message.result.items.length}`);
-            await system.withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
+            if (message.result.geek === undefined) {
+                console.log("Skipping that nonsense");
+            } else {
+                await system.withConnectionAsync(conn => doUpdateGamesForGeek(conn, message.result.geek, message.result.items));
+            }
             break;
         case "GameResultMessage":
             console.log(`GameResultMessage ${message.result.name}`);

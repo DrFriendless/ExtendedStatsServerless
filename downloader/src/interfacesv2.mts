@@ -8,6 +8,7 @@ export interface URLRequest {
 export interface AbstractDownloadRequest {
     requestId: string;
     requests: URLRequest[];
+    attempts: number;
 }
 
 // info to send the DownloadResult to a callback
@@ -51,7 +52,9 @@ export interface FailureDownloadResultType extends AbstractDownloadResult {
 export type DownloadResult = S3DownloadResultType | ContentDownloadResultType | FailureDownloadResultType;
 
 export interface AbstractDownloadResponse {
+    attempts: number;
     results: DownloadResult[];
+    requestId: string;
 }
 
 // This is what we will send to a callback
@@ -61,9 +64,4 @@ export interface CallbackDownloadResponse extends AbstractDownloadResponse {
 // This is what we will send to a newly invoked function.
 export interface ContinuationDownloadResponse extends AbstractDownloadResponse {
     continuationData: any;
-}
-
-export interface Bob {
-    continuationData: any;
-    results: DownloadResult[];
 }

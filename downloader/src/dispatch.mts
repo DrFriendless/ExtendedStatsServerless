@@ -32,6 +32,8 @@ async function sendToDownloaderQueue(system: System, body: QueueMessage, details
         // exceed SendMessage size
         log(`SQS message size exceeded: ${b.length} ${body.discriminator} ${details || ""}`);
         return;
+    } else {
+        console.log(b);
     }
     const command = new SendMessageCommand({
         QueueUrl: system.downloaderQueue,
