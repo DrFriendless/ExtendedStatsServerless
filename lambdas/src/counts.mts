@@ -41,6 +41,8 @@ interface ToProcess {
     processPlayed?: number;
     processYear?: number;
     processGame?: number;
+    processDesigner?: number;
+    processPublisher?: number;
 }
 
 interface ToProcessRow {
@@ -84,6 +86,8 @@ export async function handler(event: { Payload: CloudWatchPayload }): Promise<vo
         const authTasks: number = (await conn.query("select count(*) c from authtask"))[0].c;
         const tp = (await conn.query("select count(id) c, processMethod from files where ((lastUpdate is null) or (lastUpdate is not null and nextUpdate < now())) group by processMethod")) as ToProcessRow[];
         const toProcess: Partial<ToProcess> = Object.fromEntries(tp.map(r => [r.processMethod, r.c]));
+        const fp = (await conn.query("select count(id) c, processMethod from files where (lastUpdate is not null and nextUpdate < now()) group by processMethod")) as ToProcessRow[];
+        const processFails: Partial<ToProcess> = Object.fromEntries(fp.map(r => [r.processMethod, r.c]));
         const plays = (await conn.query("select count(*) c from plays"))[0].c;
         const notGeeks = (await conn.query("select count(*) c  from not_geeks"))[0].c;
         const notGames = (await conn.query("select count(*) c from not_games"))[0].c;
@@ -99,9 +103,11 @@ export async function handler(event: { Payload: CloudWatchPayload }): Promise<vo
         const delta_rust_calls = counters.rust_calls - latest.rust_calls;
         const delta_doco_views = counters.doco_views - latest.doco_views;
         const delta_adventure_views = counters.adventure_views - latest.adventure_views;
-        const insertSql = "insert into metrics (timestamp, page_views, blog_views, downloader_processed, api_calls, slowdowns, downloader_unknown, express_calls, process_collection, process_played, process_year, process_game, auth_count, auth_task_count, plays_count, not_geeks_count, not_games_count, dl_opt_age, dl_opt_length, dl_plays_age, dl_plays_length, dl_retry_length, db_cpu, db_credit, eb2_cpu, delta_downloader_processed, delta_slowdowns, delta_page_views, delta_blog_views, delta_plays, delta_api_calls, delta_express_calls, geek_table, connection_table, delta_rust_calls, rust_calls, adventure_views, doco_views, delta_doco_views, delta_adventure_views) values (now(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        const insertSql = "insert into metrics (timestamp, page_views, blog_views, downloader_processed, api_calls, slowdowns, downloader_unknown, express_calls, process_collection, process_played, process_year, process_game, process_designer, process_publisher, fail_collection, fail_played, fail_year, fail_game, fail_designer, fail_publisher, auth_count, auth_task_count, plays_count, not_geeks_count, not_games_count, dl_opt_age, dl_opt_length, dl_plays_age, dl_plays_length, dl_retry_length, db_cpu, db_credit, eb2_cpu, delta_downloader_processed, delta_slowdowns, delta_page_views, delta_blog_views, delta_plays, delta_api_calls, delta_express_calls, geek_table, connection_table, delta_rust_calls, rust_calls, adventure_views, doco_views, delta_doco_views, delta_adventure_views) values (now(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         const values: number[] = [ counters.page_views, counters.blog_views, counters.downloader_processed, counters.api_calls, counters.slowdowns, counters.downloader_unknown,
             counters.express_calls, toProcess.processCollection || 0, toProcess.processPlayed || 0, toProcess.processYear || 0, toProcess.processGame || 0,
+            toProcess.processDesigner || 0, toProcess.processPublisher || 0, processFails.processCollection || 0, processFails.processPlayed || 0,
+            processFails.processYear || 0, processFails.processGame || 0, processFails.processDesigner || 0, processFails.processPublisher || 0,
             auth, authTasks, plays, notGeeks, notGames, cw.dl_opt_age, cw.dl_opt_length, cw.dl_plays_age, cw.dl_plays_length, cw.dl_retry_length, cw.db_cpu, cw.db_credit, cw.eb2_cpu,
             delta_downloader_processed, delta_slowdowns, delta_page_views, delta_blog_views, delta_plays, delta_api_calls, delta_express_calls,
             geek_table, connection_table, delta_rust_calls, counters.rust_calls, counters.adventure_views, counters.doco_views, delta_doco_views, delta_adventure_views];
