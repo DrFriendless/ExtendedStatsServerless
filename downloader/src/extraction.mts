@@ -1,11 +1,11 @@
-import { CollectionGameResult, ProcessCollectionResult, ProcessGameResult, ProcessUserResult } from "extstats-core";
+import { CollectionGameResult, ProcessCollectionResult, ProcessGameResult, ProcessUserResult, RequestStats } from "extstats-core";
 import { parseStringPromise } from 'xml2js';
 import {log} from "./logging.mjs";
 import {System} from "./system.mjs";
 
 type USER_PAGE_ERROR = "ComeBackLater" | "TooBig" | "InvalidUsername" | "RateLimitExceeded" | "IncorrectDOM";
 
-export async function extractUserCollectionFromPage(system: System, geek: string, pageContent: string, url: string): Promise<ProcessCollectionResult | USER_PAGE_ERROR> {
+export async function extractUserCollectionFromPage(system: System, geek: string, pageContent: string, url: string, stats: RequestStats): Promise<ProcessCollectionResult | USER_PAGE_ERROR> {
     if (!pageContent) return "RateLimitExceeded";
     const dom = await parseStringPromise(pageContent, {trim: true});
     if (dom && dom.message) {
@@ -71,7 +71,7 @@ export async function extractUserCollectionFromPage(system: System, geek: string
     }
 
     // console.log(items);
-    return { geek: geek, items: items };
+    return { geek: geek, items: items, ...stats };
 }
 
 // TODO - update front page data
@@ -97,7 +97,7 @@ export async function extractUserCollectionFromPage(system: System, geek: string
 // pass
 
 
-export function extractUserDataFromPage(geek: string, url: string, json: any): ProcessUserResult {
+export function extractUserDataFromPage(geek: string, url: string, json: any, stats: RequestStats): ProcessUserResult {
     const users = json.filter((item: any) => item.type === 'users' && item.username.toLowerCase() === geek.toLowerCase());
 
     let bggid = -1;
@@ -108,7 +108,7 @@ export function extractUserDataFromPage(geek: string, url: string, json: any): P
         country = user.country;
     }
     if (bggid < 0) log(`Geek ${geek} doesn't seem to exist any more.`);
-    return { geek, url, country, bggid };
+    return { geek, url, country, bggid, ...stats };
 }
 
 interface NameId {
@@ -126,12 +126,12 @@ interface BGGName {
     }
 }
 
-export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string): Promise<ProcessGameResult> {
+export async function extractGameDataFromPage(bggid: number, url: string, pageContent: string, stats: RequestStats): Promise<ProcessGameResult> {
     const dom = await parseStringPromise(pageContent, {trim: true});
     if (!dom || !dom.boardgames || dom.boardgames.boardgame.length === 0) {
         throw new NoSuchGameError(bggid);
     }
-    const result = {} as ProcessGameResult;
+    const result = {...stats} as ProcessGameResult;
     for (const boardgame of dom.boardgames.boardgame) {
         const names: BGGName[] = boardgame.name;
         // console.log(JSON.stringify(boardgame));
@@ -193,67 +193,3 @@ export class NoSuchGameError {
         return this.id;
     }
 }
-
-// export async function processPlaysFile(fileContents: string, invocation: FileToProcess): Promise<{ count: number, plays: PlayData[] }> {
-//     const dom = await parseStringPromise(fileContents, {trim: true});
-//     const result: PlayData[] = [];
-//     if (!dom || !dom.plays || !dom.plays.play) {
-//         console.log("Plays not found");
-//         console.log(dom);
-//         log("Plays not found in " + invocation.url);
-//         return { count: -1, plays: result };
-//     }
-//     const playCount = parseInt(dom.plays.$.total);
-//     dom.plays.play.forEach((play: any) => {
-//         const date = play.$.date;
-//         const items = play.item;
-//         const quantity = play.$.quantity;
-//         const location = play.$.location;
-//         const gameid = parseInt(items[0].$.objectid);
-//         result.push({ quantity, location, date, gameid, id: 0 });
-//     });
-//     return { count: playCount, plays: result };
-// }
-
-// TODO - get player ratings
-// def processPlaysFile(filename, recorded):
-// import xml.dom.minidom
-// try:
-// dom = xml.dom.minidom.parse(filename)
-// except xml.parsers.expat.ExpatError, e:
-// print "Error parsing XML in file %s" % filename, e
-// return
-// playElements = dom.getElementsByTagName("play")
-// if len(playElements) == 0:
-// print "no plays in %s" % filename
-// return
-// try:
-// numEntries = int(dom.getElementsByTagName("plays")[0].getAttribute("total"))
-// except ValueError:
-//     numEntries = 1
-// for pe in playElements:
-// playerRecs = []
-// date = pe.getAttribute("date")
-// quantity = int(pe.getAttribute("quantity"))
-// items = pe.getElementsByTagName("item")
-// gameId = int(items[0].getAttribute("objectid"))
-// location = pe.getAttribute("location")
-// (raters, ratingsTotal) = getRatings(pe)
-// playersNodes = pe.getElementsByTagName("players")
-// if len(playersNodes):
-// players = playersNodes[0].getElementsByTagName("player")
-// for p in players:
-// username = p.getAttribute("username")
-// name = p.getAttribute("name")
-// colour = p.getAttribute("color")
-// if username == "":
-// username = None
-// if name == "":
-// name = None
-// if colour == "":
-// colour = None
-// if username is not None or name is not None or colour is not None:
-//     playerRecs.append((username, name, colour))
-// if quantity < 10000:
-// recorded.add(date, (gameId, quantity, raters, ratingsTotal,  location, playerRecs))
-// return numEntries

@@ -1,19 +1,4 @@
-import {LambdaClient, InvokeCommand} from "@aws-sdk/client-lambda";
-
-export async function invokeLambdaAsync(func: string, payload: object): Promise<void> {
-    const lambda = new LambdaClient({ region: process.env.REGION });
-    const command = new InvokeCommand({
-        FunctionName: func,
-        Payload: JSON.stringify(payload),
-        InvocationType: "Event"
-    });
-    try {
-        const resp = await lambda.send(command);
-        console.log(resp);
-    } catch (error) {
-        console.log(error);
-    }
-}
+import {RequestStats} from "extstats-core";
 
 export function splitYmd(ymd: string): { y: number; m: number; d: number } {
     const f = ymd.split("-");
@@ -39,4 +24,11 @@ export function between(s: string, before: string, after: string): string {
 
 export async function sleep(waitTimeInMs: number){
    await new Promise(resolve => setTimeout(resolve, waitTimeInMs));
+}
+
+// copy the stats from the source, and optionally update some
+export function copyRequestStats(src: RequestStats, extra?: Partial<RequestStats>): RequestStats {
+    const x = { initiated: src.initiated, completed: src.completed, downloaded: src.downloaded, received: src.received, scheduled: src.scheduled };
+    if (extra) Object.assign(x, extra);
+    return x;
 }

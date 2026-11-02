@@ -4,24 +4,13 @@ import { SQSClient, SendMessageCommand, SendMessageCommandOutput } from "@aws-sd
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { log } from "./logging.mjs";
 
-const INSIDE_PREFIX = "inside-dev-";
-
-// lambda names we expect to see
-const FUNCTION_UPDATE_TOP50 = "updateBGGTop50";
-
-import {invokeLambdaAsync, splitYmd} from "./library.mjs";
+import {copyRequestStats, splitYmd} from "./library.mjs";
 import {
-    ProcessGameResult,
-    FileToProcess,
-    Metadata,
-    ProcessCollectionResult,
-    ProcessUserResult,
-    CleanUpCollectionResult,
-    QueueMessage,
-    ProcessPlaysForPeriodResult, PlayDataResult, ProcessDesignerResult, ProcessPublisherResult
+    ProcessGameResult, RequestStats, FileToProcess, Metadata, ProcessCollectionResult, ProcessUserResult,
+    CleanUpCollectionResult, QueueMessage, ProcessPlaysForPeriodResult, PlayDataResult, ProcessDesignerResult,
+    ProcessPublisherResult
 } from 'extstats-core';
 import {System} from "./system.mjs";
-
 
 // Create an Amazon S3 service client object.
 const sqsClient = new SQSClient({ region: process.env.REGION });
@@ -130,6 +119,7 @@ async function saveToCache(system: System, key: string, body: string) {
 }
 
 export async function dispatchPlaysForPeriodResult(system: System, result: ProcessPlaysForPeriodResult): Promise<void> {
+    const stats = copyRequestStats(result);
     const b = JSON.stringify(result).length;
     if (b > 260000) {
         await saveToCache(system, `${result.geek}=${result.startYmdInc}=${result.endYmdInc}.json`, JSON.stringify(result));
@@ -170,12 +160,12 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
             const b3 = JSON.stringify({...result, plays: newPlays}).length;
             if (b3 > 200000 && chunkPlays.length > 0) {
                 // getting very high, emit this chunk
-                await emit(result.processMethod, chunkStart, addDashes(yesterday(d)), result.geek, chunkPlays);
+                await emit(result.processMethod, chunkStart, addDashes(yesterday(d)), result.geek, chunkPlays, stats);
                 chunkStart = addDashes(d);
                 chunkPlays = dPlays;
             } else if (b3 >= 200000 && b3 < 260000 && chunkPlays.length === 0) {
                 // this data is very big, emit it.
-                await emit(result.processMethod, chunkStart, addDashes(d), result.geek, newPlays);
+                await emit(result.processMethod, chunkStart, addDashes(d), result.geek, newPlays, stats);
                 chunkStart = addDashes(tomorrow(d));
                 chunkPlays = [];
             } else {
@@ -183,7 +173,7 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
             }
         }
         if (chunkPlays.length > 0) {
-            await emit(result.processMethod, chunkStart, result.endYmdInc, result.geek, chunkPlays);
+            await emit(result.processMethod, chunkStart, result.endYmdInc, result.geek, chunkPlays, stats);
         }
         // the inside queue has not seen a result for the whole year, so it doesn't know to mark the URL as processed
         await sendToDownloaderQueue(system, { discriminator: "MarkPlaysForPeriodProcessed", url: result.url });
@@ -216,10 +206,10 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
         return 10000 * date.getFullYear() + 100 * (date.getMonth() + 1) + date.getDate();
     }
 
-    async function emit(processMethod: string, symd: string, eymd: string, geek: string, plays: PlayDataResult[]) {
+    async function emit(processMethod: string, symd: string, eymd: string, geek: string, plays: PlayDataResult[], stats: RequestStats) {
         const url = `${symd}=${eymd}=${geek}`;
         const playsResult: ProcessPlaysForPeriodResult = {
-            processMethod, geek, startYmdInc: symd, endYmdInc: eymd, url, plays
+            processMethod, geek, startYmdInc: symd, endYmdInc: eymd, url, plays, ...stats
         };
         console.log(JSON.stringify(playsResult));
         await sendToDownloaderQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: playsResult }, url);

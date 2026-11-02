@@ -1,7 +1,5 @@
 import {HttpResponse, isHttpResponse, loadSystem, System} from "./system.mjs";
-import {
-    ToProcessElement,
-} from "extstats-core";
+import {ToProcessElement} from "extstats-core";
 import {SendMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 import {
     ContinuationDownloadRequest,
@@ -21,7 +19,7 @@ import {
     dispatchProcessGameResult,
     dispatchProcessUserResult, dispatchPublisherData
 } from "./dispatch.mjs";
-import {between} from "./library.mjs";
+import {between, copyRequestStats} from "./library.mjs";
 import {log} from "./logging.mjs";
 import {cleanupCollection, splitCollection} from "./functions.mjs";
 
@@ -31,10 +29,12 @@ export async function completeProcessUser(event: ContinuationDownloadResponse): 
         console.log(JSON.stringify(system));
         return;
     }
+    event.received = new Date().getTime();
 
     const cx = await extractContinuationDataSingle(system, event);
     if (cx) {
-        const puResult = extractUserDataFromPage(cx.continuationData.geek, cx.continuationData.url, cx.xml);
+        const stats = copyRequestStats(event);
+        const puResult = extractUserDataFromPage(cx.continuationData.geek, cx.continuationData.url, cx.xml, stats);
         await dispatchProcessUserResult(system, puResult);
     }
 }
@@ -45,12 +45,14 @@ export async function completeProcessDesigner(event: ContinuationDownloadRespons
         console.log(JSON.stringify(system));
         return;
     }
+    event.received = new Date().getTime();
 
     const cx = await extractContinuationDataSingle(system, event);
     if (cx) {
         const name = between(cx.xml, "<name>", "</name>");
         if (name.length > 0) {
-            await dispatchDesignerData(system, { url: cx.continuationData.url, bggid: cx.continuationData.bggid, name });
+            const rs = copyRequestStats(event);
+            await dispatchDesignerData(system, { url: cx.continuationData.url, bggid: cx.continuationData.bggid, name, ...copyRequestStats(event, { completed: new Date().getTime() }) });
         } else {
             // e.g. <people termsofuse=\"https://boardgamegeek.com/xmlapi/termsofuse\">\n\t\t<person>\n\t\t<error message=\"Item not found\"/>\n\t</person>\n\t</people>\n\n
             console.log(cx.xml);
@@ -64,12 +66,13 @@ export async function completeProcessPublisher(event: ContinuationDownloadRespon
         console.log(JSON.stringify(system));
         return;
     }
+    event.received = new Date().getTime();
 
     const cx = await extractContinuationDataSingle(system, event);
     if (cx) {
         const name = between(cx.xml, "<name>", "</name>");
         if (name.length > 0) {
-            await dispatchPublisherData(system, { url: cx.continuationData.url, bggid: cx.continuationData.bggid, name });
+            await dispatchPublisherData(system, { url: cx.continuationData.url, bggid: cx.continuationData.bggid, name, ...copyRequestStats(event, { completed: new Date().getTime() }) });
         } else {
             console.log(cx.xml);
         }
@@ -82,11 +85,13 @@ export async function completeProcessCollection(event: ContinuationDownloadRespo
         console.log(JSON.stringify(system));
         return;
     }
+    event.received = new Date().getTime();
+    const stats = copyRequestStats(event, { completed: new Date().getTime() });
 
     const cx = await extractContinuationDataSingle(system, event);
     console.log(JSON.stringify(cx.continuationData));
     if (cx) {
-        const collection = await extractUserCollectionFromPage(system, cx.continuationData.geek, cx.xml, cx.continuationData.url);
+        const collection = await extractUserCollectionFromPage(system, cx.continuationData.geek, cx.xml, cx.continuationData.url, stats);
         if (collection === "InvalidUsername") {
             console.log(400);
             // TODO
@@ -97,10 +102,11 @@ export async function completeProcessCollection(event: ContinuationDownloadRespo
             log(`Incorrect DOM for URL ${cx.continuationData.url}`);
             // TODO
         } else if (collection === "ComeBackLater") {
+            await system.loadBGGQueues();
             console.log(202);
             const req = makeDownloadRequest(event.continuationData, "downloader_completeProcessCollection", system.usersToken, event.results[0].url);
             req.attempts = event.attempts;
-            await sendToBGGQueue1WithDelay(system, req, 3);
+            await sendToBGGQueue2(system, req);
         } else if (collection === "TooBig") {
             log(`Collection exceeds maximum export size for ${cx.continuationData.geek}`);
             // TODO
@@ -126,11 +132,13 @@ export async function completeProcessGame(event: ContinuationDownloadResponse): 
         console.log(JSON.stringify(system));
         return;
     }
+    event.received = new Date().getTime();
+    const stats = copyRequestStats(event, { completed: new Date().getTime() });
 
     const cx = await extractContinuationDataSingle(system, event);
     if (cx) {
         try {
-            const result = await extractGameDataFromPage(cx.continuationData.bggid, cx.continuationData.url, cx.xml);
+            const result = await extractGameDataFromPage(cx.continuationData.bggid, cx.continuationData.url, cx.xml, stats);
             await dispatchProcessGameResult(system, result);
         } catch (err) {
             if (err instanceof NoSuchGameError) {
@@ -143,7 +151,7 @@ export async function completeProcessGame(event: ContinuationDownloadResponse): 
 }
 
 function makeDownloadRequest(continuationData: any, functionName: string, token: string, url: string): ContinuationDownloadRequest {
-    const req: ContinuationDownloadRequest = {
+    return {
         type: "continuation",
         functionName,
         continuationData,
@@ -151,9 +159,13 @@ function makeDownloadRequest(continuationData: any, functionName: string, token:
             {bggApiKey: token, url, notBefore: undefined}
         ],
         requestId: crypto.randomUUID(),
-        attempts: 0
+        attempts: 0,
+        initiated: new Date().getTime(),
+        completed: 0,
+        downloaded: 0,
+        scheduled: 0,
+        received: 0
     };
-    return req;
 }
 
 export async function prehandle(event: ToProcessElement) {
@@ -167,21 +179,21 @@ export async function prehandle(event: ToProcessElement) {
         // which will be used to update the file entry in the DB
         // however it may not be the URL we actually need to get the data from.
         const req = makeDownloadRequest({ geek: event.geek, url: event.url }, "downloader_completeProcessUser", system.usersToken, url );
-        await sendToBGGQueue1(system, req);
+        await sendToBGGQueue2(system, req);
     } else if (event.processMethod === "processDesigner") {
         const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completeProcessDesigner", system.usersToken, event.url );
-        await sendToBGGQueue1(system, req);
+        await sendToBGGQueue2(system, req);
     } else if (event.processMethod === "processPublisher") {
-        const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completePublisher", system.usersToken, event.url );
-        await sendToBGGQueue1(system, req);
+        const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completeProcessPublisher", system.usersToken, event.url );
+        await sendToBGGQueue2(system, req);
     } else if (event.processMethod === "processGame") {
         const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completeProcessGame", system.gamesToken, event.url );
-        await sendToBGGQueue1(system, req);
+        await sendToBGGQueue2(system, req);
     } else if (event.processMethod === "processCollection") {
         console.log(JSON.stringify(event));
         // TODO - change to collectionToken
         const req = makeDownloadRequest({ geek: event.geek, url: event.url }, "downloader_completeProcessCollection", system.usersToken, event.url );
-        await sendToBGGQueue1(system, req);
+        await sendToBGGQueue2(system, req);
     } else if (event.processMethod !== "processCollection") {
         console.log(JSON.stringify(event));
     } else {
@@ -189,24 +201,26 @@ export async function prehandle(event: ToProcessElement) {
     }
 }
 
-async function sendToBGGQueue1(system: System, payload: DownloadRequest): Promise<any> {
+async function sendToBGGQueue2(system: System, payload: DownloadRequest): Promise<any> {
     const sqs = new SQSClient({ region: process.env.REGION });
     const command = new SendMessageCommand({
-        QueueUrl: system.bggQueue1,
-        MessageBody: JSON.stringify(payload)
+        QueueUrl: system.bggQueue2,
+        MessageBody: JSON.stringify(payload),
+        MessageGroupId: "pre_handle"
     });
     return await sqs.send(command);
 }
 
-async function sendToBGGQueue1WithDelay(system: System, payload: DownloadRequest, delay: number): Promise<any> {
-    const sqs = new SQSClient({ region: process.env.REGION });
-    const command = new SendMessageCommand({
-        QueueUrl: system.bggQueue1,
-        MessageBody: JSON.stringify(payload),
-        DelaySeconds: delay
-    });
-    return await sqs.send(command);
-}
+// async function sendToBGGQueue1WithDelay(system: System, payload: DownloadRequest, delay: number): Promise<any> {
+//     const sqs = new SQSClient({ region: process.env.REGION });
+//     console.log(JSON.stringify(system));
+//     const command = new SendMessageCommand({
+//         QueueUrl: system.bggQueue1,
+//         MessageBody: JSON.stringify(payload),
+//         DelaySeconds: delay
+//     });
+//     return await sqs.send(command);
+// }
 
 async function extractContinuationDataSingle(system: System, event: ContinuationDownloadResponse): Promise<{ continuationData: any, xml: string} | undefined> {
     const continuationData = event.continuationData;

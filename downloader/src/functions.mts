@@ -1,23 +1,11 @@
-import {between, sleep} from "./library.mjs";
+import {between, copyRequestStats, sleep} from "./library.mjs";
 import {
-    extractGameDataFromPage,
-    extractUserCollectionFromPage,
-    extractUserDataFromPage,
-    NoSuchGameError
-} from "./extraction.mjs";
-import {
-    dispatchDesignerData,
-    dispatchEnsureGames,
     dispatchMarkAsProcessed,
     dispatchMarkAsTryAgainTomorrow,
     dispatchMarkAsUnprocessed,
-    dispatchNoSuchGame,
-    dispatchNoSuchUser,
     dispatchPlaysForPeriodResult,
     dispatchProcessCleanUpCollection,
-    dispatchProcessCollectionUpdateGames,
-    dispatchProcessGameResult,
-    dispatchProcessUserResult, dispatchPublisherData, dispatchSlowDown,
+    dispatchSlowDown,
     dispatchUpdateMetadata,
     dispatchUpdateTop50,
     dispatchUpdateUserList
@@ -119,29 +107,6 @@ export async function processBGGTop50(ignored: UpdateTop50Message) {
     await dispatchUpdateTop50(system, top50);
 }
 
-// Lambda to harvest data about a game
-export async function processGame(event: FileToProcess) {
-    const system = await loadSystem();
-    if (isHttpResponse(system)) return system;
-    await initLogging(system, "processGame");
-
-    const invocation = event as FileToProcess;
-    const data = await fetchXMLFromBGG(system.gamesToken, invocation.url, event);
-    if (data) {
-        try {
-            const result = await extractGameDataFromPage(invocation.bggid, invocation.url, data);
-            await dispatchProcessGameResult(system, result);
-        } catch (err) {
-            if (err instanceof NoSuchGameError) {
-                await dispatchNoSuchGame(system, err.getId());
-            } else {
-                console.log(err);
-            }
-        }
-    }
-    await flushLogging();
-}
-
 async function fetchXMLFromBGG(token: string, url: string, task: object): Promise<string | undefined> {
     const resp = await fetchFromBGG(token, url);
     console.log(resp.url, resp.status);
@@ -160,87 +125,6 @@ async function fetchFromBGG(token: string, url: string): Promise<Response> {
             "Authorization": `Bearer ${token}`,
         }
     });
-}
-
-// Lambda to harvest data about a user
-export async function processUser(event: FileToProcess) {
-    const system = await loadSystem();
-    if (isHttpResponse(system)) return system;
-    await initLogging(system, "processUser");
-
-    const invocation = event as FileToProcess;
-
-    const url = `https://api.geekdo.com/api/users?username=${encodeURIComponent(invocation.geek)}`;
-    console.log(url);
-    const resp = await fetchFromBGG(system.usersToken, url);
-    console.log(resp);
-    const data = await resp.json();
-    console.log(data);
-    // we send the invocation URL here as it is identification for the task, not actually the URL.
-    const puResult = extractUserDataFromPage(invocation.geek, invocation.url, data);
-    await dispatchProcessUserResult(system, puResult);
-
-    await flushLogging();
-}
-
-// Lambda to harvest a user's collection
-export async function processCollection(invocation: FileToProcess) {
-    const system = await loadSystem();
-    if (isHttpResponse(system)) return system;
-    await initLogging(system, "processCollection");
-
-    try {
-        const code = await tryToProcessCollection(system, invocation);
-        if (code === 202) {
-            await markAsUnprocessed(system, invocation);
-        } else if (code > 500) {
-            await markTryAgainTomorrow(system, invocation);
-        } else if (code === 400) {
-            log(`No such geek: ${invocation.geek}`)
-            await dispatchNoSuchUser(system, invocation.geek);
-        } else if (code === 429) {
-            log(`Rate limit exceeded processing collection for ${invocation.geek}`);
-            await dispatchSlowDown(system);
-        }
-    } catch (e) {
-        console.log(e);
-        console.log(invocation);
-    }
-    console.log(`processCollection ${invocation.geek} done`);
-    await flushLogging();
-}
-
-// return success
-async function tryToProcessCollection(system: System, invocation: FileToProcess): Promise<number> {
-    const data = await fetchXMLFromBGG(system.collectionToken, invocation.url, invocation);
-    const collection = await extractUserCollectionFromPage(system, invocation.geek, data, invocation.url);
-    if (collection === "InvalidUsername") {
-        return 400;
-    } else if (collection === "RateLimitExceeded") {
-        return 429;
-    } else if (collection === "IncorrectDOM") {
-        log(`Incorrect DOM for URL ${invocation.url}`);
-        await system.publishError(`Incorrect DOM for URL ${invocation.url}`, "processCollection");
-    } else if (collection === "ComeBackLater") {
-        return 202;
-    } else if (collection === "TooBig") {
-        log(`Collection exceeds maximum export size for ${invocation.geek}`);
-        await system.publishError(`Collection exceeds maximum export size for ${invocation.geek}`, "processCollection");
-        // TODO
-    } else {
-        const ids = collection.items.map(item => item.gameId);
-        console.log(ids);
-        // make sure that all of these games are in the database
-        // if there are a lot, this lambda might timeout, but next time more of them will be there.
-        await dispatchEnsureGames(system, ids);
-        console.log(`Collection data size ${JSON.stringify(collection).length}`);
-        for (const games of splitCollection(collection)) {
-            console.log(`subcollection data size ${JSON.stringify(games).length}`);
-            await dispatchProcessCollectionUpdateGames(system, games);
-        }
-        await cleanupCollection(system, collection, invocation.url);
-    }
-    return 200;
 }
 
 export async function cleanupCollection(system: System, collection: ProcessCollectionResult, url: string) {
@@ -265,8 +149,9 @@ async function markTryAgainTomorrow(system: System, fileDetails: FileToProcess) 
 }
 
 export function splitCollection(original: ProcessCollectionResult): ProcessCollectionResult[] {
+    const stats = copyRequestStats(original);
     return _.chunk(original.items, MAX_GAMES_PER_CALL)
-        .map(items => { return { geek: original.geek, items: items }; });
+        .map(items => { return { geek: original.geek, items: items, ...stats }; });
 }
 
 interface QueueInput {
@@ -348,7 +233,13 @@ export async function processPlayed(event: QueueInput) {
             geek: invocation.geek,
             endYmdInc: invocation.endYmdInc,
             startYmdInc: invocation.startYmdInc,
-            url: invocation.url
+            url: invocation.url,
+            // TODO - use real stats
+            initiated: 0,
+            scheduled: 0,
+            received: 0,
+            downloaded: 0,
+            completed: 0
         }
         await dispatchPlaysForPeriodResult(system, result);
         await dispatchPlaysForPeriodResult(system, result);
@@ -364,36 +255,6 @@ export async function processPlayed(event: QueueInput) {
         if (response.$metadata.httpStatusCode !== 200) {
             await system.publishError(JSON.stringify(response), "processPlayed");
         }
-    }
-    await flushLogging();
-}
-
-export async function processDesigner(event: FileToProcess) {
-    const system = await loadSystem();
-    if (isHttpResponse(system)) return system;
-    await initLogging(system, "processDesigner");
-
-    const data = await fetchXMLFromBGG(system.extrasToken, event.url, event);
-    const name = between(data, "<name>", "</name>");
-    if (name.length > 0) {
-        await dispatchDesignerData(system, { url: event.url, bggid: event.bggid, name });
-    } else {
-        console.log(data);
-    }
-    await flushLogging();
-}
-
-export async function processPublisher(event: FileToProcess) {
-    const system = await loadSystem();
-    if (isHttpResponse(system)) return system;
-    await initLogging(system, "processPublisher");
-
-    const data = await fetchXMLFromBGG(system.extrasToken, event.url, event);
-    const name = between(data, "<name>", "</name>");
-    if (name.length > 0) {
-        await dispatchPublisherData(system, { url: event.url, bggid: event.bggid, name });
-    } else {
-        console.log(data);
     }
     await flushLogging();
 }

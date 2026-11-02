@@ -1,3 +1,5 @@
+import { RequestStats } from "extstats-core";
+
 export interface URLRequest {
     url: string;
     bggApiKey: string;
@@ -5,7 +7,7 @@ export interface URLRequest {
 }
 
 // properties common to all download requests
-export interface AbstractDownloadRequest {
+export interface AbstractDownloadRequest extends RequestStats {
     requestId: string;
     requests: URLRequest[];
     attempts: number;
@@ -51,7 +53,7 @@ export interface FailureDownloadResultType extends AbstractDownloadResult {
 
 export type DownloadResult = S3DownloadResultType | ContentDownloadResultType | FailureDownloadResultType;
 
-export interface AbstractDownloadResponse {
+export interface AbstractDownloadResponse extends RequestStats {
     attempts: number;
     results: DownloadResult[];
     requestId: string;
