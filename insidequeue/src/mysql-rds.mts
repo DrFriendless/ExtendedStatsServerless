@@ -619,8 +619,6 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
     for (const q of query) {
         if (q.processMethod === 'processYear') {
             risk += 7;
-        } else if (q.processMethod === 'processCollection') {
-            risk += 6;
         } else {
             risk++;
         }

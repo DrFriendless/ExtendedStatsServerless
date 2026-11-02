@@ -1,4 +1,4 @@
-
+import dateFormat from "dateformat";
 import {
     DeleteMessageCommand,
     Message,
@@ -15,7 +15,7 @@ import {
     PlaysToProcess,
     ProcessMethod,
     QueueMessage,
-    ToProcessElement
+    ToProcessElement, RequestStats
 } from "extstats-core";
 import {
     doEnsureUsers,
@@ -67,21 +67,22 @@ async function main() {
     await initLogging(system, "InsideQueue");
     let slowdowns = 0;
     const sqsClient = new SQSClient({ region: REGION });
+    let lastTime = new Date().getTime();
     while (true) {
-        console.log(`... waiting for queue with ${slowdowns} slowdowns.`);
+        // console.log(`... waiting for queue with ${slowdowns} slowdowns.`);
         // Credentials are granted to the EC2 hosting this so we don't need to add them here.
-        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 5, MaxNumberOfMessages: 10 };
+        const input: ReceiveMessageCommandInput = { QueueUrl: system.downloaderQueue, WaitTimeSeconds: 20, MaxNumberOfMessages: 10 };
         const command = new ReceiveMessageCommand(input);
         await flushLogging();
         const response = await sqsClient.send(command);
         if (response.Messages) {
             slowdowns += await handleMessages(system, sqsClient, response.Messages, system.downloaderQueue);
-            if (response.Messages.length < 2) {
-                slowdowns -= await noMessages(system, 2 - response.Messages.length, slowdowns);
-            }
-        } else {
-            console.log("No messages");
-            slowdowns -= await noMessages(system, 10, slowdowns);
+        }
+        const thisTime = new Date().getTime();
+        const howManyToDo = Math.ceil((thisTime - lastTime) / 5000) - slowdowns;
+        if (howManyToDo > 0) {
+            lastTime = thisTime;
+            await noMessages(system, howManyToDo);
         }
         await flushLogging();
     }
@@ -171,26 +172,14 @@ async function getRetries(system: System): Promise<ToProcessElement[]> {
 }
 
 // return how many slowdowns we ate up
-async function noMessages(system: System, howManyToDo: number, slowDowns: number): Promise<number> {
-    let eaten = 0;
-    if (slowDowns > 0) {
-        const toDo = Math.min(slowDowns, 5);
-        eaten = toDo;
-        console.log(`... sleeping for ${toDo * 3} seconds due to ${slowDowns} slowdowns`);
-        slowDowns -= eaten;
-        await sleep(toDo * 3000);
-    }
-    if (slowDowns >= howManyToDo) return (eaten + howManyToDo);
+async function noMessages(system: System, howManyToDo: number): Promise<void> {
     const retries = await getRetries(system);
     if (retries.length > 0) {
         for (const element of retries) {
             console.log(`Processing retry ${element.url}`);
             await scheduleProcessing(system, element, true);
         }
-        return eaten;
     }
-    howManyToDo -= slowDowns;
-    eaten += slowDowns;
     const geeksThatDontExist = await system.returnWithConnection(getGeeksThatDontExist);
     const todo: ToProcessElement[] =
         await system.returnWithConnection(conn =>
@@ -204,7 +193,6 @@ async function noMessages(system: System, howManyToDo: number, slowDowns: number
             await scheduleProcessing(system, element, false);
         }
     }
-    return eaten;
 }
 
 interface SQSMessage {
@@ -225,7 +213,7 @@ function processSQSMessage(message: Message): SQSMessage {
 }
 
 async function handleMessages(system: System, sqsClient: SQSClient, messages: Message[], queueUrl: string): Promise<number> {
-    console.log(`Retrieved ${messages.length} messages from downloader queue`);
+    console.log(`${dateFormat("isoTime")}: Retrieved ${messages.length} messages from downloader queue`);
     const processedMessages = messages.map(processSQSMessage);
     // count the slowdowns
     const slowdowns = processedMessages.filter(m => m.isSlowdown).length;
@@ -253,7 +241,7 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
                 listAdd(ids, e);
             }
         }
-        console.log(`Coalesced ${ensures.length} ensure games messages ${playeds.length} played games messages : ${ids.length}`);
+        // console.log(`Coalesced ${ensures.length} ensure games messages ${playeds.length} played games messages : ${ids.length}`);
         await system.withConnectionAsync(conn => doEnsureGames(conn, ids));
     }
     // ack the ones we've done
@@ -287,6 +275,11 @@ async function handleMessages(system: System, sqsClient: SQSClient, messages: Me
     return slowdowns;
 }
 
+function reportStats(discriminator: string, stats: RequestStats) {
+    stats.received = new Date().getTime();
+    console.log(`${discriminator}: INIT ${stats.downloaded - stats.initiated} DL ${stats.completed - stats.downloaded} COMP ${stats.received - stats.completed} RECV ${stats.received - stats.initiated} TOT`);
+}
+
 async function handleQueueMessage(system: System, message: QueueMessage) {
     switch (message.discriminator) {
         case "RebuildMaterialisedViews":
@@ -304,7 +297,7 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             await sendMessage(system, [message.params.geek], ["updates"], { message: "Finished updating your collection."});
             break;
         case "CollectionResultMessage":
-            console.log(`CollectionResultMessage ${message.result.geek} ${message.result.items.length}`);
+            reportStats(message.discriminator, message.result);
             if (message.result.geek === undefined) {
                 console.log("Skipping that nonsense");
             } else {
@@ -312,7 +305,7 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             }
             break;
         case "GameResultMessage":
-            console.log(`GameResultMessage ${message.result.name}`);
+            reportStats(message.discriminator, message.result);
             await system.withConnectionAsync(conn => doProcessGameResult(conn, message.result));
             break;
         case "MarkAsProcessedMessage":
@@ -372,16 +365,19 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
             await system.withConnectionAsync(conn => doEnsureUsers(conn, message.users));
             break;
         case "UserResultMessage":
+            reportStats(message.discriminator, message.result);
             console.log(`UserResultMessage ${message.result.geek}`);
             await system.withConnectionAsync(conn =>
                 doUpdateProcessUserResult(conn, message.result.geek, message.result.bggid, message.result.country, message.result.url));
             await sendMessage(system, [message.result.geek], ["updates"], { message: `Updated your geek info.`});
             break;
         case "DesignerResultMessage":
+            reportStats(message.discriminator, message.result);
             console.log(`DesignerResultMessage ${message.result.name}`);
             await system.withConnectionAsync(conn => doProcessDesignerResult(conn, message.result));
             break;
         case "PublisherResultMessage":
+            reportStats(message.discriminator, message.result);
             console.log(`PublisherResultMessage ${message.result.name}`);
             await system.withConnectionAsync(conn => doProcessPublisherResult(conn, message.result));
             break;
