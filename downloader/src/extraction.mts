@@ -96,9 +96,17 @@ export async function extractUserCollectionFromPage(system: System, geek: string
 //     # no tags
 // pass
 
+interface Users {
+    type: string;
+    username: string;
+    id: string;
+    country: string;
+}
 
-export function extractUserDataFromPage(geek: string, url: string, json: any, stats: RequestStats): ProcessUserResult {
-    const users = json.filter((item: any) => item.type === 'users' && item.username.toLowerCase() === geek.toLowerCase());
+// it turns out the XML is JSON in this case.
+export function extractUserDataFromPage(geek: string, url: string, xml: string, stats: RequestStats): ProcessUserResult {
+    const json: Users[] = JSON.parse(xml);
+    const users = json.filter((item) => item.type === 'users' && item.username.toLowerCase() === geek.toLowerCase());
 
     let bggid = -1;
     let country = "";

@@ -35,6 +35,8 @@ export async function completeProcessUser(event: ContinuationDownloadResponse): 
     if (cx) {
         const stats = copyRequestStats(event);
         const puResult = extractUserDataFromPage(cx.continuationData.geek, cx.continuationData.url, cx.xml, stats);
+        console.log(JSON.stringify(puResult));
+        puResult.completed = new Date().getTime();
         await dispatchProcessUserResult(system, puResult);
     }
 }
@@ -194,9 +196,8 @@ export async function prehandle(event: ToProcessElement) {
         // TODO - change to collectionToken
         const req = makeDownloadRequest({ geek: event.geek, url: event.url }, "downloader_completeProcessCollection", system.usersToken, event.url );
         await sendToBGGQueue2(system, req);
-    } else if (event.processMethod !== "processCollection") {
-        console.log(JSON.stringify(event));
     } else {
+        console.log(JSON.stringify(event));
         // TODO - what else is there?
     }
 }
@@ -211,17 +212,6 @@ async function sendToBGGQueue2(system: System, payload: DownloadRequest): Promis
     return await sqs.send(command);
 }
 
-// async function sendToBGGQueue1WithDelay(system: System, payload: DownloadRequest, delay: number): Promise<any> {
-//     const sqs = new SQSClient({ region: process.env.REGION });
-//     console.log(JSON.stringify(system));
-//     const command = new SendMessageCommand({
-//         QueueUrl: system.bggQueue1,
-//         MessageBody: JSON.stringify(payload),
-//         DelaySeconds: delay
-//     });
-//     return await sqs.send(command);
-// }
-
 async function extractContinuationDataSingle(system: System, event: ContinuationDownloadResponse): Promise<{ continuationData: any, xml: string} | undefined> {
     const continuationData = event.continuationData;
     if (!event.results || event.results.length !== 1 || event.results[0].type === "failure") {
@@ -230,7 +220,6 @@ async function extractContinuationDataSingle(system: System, event: Continuation
         return undefined;
     }
     const xml = await retrieveXml(system, event.results[0]);
-    console.log(`xml = ${xml}`);
     if (isHttpResponse(xml)) {
         console.log(JSON.stringify(xml));
         return undefined;

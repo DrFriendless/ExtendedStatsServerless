@@ -86,7 +86,7 @@ export async function handler(event: { Payload: CloudWatchPayload }): Promise<vo
         const authTasks: number = (await conn.query("select count(*) c from authtask"))[0].c;
         const tp = (await conn.query("select count(id) c, processMethod from files where ((lastUpdate is null) or (lastUpdate is not null and nextUpdate < now())) group by processMethod")) as ToProcessRow[];
         const toProcess: Partial<ToProcess> = Object.fromEntries(tp.map(r => [r.processMethod, r.c]));
-        const fp = (await conn.query("select count(id) c, processMethod from files where (lastUpdate is not null and nextUpdate < now()) group by processMethod")) as ToProcessRow[];
+        const fp = (await conn.query("select count(id) c, processMethod from files where last_scheduled is not null and nextUpdate < now() group by processMethod")) as ToProcessRow[];
         const processFails: Partial<ToProcess> = Object.fromEntries(fp.map(r => [r.processMethod, r.c]));
         const plays = (await conn.query("select count(*) c from plays"))[0].c;
         const notGeeks = (await conn.query("select count(*) c  from not_geeks"))[0].c;
