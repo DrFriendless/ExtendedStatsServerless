@@ -20,7 +20,6 @@ import {
     dispatchProcessUserResult, dispatchPublisherData
 } from "./dispatch.mjs";
 import {between, copyRequestStats} from "./library.mjs";
-import {log} from "./logging.mjs";
 import {cleanupCollection, splitCollection} from "./functions.mjs";
 
 export async function completeProcessUser(event: ContinuationDownloadResponse): Promise<void> {
@@ -53,7 +52,6 @@ export async function completeProcessDesigner(event: ContinuationDownloadRespons
     if (cx) {
         const name = between(cx.xml, "<name>", "</name>");
         if (name.length > 0) {
-            const rs = copyRequestStats(event);
             await dispatchDesignerData(system, { url: cx.continuationData.url, bggid: cx.continuationData.bggid, name, ...copyRequestStats(event, { completed: new Date().getTime() }) });
         } else {
             // e.g. <people termsofuse=\"https://boardgamegeek.com/xmlapi/termsofuse\">\n\t\t<person>\n\t\t<error message=\"Item not found\"/>\n\t</person>\n\t</people>\n\n
@@ -81,6 +79,7 @@ export async function completeProcessPublisher(event: ContinuationDownloadRespon
     }
 }
 
+// Lambda entry point.
 export async function completeProcessCollection(event: ContinuationDownloadResponse): Promise<void> {
     const system = await loadSystem();
     if (isHttpResponse(system)) {
@@ -88,41 +87,42 @@ export async function completeProcessCollection(event: ContinuationDownloadRespo
         return;
     }
     event.received = new Date().getTime();
-    const stats = copyRequestStats(event, { completed: new Date().getTime() });
+    const stats = copyRequestStats(event);
 
     const cx = await extractContinuationDataSingle(system, event);
-    console.log(JSON.stringify(cx.continuationData));
     if (cx) {
-        const collection = await extractUserCollectionFromPage(system, cx.continuationData.geek, cx.xml, cx.continuationData.url, stats);
+        const collection = await extractUserCollectionFromPage(cx.continuationData.geek, cx.xml, cx.continuationData.url, stats);
         if (collection === "InvalidUsername") {
-            console.log(400);
+            console.log("Error: Invalid Username");
             // TODO
         } else if (collection === "RateLimitExceeded") {
-            console.log(429);
+            console.log("Error: Rate Limit Exceeded");
             // TODO
         } else if (collection === "IncorrectDOM") {
-            log(`Incorrect DOM for URL ${cx.continuationData.url}`);
-            // TODO
+            console.log(`Error: Incorrect DOM for URL ${cx.continuationData.url}`);
+            console.log(cx.xml);
         } else if (collection === "ComeBackLater") {
             await system.loadBGGQueues();
-            console.log(202);
+            console.log(`Error: come back later for ${cx.continuationData.geek}`);
             const req = makeDownloadRequest(event.continuationData, "downloader_completeProcessCollection", system.usersToken, event.results[0].url);
             req.attempts = event.attempts;
-            await sendToBGGQueue2(system, req);
+            await sendToInputQueue(system, req);
         } else if (collection === "TooBig") {
-            log(`Collection exceeds maximum export size for ${cx.continuationData.geek}`);
+            console.log(`Error: Collection exceeds maximum export size for ${cx.continuationData.geek}`);
             // TODO
         } else {
             const ids = collection.items.map(item => item.gameId);
             console.log(ids);
             // make sure that all of these games are in the database
             // if there are a lot, this lambda might timeout, but next time more of them will be there.
+            collection.completed = new Date().getTime();
             await dispatchEnsureGames(system, ids);
             console.log(`Collection data size ${JSON.stringify(collection).length}`);
             for (const games of splitCollection(collection)) {
                 console.log(`subcollection data size ${JSON.stringify(games).length}`);
                 await dispatchProcessCollectionUpdateGames(system, games);
             }
+            collection.completed = new Date().getTime();
             await cleanupCollection(system, collection, cx.continuationData.url);
         }
     }
@@ -170,42 +170,84 @@ function makeDownloadRequest(continuationData: any, functionName: string, token:
     };
 }
 
-export async function prehandle(event: ToProcessElement) {
+// The tokens don't matter much here, because as long as the requests to BGG are 5 seconds apart we can use the same one for all requests.
+export async function prehandle(events: ToProcessElement[]) {
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
     await system.loadBGGQueues();
 
-    if (event.processMethod === "processUser") {
-        const url = `https://api.geekdo.com/api/users?username=${encodeURIComponent(event.geek)}`;
-        // the URL in the continuation data is the URL we were told to download,
-        // which will be used to update the file entry in the DB
-        // however it may not be the URL we actually need to get the data from.
-        const req = makeDownloadRequest({ geek: event.geek, url: event.url }, "downloader_completeProcessUser", system.usersToken, url );
-        await sendToBGGQueue2(system, req);
-    } else if (event.processMethod === "processDesigner") {
-        const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completeProcessDesigner", system.usersToken, event.url );
-        await sendToBGGQueue2(system, req);
-    } else if (event.processMethod === "processPublisher") {
-        const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completeProcessPublisher", system.usersToken, event.url );
-        await sendToBGGQueue2(system, req);
-    } else if (event.processMethod === "processGame") {
-        const req = makeDownloadRequest({ bggid: event.bggid, url: event.url }, "downloader_completeProcessGame", system.gamesToken, event.url );
-        await sendToBGGQueue2(system, req);
-    } else if (event.processMethod === "processCollection") {
-        console.log(JSON.stringify(event));
-        // TODO - change to collectionToken
-        const req = makeDownloadRequest({ geek: event.geek, url: event.url }, "downloader_completeProcessCollection", system.usersToken, event.url );
-        await sendToBGGQueue2(system, req);
-    } else {
-        console.log(JSON.stringify(event));
-        // TODO - what else is there?
+    for (const event of events) {
+        if (event.processMethod === "processUser") {
+            const url = `https://api.geekdo.com/api/users?username=${encodeURIComponent(event.geek)}`;
+            // the URL in the continuation data is the URL we were told to download,
+            // which will be used to update the file entry in the DB
+            // however it may not be the URL we actually need to get the data from.
+            const req = makeDownloadRequest({
+                geek: event.geek,
+                url: event.url
+            }, "downloader_completeProcessUser", system.usersToken, url);
+            await sendToInputQueue(system, req);
+        } else if (event.processMethod === "processDesigner") {
+            const req = makeDownloadRequest({
+                bggid: event.bggid,
+                url: event.url
+            }, "downloader_completeProcessDesigner", system.extrasToken, event.url);
+            await sendToInputQueue(system, req);
+        } else if (event.processMethod === "processPublisher") {
+            const req = makeDownloadRequest({
+                bggid: event.bggid,
+                url: event.url
+            }, "downloader_completeProcessPublisher", system.extrasToken, event.url);
+            await sendToInputQueue(system, req);
+        } else if (event.processMethod === "processGame") {
+            const req = makeDownloadRequest({
+                bggid: event.bggid,
+                url: event.url
+            }, "downloader_completeProcessGame", system.gamesToken, event.url);
+            await sendToInputQueue(system, req);
+        } else if (event.processMethod === "processCollection") {
+            console.log(JSON.stringify(event));
+            const req = makeDownloadRequest({
+                geek: event.geek,
+                url: event.url
+            }, "downloader_completeProcessCollection", system.collectionToken, event.url);
+            await sendToInputQueue(system, req);
+        } else if (event.processMethod === "processYear") {
+            const parts = event.url.split("=");
+            const firstPageUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${event.geek}&type=thing&mindate=${parts[0]}&maxdate=${parts[1]}&subtype=boardgame&page=1`;
+            console.log(JSON.stringify(event));
+            const req = makeDownloadRequest({
+                geek: event.geek,
+                url: event.url
+            }, "downloader_firstPageProcessYear", system.extrasToken, firstPageUrl);
+            await sendToInputQueue(system, req);
+        } else {
+            console.log(JSON.stringify(event));
+            // TODO - what else is there?
+        }
     }
 }
 
-async function sendToBGGQueue2(system: System, payload: DownloadRequest): Promise<any> {
+export async function firstPageProcessYear(event: ContinuationDownloadResponse): Promise<void> {
+    const system = await loadSystem();
+    if (isHttpResponse(system)) {
+        console.log(JSON.stringify(system));
+        return;
+    }
+    event.received = new Date().getTime();
+    const stats = copyRequestStats(event, { completed: new Date().getTime() });
+
+    const cx = await extractContinuationDataSingle(system, event);
+    console.log(JSON.stringify(cx));
+    if (cx) {
+        // TODO
+    }
+}
+
+async function sendToInputQueue(system: System, payload: DownloadRequest): Promise<any> {
     const sqs = new SQSClient({ region: process.env.REGION });
     const command = new SendMessageCommand({
-        QueueUrl: system.bggQueue2,
+        QueueUrl: system.inputQueue,
         MessageBody: JSON.stringify(payload),
         MessageGroupId: "pre_handle"
     });

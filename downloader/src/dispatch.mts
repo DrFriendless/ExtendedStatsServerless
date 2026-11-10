@@ -22,7 +22,7 @@ async function sendToDownloaderQueue(system: System, body: QueueMessage, details
         log(`SQS message size exceeded: ${b.length} ${body.discriminator} ${details || ""}`);
         return;
     } else {
-        console.log(b);
+        // console.log(b);
     }
     const command = new SendMessageCommand({
         QueueUrl: system.downloaderQueue,

@@ -242,7 +242,6 @@ export async function processPlayed(event: QueueInput) {
             completed: 0
         }
         await dispatchPlaysForPeriodResult(system, result);
-        await dispatchPlaysForPeriodResult(system, result);
 
         // ack message
         const sqsClient = new SQSClient({ region: record.awsRegion });

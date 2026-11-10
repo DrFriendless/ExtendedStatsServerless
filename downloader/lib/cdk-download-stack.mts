@@ -13,7 +13,6 @@ import * as events from "aws-cdk-lib/aws-events";
 import {Rule} from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import {CACHE_BUCKET, COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS} from "./metadata.mts";
-import {RedrivePermission} from "aws-cdk-lib/aws-sqs/lib/queue";
 
 const RUNTIME = lambda.Runtime.NODEJS_24_X;
 
@@ -157,19 +156,22 @@ export class DownloadStack extends cdk.Stack {
 
   defineDeadLetterQueue(): sqs.IQueue {
     return new sqs.Queue(this, "bggDLQ", {
-      queueName: "downloaderDLQ",
-      visibilityTimeout: Duration.seconds(43200),
+      queueName: "downloaderDLQ.fifo",
+      visibilityTimeout: Duration.seconds(1800),
       redriveAllowPolicy: {
-        redrivePermission: RedrivePermission.ALLOW_ALL,
-      }
+        redrivePermission: sqs.RedrivePermission.ALLOW_ALL,
+      },
+      fifo: true
     });
   }
 
   defineInputQueue2(dlq: sqs.DeadLetterQueue): sqs.IQueue {
     return new sqs.Queue(this, "bggQueueNewArch2", {
-      queueName: "downloaderBGGQueue2",
-      visibilityTimeout: Duration.seconds(43200),
+      queueName: "downloaderInputQueue.fifo",
+      visibilityTimeout: Duration.seconds(600),
       deadLetterQueue: dlq,
+      contentBasedDeduplication: true,
+      fifo: true
     });
   }
 
@@ -231,7 +233,7 @@ export class DownloadStack extends cdk.Stack {
     const playsQueue = this.definePlaysQueue();
     const retryQueue = this.defineRetryQueue();
     const dlq = this.defineDeadLetterQueue();
-    const inputQueue = this.defineInputQueue2({ maxReceiveCount: 1, queue: dlq });
+    const inputQueue = this.defineInputQueue2({ maxReceiveCount: 3, queue: dlq });
 
     const snsTopic = this.defineSnsTopic(process.env.SNS_TOPIC, process.env.SNS_EMAIL);
     const role = this.defineDownloaderRole(outputQueue, inputQueue, dlq, cacheBucket, snsTopic);
@@ -252,7 +254,7 @@ export class DownloadStack extends cdk.Stack {
       }
     }
     if (playsLambda) {
-      const mapping = new sources.SqsEventSource(playsQueue, {batchSize: 1, enabled: false});
+      const mapping = new sources.SqsEventSource(playsQueue, {batchSize: 1, enabled: false });
       playsLambda.addEventSource(mapping);
       new cdk.CfnOutput(this, 'downloaderPlaysMapping', {
         value: mapping.eventSourceMappingId,
@@ -283,13 +285,13 @@ export class DownloadStack extends cdk.Stack {
       value: playsQueue.queueUrl,
       exportName: 'downloader-PlaysQueueURL'
     });
-    new cdk.CfnOutput(this, 'downloaderBGGQueue2', {
+    new cdk.CfnOutput(this, 'downloaderInputQueue', {
       value: inputQueue.queueUrl,
-      exportName: 'downloader-BGGQueue2URL'
+      exportName: 'downloader-InputQueueURL'
     });
-    new cdk.CfnOutput(this, 'downloaderBGGQueue2arn', {
+    new cdk.CfnOutput(this, 'downloaderInputQueueArn', {
       value: inputQueue.queueArn,
-      exportName: 'downloader-BGGQueue2ARN'
+      exportName: 'downloader-InputQueueARN'
     });
     new cdk.CfnOutput(this, 'downloaderRetryQueue', {
       value: retryQueue.queueUrl,

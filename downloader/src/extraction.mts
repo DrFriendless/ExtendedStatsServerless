@@ -1,15 +1,14 @@
 import { CollectionGameResult, ProcessCollectionResult, ProcessGameResult, ProcessUserResult, RequestStats } from "extstats-core";
 import { parseStringPromise } from 'xml2js';
 import {log} from "./logging.mjs";
-import {System} from "./system.mjs";
 
 type USER_PAGE_ERROR = "ComeBackLater" | "TooBig" | "InvalidUsername" | "RateLimitExceeded" | "IncorrectDOM";
 
-export async function extractUserCollectionFromPage(system: System, geek: string, pageContent: string, url: string, stats: RequestStats): Promise<ProcessCollectionResult | USER_PAGE_ERROR> {
+export async function extractUserCollectionFromPage(geek: string, pageContent: string, url: string, stats: RequestStats): Promise<ProcessCollectionResult | USER_PAGE_ERROR> {
     if (!pageContent) return "RateLimitExceeded";
     const dom = await parseStringPromise(pageContent, {trim: true});
     if (dom && dom.message) {
-        console.log("BGG says come back later");
+        console.log(`BGG says: ${dom.message}`);
         return "ComeBackLater";
     }
     if (!dom || !dom.items) {
