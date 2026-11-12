@@ -5,7 +5,6 @@ import {
     GetMetricStatisticsCommand, GetMetricStatisticsCommandInput,
     Statistic
 } from "@aws-sdk/client-cloudwatch";
-import {ListBucketsCommand, S3Client} from "@aws-sdk/client-s3";
 
 export async function handler(ignored: any): Promise<Record<string, number> | HttpResponse> {
     const system = await findSystem([]);
@@ -19,12 +18,6 @@ export async function handler(ignored: any): Promise<Record<string, number> | Ht
         StartTime: startTime,
         EndTime: endTime,
         Statistics: ["Maximum"]
-    };
-    const averageLongTime: { Period: number, StartTime: Date, EndTime: Date, Statistics: Statistic[] } = {
-        Period: 600,
-        StartTime: new Date(endTime.getTime() - 86400000),
-        EndTime: endTime,
-        Statistics: ["Average"]
     };
     const average: { Period: number, StartTime: Date, EndTime: Date, Statistics: Statistic[] } = {
         Period: 600,
@@ -41,6 +34,18 @@ export async function handler(ignored: any): Promise<Record<string, number> | Ht
         },
         "dl_opt_length": {
             Dimensions: [{Name: "QueueName", Value: "downloaderOutputQueue"}],
+            MetricName: "ApproximateNumberOfMessagesVisible",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "dl_ipt_age": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderInputQueue.fifo"}],
+            MetricName: "ApproximateAgeOfOldestMessage",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "dl_ipt_length": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderInputQueue.fifo"}],
             MetricName: "ApproximateNumberOfMessagesVisible",
             Namespace: "AWS/SQS",
             ...maximum
