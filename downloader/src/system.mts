@@ -1,6 +1,6 @@
 import {GetParameterCommand, GetParametersByPathCommand, SSMClient, PutParameterCommand} from "@aws-sdk/client-ssm";
 import {SQSClient, ListQueuesCommand} from "@aws-sdk/client-sqs";
-import {S3Client, GetObjectCommand} from "@aws-sdk/client-s3";
+import {S3Client, GetObjectCommand, PutObjectCommand, PutObjectCommandOutput} from "@aws-sdk/client-s3";
 import {PublishCommand, SNSClient} from "@aws-sdk/client-sns";
 import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
 
@@ -43,6 +43,18 @@ export class System {
         } else {
             console.log(`Error: ${JSON.stringify(resp.$metadata)}`);
         }
+    }
+
+    async putObjectToS3(bucket: string, objectKey: string, content: string): Promise<PutObjectCommandOutput> {
+        const s3Client = new S3Client({
+            apiVersion: '2014-11-06',
+            region: process.env.AWS_REGION
+        });
+        const resp = await s3Client.send(new PutObjectCommand({ Bucket: bucket, Key: objectKey }));
+        if (resp.$metadata.httpStatusCode !== 200) {
+            console.log(`Error putting object to S3: ${JSON.stringify(resp.$metadata)}`);
+        }
+        return resp;
     }
 
     async loadBGGQueues(): Promise<System | HttpResponse> {

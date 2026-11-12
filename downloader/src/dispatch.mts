@@ -70,8 +70,16 @@ export async function dispatchDesignerData(system: System, result: ProcessDesign
     await sendToDownloaderQueue(system, { discriminator: "DesignerResultMessage", result }, result.url);
 }
 
+export async function dispatchNoSuchDesigner(system: System, bggId: number): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "NoSuchDesignerMessage", bggId  });
+}
+
 export async function dispatchPublisherData(system: System, result: ProcessPublisherResult): Promise<void> {
     await sendToDownloaderQueue(system, { discriminator: "PublisherResultMessage", result }, result.url);
+}
+
+export async function dispatchNoSuchPublisher(system: System, bggId: number): Promise<void> {
+    await sendToDownloaderQueue(system, { discriminator: "NoSuchPublisherMessage", bggId });
 }
 
 export function dispatchProcessUserResult(system: System, result: ProcessUserResult): Promise<void> {

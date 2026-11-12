@@ -3,7 +3,6 @@ import { RequestStats } from "extstats-core";
 export interface URLRequest {
     url: string;
     bggApiKey: string;
-    notBefore?: number;
 }
 
 // properties common to all download requests

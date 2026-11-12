@@ -423,6 +423,38 @@ export async function doMarkGameDoesNotExist(conn: mysql.Connection, bggid: numb
     await conn.query(deleteSql2, [bggid]);
 }
 
+export async function doMarkDesignerDoesNotExist(conn: mysql.Connection, bggid: number) {
+    // just check whether we have data for them anyway, in which case
+    // what you talking about, Willis?
+    const countSql = "select count(*) from designers where bggid = ?";
+    try {
+        const count: number[] = await conn.query(countSql, [bggid]);
+        if (count && count.length > 0 && count[0] > 0) return;
+    } catch (e) {
+        // ignore error if it's already there
+    }
+    const deleteSql1 = "delete from files where processMethod = 'processDesigner' and bggid = ?";
+    const deleteSql2 = "delete from game_designers where designer = ?";
+    await conn.query(deleteSql1, [bggid]);
+    await conn.query(deleteSql2, [bggid]);
+    console.log(`Deleted designer ${bggid}`);
+}
+
+export async function doMarkPublisherDoesNotExist(conn: mysql.Connection, bggid: number) {
+    const countSql = "select count(*) from publishers where bggid = ?";
+    try {
+        const count: number[] = await conn.query(countSql, [bggid]);
+        if (count && count.length > 0 && count[0] > 0) return;
+    } catch (e) {
+        // ignore error if it's already there
+    }
+    const deleteSql1 = "delete from files where processMethod = 'processPublisher' and bggid = ?";
+    const deleteSql2 = "delete from game_publishers where publisher = ?";
+    await conn.query(deleteSql1, [bggid]);
+    await conn.query(deleteSql2, [bggid]);
+    console.log(`Deleted publisher ${bggid}`);
+}
+
 export async function doMarkGeekDoesNotExist(conn: mysql.Connection, geek: string) {
     const insertSql = "insert into not_geeks (geek) values (?)";
     const deleteSql1 = "delete from files where geek is not null and geek = ?";

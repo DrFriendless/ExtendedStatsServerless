@@ -35,9 +35,10 @@ import {
     doUpdatePlaysForPeriod,
     doMarkPlaysUrlProcessed,
     doProcessDesignerResult,
-    doProcessPublisherResult, doReprocessPlays, doRebuildMaterialisedViews
+    doProcessPublisherResult, doReprocessPlays, doRebuildMaterialisedViews, doMarkDesignerDoesNotExist,
+    doMarkPublisherDoesNotExist
 } from "./mysql-rds.mjs";
-import {invokeLambdaAsync, listAdd, sendMessage, sendToQueue, sendToQueueWithDelay, sleep} from "./library.mjs";
+import {invokeLambdaAsync, listAdd, sendMessage, sendToQueue, sendToQueueWithDelay} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
@@ -79,8 +80,9 @@ async function main() {
             slowdowns += await handleMessages(system, sqsClient, response.Messages, system.downloaderQueue);
         }
         const thisTime = new Date().getTime();
-        const howManyToDo = Math.ceil((thisTime - lastTime) / 5000) - slowdowns;
+        const howManyToDo = Math.floor((thisTime - lastTime) / 6000) - slowdowns;
         if (howManyToDo > 0) {
+            console.log(`Scheduling ${howManyToDo} tasks after ${thisTime - lastTime} millis`);
             lastTime = thisTime;
             await noMessages(system, howManyToDo);
         }
@@ -90,17 +92,18 @@ async function main() {
     await flushLogging();
 }
 
-async function scheduleProcessing(system: System, element: ToProcessElement, retry: boolean) {
+async function scheduleProcessing(system: System, element: ToProcessElement, retry: boolean): Promise<ToProcessElement | undefined> {
     const sch = retry ? "rescheduling" : "scheduling";
 
     if (element.processMethod === METHOD_PROCESS_USER || element.processMethod === METHOD_PROCESS_GAME ||
         element.processMethod === METHOD_PROCESS_DESIGNER || element.processMethod === METHOD_PROCESS_PUBLISHER ||
         element.processMethod === METHOD_PROCESS_COLLECTION) {
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PREHANDLE, element);
         console.log(`${sch} ${element.processMethod} ${element.geek || element.bggid}`);
+        return element;
     } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
         console.log(`* updating played years for ${element.geek} ${element.geekid}`);
         await updatePlayedYears(system, element.geek, element.geekid, element.id);
+        return undefined;
     } else if (element.processMethod === METHOD_PROCESS_YEAR) {
         const fs = element.url.split("=");
         const p2p = {
@@ -113,6 +116,13 @@ async function scheduleProcessing(system: System, element: ToProcessElement, ret
         } as PlaysToProcess;
         console.log(`${sch} processYear ${element.url}`);
         await sendToQueue(system.playsQueue, p2p);
+        // testing
+        if (element.geek === "Friendless") {
+            console.log(`(test) ${sch} ${element.processMethod} ${element.geek || element.bggid}`);
+            return element;
+        } else {
+            return undefined;
+        }
     }
 }
 
@@ -183,15 +193,25 @@ async function noMessages(system: System, howManyToDo: number): Promise<void> {
     const geeksThatDontExist = await system.returnWithConnection(getGeeksThatDontExist);
     const todo: ToProcessElement[] =
         await system.returnWithConnection(conn =>
-            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed", "processYear", "processDesigner", "processPublisher"], true))
+            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed", "processYear", "processDesigner", "processPublisher"], true));
+    const batch: ToProcessElement[] = [];
     for (const element of todo) {
         if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
             // this shouldn't happen.
             log(`Geek ${element.geek} doesn't even exist.`);
             await system.withConnectionAsync(conn => doMarkUrlProcessed(conn, element.processMethod as ProcessMethod, element.url));
         } else {
-            await scheduleProcessing(system, element, false);
+            const e = await scheduleProcessing(system, element, false);
+            if (e) batch.push(e);
         }
+    }
+    if (batch.length === 0) {
+        console.log("Couldn't find any files to process.");
+    } else {
+        if (batch.length < howManyToDo) {
+            console.log(`Only found ${batch.length} files to send to prehandle.`);
+        }
+        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PREHANDLE, batch);
     }
 }
 
@@ -346,6 +366,14 @@ async function handleQueueMessage(system: System, message: QueueMessage) {
         case "NoSuchGeekMessage":
             console.log(`NoSuchGeek ${message.geek}`);
             await system.withConnectionAsync(conn => doMarkGeekDoesNotExist(conn, message.geek));
+            break;
+        case "NoSuchDesignerMessage":
+            console.log(`NoSuchDesigner ${message.bggId}`);
+            await system.withConnectionAsync(conn => doMarkDesignerDoesNotExist(conn, message.bggId));
+            break;
+        case "NoSuchPublisherMessage":
+            console.log(`NoSuchPublisher ${message.bggId}`);
+            await system.withConnectionAsync(conn => doMarkPublisherDoesNotExist(conn, message.bggId));
             break;
         case "PlaysForPeriodResultMessage":
             console.log(`PlaysForPeriodResultMessage ${message.plays.geek} ${message.plays.startYmdInc} ${message.plays.endYmdInc} ${message.plays.plays.length}`);

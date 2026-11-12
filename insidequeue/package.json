@@ -21,7 +21,7 @@
     "async": "^3.2.6",
     "dateformat": "^5.0.5",
     "dotenv": "^17.2.1",
-    "extstats-core": "file:../../repo/extstats-core-2.0.7.tgz",
+    "extstats-core": "file:../../repo/extstats-core-2.0.8.tgz",
     "lodash": "^4.18.1",
     "mysql": "^2.18.1",
     "promise-mysql": "^5.2.0"

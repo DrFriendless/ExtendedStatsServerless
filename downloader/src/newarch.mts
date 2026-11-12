@@ -5,7 +5,7 @@ import {
     ContinuationDownloadRequest,
     ContinuationDownloadResponse,
     DownloadRequest,
-    DownloadResult
+    DownloadResult, URLRequest
 } from "./interfacesv2.mjs";
 import {
     extractGameDataFromPage,
@@ -14,13 +14,14 @@ import {
     NoSuchGameError
 } from "./extraction.mjs";
 import {
-    dispatchDesignerData, dispatchEnsureGames,
-    dispatchNoSuchGame, dispatchProcessCollectionUpdateGames,
+    dispatchDesignerData, dispatchEnsureGames, dispatchNoSuchDesigner,
+    dispatchNoSuchGame, dispatchNoSuchPublisher, dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult,
     dispatchProcessUserResult, dispatchPublisherData
 } from "./dispatch.mjs";
-import {between, copyRequestStats} from "./library.mjs";
+import {between, copyRequestStats, sleep} from "./library.mjs";
 import {cleanupCollection, splitCollection} from "./functions.mjs";
+import {XMLParser} from "fast-xml-parser";
 
 export async function completeProcessUser(event: ContinuationDownloadResponse): Promise<void> {
     const system = await loadSystem();
@@ -55,7 +56,12 @@ export async function completeProcessDesigner(event: ContinuationDownloadRespons
             await dispatchDesignerData(system, { url: cx.continuationData.url, bggid: cx.continuationData.bggid, name, ...copyRequestStats(event, { completed: new Date().getTime() }) });
         } else {
             // e.g. <people termsofuse=\"https://boardgamegeek.com/xmlapi/termsofuse\">\n\t\t<person>\n\t\t<error message=\"Item not found\"/>\n\t</person>\n\t</people>\n\n
+            // <people termsofuse="https://boardgamegeek.com/xmlapi/termsofuse"> <person> <error message="Item not found"/> </person> </people>
+            // TODO - deal with this
             console.log(cx.xml);
+            if (cx.xml.indexOf("Item not found") >= 0) {
+                await dispatchNoSuchDesigner(system, cx.continuationData.bggid);
+            }
         }
     }
 }
@@ -75,6 +81,9 @@ export async function completeProcessPublisher(event: ContinuationDownloadRespon
             await dispatchPublisherData(system, { url: cx.continuationData.url, bggid: cx.continuationData.bggid, name, ...copyRequestStats(event, { completed: new Date().getTime() }) });
         } else {
             console.log(cx.xml);
+            if (cx.xml.indexOf("Item not found") >= 0) {
+                await dispatchNoSuchPublisher(system, cx.continuationData.bggid);
+            }
         }
     }
 }
@@ -158,7 +167,7 @@ function makeDownloadRequest(continuationData: any, functionName: string, token:
         functionName,
         continuationData,
         requests: [
-            {bggApiKey: token, url, notBefore: undefined}
+            {bggApiKey: token, url }
         ],
         requestId: crypto.randomUUID(),
         attempts: 0,
@@ -206,7 +215,6 @@ export async function prehandle(events: ToProcessElement[]) {
             }, "downloader_completeProcessGame", system.gamesToken, event.url);
             await sendToInputQueue(system, req);
         } else if (event.processMethod === "processCollection") {
-            console.log(JSON.stringify(event));
             const req = makeDownloadRequest({
                 geek: event.geek,
                 url: event.url
@@ -218,8 +226,11 @@ export async function prehandle(events: ToProcessElement[]) {
             console.log(JSON.stringify(event));
             const req = makeDownloadRequest({
                 geek: event.geek,
-                url: event.url
+                url: event.url,
+                startYmdInc: parts[0],
+                endYmdInc: parts[1]
             }, "downloader_firstPageProcessYear", system.extrasToken, firstPageUrl);
+            console.log(JSON.stringify(req));
             await sendToInputQueue(system, req);
         } else {
             console.log(JSON.stringify(event));
@@ -240,8 +251,71 @@ export async function firstPageProcessYear(event: ContinuationDownloadResponse):
     const cx = await extractContinuationDataSingle(system, event);
     console.log(JSON.stringify(cx));
     if (cx) {
+        const parser = new XMLParser({
+            ignoreAttributes: false, trimValues: true,
+            isArray: (name, jpath, isLeafNode, isAttribute) => {
+                if (["play","subtype","player","comments"].indexOf(name) >= 0) return true;
+                if (["item","players","subtypes"].indexOf(name) >= 0) return false;
+                if (name.startsWith("@_") || name.startsWith("?")) return false;
+                console.log(name);
+                return false;
+            }
+        });
+
+        const doc = parser.parse(cx.xml);
+        const urls: URLRequest[] = [];
+        if (!doc.plays) {
+            console.log(JSON.stringify(doc));
+            // TODO - failure
+        } else {
+            const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${cx.continuationData.geek}&type=thing&mindate=${cx.continuationData.startYmdInc}&maxdate=${cx.continuationData.endYmdInc}&subtype=boardgame&page=`;
+            let maxEntries = parseInt(doc.plays['@_total']);
+            let maxPages = Math.floor((maxEntries + 99)/100);
+            let pageNum = 1;
+            console.log(`maxEntries=${maxEntries} ${maxPages}`);
+            while (pageNum <= maxPages) {
+                const url = baseUrl + pageNum;
+                if (url === event.results[0].url) {
+                    console.log(`I already have ${url}`);
+                } else {
+                    console.log(`I need to download ${url}`);
+                    urls.push({ bggApiKey: system.playsToken, url });
+                }
+                pageNum++;
+            }
+        }
+        console.log(JSON.stringify(urls));
+        if (urls.length === 0) {
+            await processPlaysSimple(system, event, doc);
+        } else {
+            const req: ContinuationDownloadRequest = {
+                type: "continuation",
+                functionName: "completeProcessPlays",
+                continuationData: cx.continuationData,
+                requests: urls,
+                requestId: event.requestId,
+                attempts: 0,
+                ...stats
+            };
+            await sendToInputQueue(system, req);
+        }
         // TODO
     }
+}
+
+async function completeProcessPlays(event: ContinuationDownloadResponse): Promise<void> {
+    const system = await loadSystem();
+    if (isHttpResponse(system)) {
+        console.log(JSON.stringify(system));
+        return;
+    }
+
+    console.log(JSON.stringify(event));
+}
+
+async function processPlaysSimple(system: System, event: ContinuationDownloadResponse, doc: any) {
+    console.log("processPlaysSimple");
+    console.log(JSON.stringify(doc));
 }
 
 async function sendToInputQueue(system: System, payload: DownloadRequest): Promise<any> {
