@@ -12,7 +12,6 @@ import {
     EnsureGamesMessage,
     PlaysForPeriodResultMessage,
     FileToProcess,
-    PlaysToProcess,
     ProcessMethod,
     QueueMessage,
     ToProcessElement, RequestStats
@@ -38,7 +37,7 @@ import {
     doProcessPublisherResult, doReprocessPlays, doRebuildMaterialisedViews, doMarkDesignerDoesNotExist,
     doMarkPublisherDoesNotExist
 } from "./mysql-rds.mjs";
-import {invokeLambdaAsync, listAdd, sendMessage, sendToQueue, sendToQueueWithDelay} from "./library.mjs";
+import {invokeLambdaAsync, listAdd, sendMessage, sendToQueueWithDelay} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
 
@@ -97,27 +96,13 @@ async function scheduleProcessing(system: System, element: ToProcessElement, ret
 
     if (element.processMethod === METHOD_PROCESS_USER || element.processMethod === METHOD_PROCESS_GAME ||
         element.processMethod === METHOD_PROCESS_DESIGNER || element.processMethod === METHOD_PROCESS_PUBLISHER ||
-        element.processMethod === METHOD_PROCESS_COLLECTION) {
+        element.processMethod === METHOD_PROCESS_COLLECTION || element.processMethod === METHOD_PROCESS_YEAR) {
         console.log(`${sch} ${element.processMethod} ${element.geek || element.bggid}`);
         return element;
     } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
         console.log(`* updating played years for ${element.geek} ${element.geekid}`);
         await updatePlayedYears(system, element.geek, element.geekid, element.id);
         return undefined;
-    } else if (element.processMethod === METHOD_PROCESS_YEAR) {
-        const fs = element.url.split("=");
-        const p2p = {
-            url: element.url,
-            processMethod: METHOD_PROCESS_YEAR,
-            geek: element.geek,
-            geekid: element.geekid,
-            startYmdInc: fs[0],
-            endYmdInc: fs[1]
-        } as PlaysToProcess;
-        // console.log(`${sch} processYear ${element.url}`);
-        // await sendToQueue(system.playsQueue, p2p);
-        console.log(`(beta) ${sch} ${element.processMethod} ${element.geek || element.bggid}`);
-        return element;
     }
 }
 
@@ -176,7 +161,6 @@ async function getRetries(system: System): Promise<ToProcessElement[]> {
     }
 }
 
-// return how many slowdowns we ate up
 async function noMessages(system: System, howManyToDo: number): Promise<void> {
     const retries = await getRetries(system);
     if (retries.length > 0) {
