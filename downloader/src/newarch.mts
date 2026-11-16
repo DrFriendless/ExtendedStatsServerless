@@ -1,5 +1,5 @@
 import {HttpResponse, isHttpResponse, loadSystem, System} from "./system.mjs";
-import {ToProcessElement} from "extstats-core";
+import {ToProcessElement, PlayDataResult, ProcessPlaysForPeriodResult} from "extstats-core";
 import {SendMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 import {
     ContinuationDownloadRequest,
@@ -15,7 +15,7 @@ import {
 } from "./extraction.mjs";
 import {
     dispatchDesignerData, dispatchEnsureGames, dispatchNoSuchDesigner,
-    dispatchNoSuchGame, dispatchNoSuchPublisher, dispatchProcessCollectionUpdateGames,
+    dispatchNoSuchGame, dispatchNoSuchPublisher, dispatchPlaysForPeriodResult, dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult,
     dispatchProcessUserResult, dispatchPublisherData
 } from "./dispatch.mjs";
@@ -228,8 +228,9 @@ export async function prehandle(events: ToProcessElement[]) {
                 geek: event.geek,
                 url: event.url,
                 startYmdInc: parts[0],
-                endYmdInc: parts[1]
-            }, "downloader_firstPageProcessYear", system.extrasToken, firstPageUrl);
+                endYmdInc: parts[1],
+                compress: true
+            }, "downloader_completeProcessPlays", system.extrasToken, firstPageUrl);
             console.log(JSON.stringify(req));
             await sendToInputQueue(system, req);
         } else {
@@ -239,83 +240,119 @@ export async function prehandle(events: ToProcessElement[]) {
     }
 }
 
-export async function firstPageProcessYear(event: ContinuationDownloadResponse): Promise<void> {
+function getMaxPagesFromXml(doc: any) {
+    let maxEntries = parseInt(doc.plays['@_total']);
+    return Math.floor((maxEntries + 99) / 100);
+}
+
+export async function completeProcessPlays(event: ContinuationDownloadResponse): Promise<void> {
     const system = await loadSystem();
     if (isHttpResponse(system)) {
         console.log(JSON.stringify(system));
         return;
     }
+    await system.loadBGGQueues();
+    console.log(JSON.stringify(event));
     event.received = new Date().getTime();
     const stats = copyRequestStats(event, { completed: new Date().getTime() });
 
-    const cx = await extractContinuationDataSingle(system, event);
-    console.log(JSON.stringify(cx));
-    if (cx) {
-        const parser = new XMLParser({
-            ignoreAttributes: false, trimValues: true,
-            isArray: (name, jpath, isLeafNode, isAttribute) => {
-                if (["play","subtype","player","comments"].indexOf(name) >= 0) return true;
-                if (["item","players","subtypes"].indexOf(name) >= 0) return false;
-                if (name.startsWith("@_") || name.startsWith("?")) return false;
-                console.log(name);
-                return false;
-            }
-        });
+    const continuationData = event.continuationData;
+    console.log(JSON.stringify(continuationData));
+    if (continuationData) {
+        const goodResultsAlready: DownloadResult[] = [ ...continuationData.results || [], ...(event.results || []).filter(dr => dr.type !== "failure") ];
+        const urlsAlready = goodResultsAlready.map(dr => dr.url);
+        const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${continuationData.geek}&type=thing&mindate=${continuationData.startYmdInc}&maxdate=${continuationData.endYmdInc}&subtype=boardgame&page=`;
 
-        const doc = parser.parse(cx.xml);
-        const urls: URLRequest[] = [];
-        if (!doc.plays) {
-            console.log(JSON.stringify(doc));
-            // TODO - failure
-        } else {
-            const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${cx.continuationData.geek}&type=thing&mindate=${cx.continuationData.startYmdInc}&maxdate=${cx.continuationData.endYmdInc}&subtype=boardgame&page=`;
-            let maxEntries = parseInt(doc.plays['@_total']);
-            let maxPages = Math.floor((maxEntries + 99)/100);
-            let pageNum = 1;
-            console.log(`maxEntries=${maxEntries} ${maxPages}`);
-            while (pageNum <= maxPages) {
-                const url = baseUrl + pageNum;
-                if (url === event.results[0].url) {
-                    console.log(`I already have ${url}`);
-                } else {
-                    console.log(`I need to download ${url}`);
-                    urls.push({ bggApiKey: system.playsToken, url });
-                }
-                pageNum++;
-            }
+        const urlsToRetrieve: URLRequest[] = [];
+        if (!continuationData.maxPages) {
+            // this is the first page
+            const parser = createXmlParserForPlays();
+            const xml = await extractXml(system, event);
+            const doc = parser.parse(xml);
+            continuationData.maxPages = getMaxPagesFromXml(doc);
         }
-        console.log(JSON.stringify(urls));
-        if (urls.length === 0) {
-            await processPlaysSimple(system, event, doc);
+        let pageNum = 1;
+        console.log(`maxPages=${continuationData.maxPages}`);
+        while (pageNum <= continuationData.maxPages) {
+            const url = baseUrl + pageNum;
+            if (urlsAlready.indexOf(url) >= 0) {
+                console.log(`I already have ${url}`);
+            } else {
+                console.log(`I need to download ${url}`);
+                urlsToRetrieve.push({ bggApiKey: system.playsToken, url });
+            }
+            pageNum++;
+        }
+        console.log(`URLs to retrieve: ${JSON.stringify(urlsToRetrieve)}`);
+        if (urlsToRetrieve.length === 0) {
+            await processPlays(system, event, goodResultsAlready);
         } else {
+            // go get the rest of the data
             const req: ContinuationDownloadRequest = {
                 type: "continuation",
-                functionName: "completeProcessPlays",
-                continuationData: cx.continuationData,
-                requests: urls,
+                functionName: "downloader_completeProcessPlays",
+                continuationData: { ...continuationData, results: goodResultsAlready },
+                requests: urlsToRetrieve,
                 requestId: event.requestId,
                 attempts: 0,
                 ...stats
             };
             await sendToInputQueue(system, req);
         }
-        // TODO
     }
 }
 
-async function completeProcessPlays(event: ContinuationDownloadResponse): Promise<void> {
-    const system = await loadSystem();
-    if (isHttpResponse(system)) {
-        console.log(JSON.stringify(system));
-        return;
-    }
-
-    console.log(JSON.stringify(event));
-}
-
-async function processPlaysSimple(system: System, event: ContinuationDownloadResponse, doc: any) {
+async function processPlays(system: System, event: ContinuationDownloadResponse, results: DownloadResult[]) {
     console.log("processPlaysSimple");
-    console.log(JSON.stringify(doc));
+    console.log(JSON.stringify(results));
+    const parser = createXmlParserForPlays();
+
+    const plays: PlayDataResult[] = [];
+
+    for (const dlr of results) {
+        const xml = await retrieveXml(system, dlr);
+        if (isHttpResponse(xml)) {
+            console.log(`Error: could not get XML from ${dlr} - ${JSON.stringify(xml)}`);
+            return;
+        }
+        const doc = parser.parse(xml);
+        let playCount = 0;
+        if (!doc.plays || !doc.plays.play) {
+            console.log(`broken on URL ${dlr.url}`);
+            console.log(xml);
+            break;
+        }
+        for (const play of doc.plays.play) {
+            const p: PlayDataResult = {
+                quantity: parseInt(play['@_quantity']),
+                location: play['@_location'],
+                date: play['@_date'],
+                gameid: parseInt(play.item['@_objectid']),
+                id: parseInt(play['@_id'])
+            }
+            if (p.quantity > 0) plays.push(p);
+            playCount++;
+        }
+        console.log(`URL ${dlr.url} contained ${playCount} plays`);
+    }
+
+    // console.log(JSON.stringify(plays));
+    const result: ProcessPlaysForPeriodResult = {
+        processMethod: "processYear",
+        plays: plays,
+        geek: event.continuationData.geek,
+        endYmdInc: event.continuationData.endYmdInc,
+        startYmdInc: event.continuationData.startYmdInc,
+        url: event.continuationData.url,
+        // TODO - use real stats
+        initiated: 0,
+        scheduled: 0,
+        received: 0,
+        downloaded: 0,
+        completed: 0
+    }
+    console.log(JSON.stringify(result));
+    await dispatchPlaysForPeriodResult(system, result);
 }
 
 async function sendToInputQueue(system: System, payload: DownloadRequest): Promise<any> {
@@ -326,6 +363,15 @@ async function sendToInputQueue(system: System, payload: DownloadRequest): Promi
         MessageGroupId: "pre_handle"
     });
     return await sqs.send(command);
+}
+
+async function extractXml(system: System, event: ContinuationDownloadResponse): Promise<string | undefined> {
+    const xml = await retrieveXml(system, event.results[0]);
+    if (isHttpResponse(xml)) {
+        console.log(JSON.stringify(xml));
+        return undefined;
+    }
+    return xml;
 }
 
 async function extractContinuationDataSingle(system: System, event: ContinuationDownloadResponse): Promise<{ continuationData: any, xml: string} | undefined> {
@@ -352,3 +398,15 @@ async function retrieveXml(system: System, dlr: DownloadResult): Promise<string 
     }
 }
 
+function createXmlParserForPlays() {
+    return new XMLParser({
+        ignoreAttributes: false, trimValues: true,
+        isArray: (name, jpath, isLeafNode, isAttribute) => {
+            if (["play", "subtype", "player", "comments"].indexOf(name) >= 0) return true;
+            if (["item", "players", "subtypes"].indexOf(name) >= 0) return false;
+            if (name.startsWith("@_") || name.startsWith("?")) return false;
+            console.log(name);
+            return false;
+        }
+    });
+}

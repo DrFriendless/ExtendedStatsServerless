@@ -114,15 +114,10 @@ async function scheduleProcessing(system: System, element: ToProcessElement, ret
             startYmdInc: fs[0],
             endYmdInc: fs[1]
         } as PlaysToProcess;
-        console.log(`${sch} processYear ${element.url}`);
-        await sendToQueue(system.playsQueue, p2p);
-        // testing
-        if (element.geek === "Friendless") {
-            console.log(`(test) ${sch} ${element.processMethod} ${element.geek || element.bggid}`);
-            return element;
-        } else {
-            return undefined;
-        }
+        // console.log(`${sch} processYear ${element.url}`);
+        // await sendToQueue(system.playsQueue, p2p);
+        console.log(`(beta) ${sch} ${element.processMethod} ${element.geek || element.bggid}`);
+        return element;
     }
 }
 
