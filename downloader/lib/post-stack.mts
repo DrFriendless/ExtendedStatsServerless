@@ -4,7 +4,15 @@ import {
     DescribeLogGroupsCommand,
     PutRetentionPolicyCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
-import {COMPONENT, DEPLOYMENT_BUCKET, REGION, PROFILE, LAMBDA_SPECS, CACHE_BUCKET} from "./metadata.mts";
+import {
+    COMPONENT,
+    DEPLOYMENT_BUCKET,
+    REGION,
+    PROFILE,
+    LAMBDA_SPECS,
+    CACHE_BUCKET,
+    INSIDE_LAMBDA_SPECS
+} from "./metadata.mts";
 import {CloudFormationClient, ListExportsCommand} from "@aws-sdk/client-cloudformation";
 import {PutParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 
@@ -27,6 +35,9 @@ async function updateCode(client: LambdaClient, funcName: string, durable: boole
 console.log("Telling Lambdas they have new code");
 const lClient = new LambdaClient(CREDENTIALS);
 for (const spec of LAMBDA_SPECS) {
+    await updateCode(lClient, spec.name, !!spec.durableConfig);
+}
+for (const spec of INSIDE_LAMBDA_SPECS) {
     await updateCode(lClient, spec.name, !!spec.durableConfig);
 }
 

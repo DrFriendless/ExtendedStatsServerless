@@ -3,26 +3,29 @@ import {Duration, Tags} from 'aws-cdk-lib';
 import {Construct} from 'constructs';
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import {BlockPublicAccess} from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as sns from "aws-cdk-lib/aws-sns";
-import {SubscriptionProtocol} from "aws-cdk-lib/aws-sns";
 import * as sources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as events from "aws-cdk-lib/aws-events";
-import {Rule} from "aws-cdk-lib/aws-events";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as targets from "aws-cdk-lib/aws-events-targets";
-import {CACHE_BUCKET, COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS} from "./metadata.mts";
+import {CACHE_BUCKET, COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS, INSIDE_LAMBDA_SPECS} from "./metadata.mts";
 
 const RUNTIME = lambda.Runtime.NODEJS_24_X;
 
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
+let DATABASE_VPC: ec2.IVpc = undefined;
+let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
+let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
+let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
+let RDS_SECURITY_GROUP: ec2.ISecurityGroup = undefined;
 
 export class DownloadStack extends cdk.Stack {
   defineCacheBucket(name: string): s3.Bucket {
     return new s3.Bucket(this, "cacheBucket", {
       bucketName: name,
-      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
     });
   }
 
@@ -46,6 +49,42 @@ export class DownloadStack extends cdk.Stack {
     return f;
   }
 
+  defineInsideLambda(name: string, handler: string, role: iam.IRole, duration: number, mem: number = 128,
+                     maxConcurrency: number | undefined, durableConfig: { executionTimeout: Duration } | undefined,
+                     insideLambdaSg: ec2.ISecurityGroup): lambda.Function {
+    const code = lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip");
+    const dc = durableConfig ? { durableConfig } : {};
+    const vpcOpts: Partial<lambda.FunctionProps> = {
+      vpc: DATABASE_VPC,
+      vpcSubnets: {
+        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
+      },
+      securityGroups: [ insideLambdaSg ],
+      allowPublicSubnet: true
+    };
+    let opts: lambda.FunctionProps = {
+      functionName: name,
+      runtime: RUNTIME,
+      handler,
+      role: role,
+      code: code,
+      timeout: Duration.seconds(duration),
+      reservedConcurrentExecutions: maxConcurrency,
+      memorySize: mem,
+      ...dc,
+      ...vpcOpts,
+      environment: {
+        MYSQL_HOST: process.env.MYSQL_HOST,
+        MYSQL_USERNAME: process.env.MYSQL_USERNAME,
+        MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
+        MYSQL_DATABASE: process.env.MYSQL_DATABASE
+      }
+    }
+    const f = new lambda.Function(this, name, opts);
+    Tags.of(f).add("component", COMPONENT);
+    return f;
+  }
+
   defineSnsTopic(name: string, email: string) {
     const topic = new sns.Topic(this, "downloader_topic", {
       topicName: name,
@@ -53,7 +92,7 @@ export class DownloadStack extends cdk.Stack {
     });
     const sub = new sns.Subscription(this, "downloader_topic_sub", {
       topic: topic,
-      protocol: SubscriptionProtocol.EMAIL,
+      protocol: sns.SubscriptionProtocol.EMAIL,
       endpoint: email
     });
     Tags.of(sub).add("component", COMPONENT);
@@ -139,6 +178,11 @@ export class DownloadStack extends cdk.Stack {
   lookupExternalResources() {
     // resources external to this stack
     ZIP_BUCKET = s3.Bucket.fromBucketName(this, "bucket", DEPLOYMENT_BUCKET);
+    DATABASE_VPC = ec2.Vpc.fromLookup(this, "vpc", {vpcId: process.env.VPC_ID});
+    PRIVATE_SUBNET_A = ec2.Subnet.fromSubnetId(this, "private a", process.env.PRIVATE_A || "bug1");
+    PRIVATE_SUBNET_B = ec2.Subnet.fromSubnetId(this, "private b", process.env.PRIVATE_B || "bug2");
+    PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", process.env.PRIVATE_C || "bug3");
+    RDS_SECURITY_GROUP = ec2.SecurityGroup.fromSecurityGroupId(this, "rds security group", process.env.RDS_SECURITY_GROUP);
   }
 
   defineOutputQueue(): sqs.IQueue {
@@ -182,7 +226,7 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-  defineRuleToUpdateMetadata(func: lambda.IFunction): Rule {
+  defineRuleToUpdateMetadata(func: lambda.IFunction): events.Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("lambda:InvokeFunction");
     st1.addResources(func.functionArn);
@@ -203,7 +247,7 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-  defineRuleToUpdateUserList(func: lambda.IFunction): Rule {
+  defineRuleToUpdateUserList(func: lambda.IFunction): events.Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("lambda:InvokeFunction");
     st1.addResources(func.functionArn);
@@ -252,6 +296,14 @@ export class DownloadStack extends cdk.Stack {
       } else if (spec.name.endsWith("_prehandle")) {
         preLambda = f;
       }
+    }
+    const insideLambdaSg: ec2.ISecurityGroup = new ec2.SecurityGroup(this, "InsideLambdaSg", {
+      vpc: DATABASE_VPC,
+      description: "Inside Lambdas: MySQL only",
+      allowAllOutbound: true,
+    });
+    for (const spec of INSIDE_LAMBDA_SPECS) {
+      const f = this.defineInsideLambda(spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency, spec.durableConfig, insideLambdaSg);
     }
     if (playsLambda) {
       const mapping = new sources.SqsEventSource(playsQueue, {batchSize: 1, enabled: false });

@@ -32,3 +32,7 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_completeProcessPlays`, handler: "newarch.completeProcessPlays", duration: 100, mem: 256, maxConcurrency: undefined },
 ];
 
+// Lambdas which run in the VPC.
+export const INSIDE_LAMBDA_SPECS: LambdaSpec[] = [
+    { name: `${COMPONENT}_insideProcessPlayedYears`, handler: "newinside.handleUpdatePlayedYears", duration: 10, mem: 128, maxConcurrency: undefined },
+];

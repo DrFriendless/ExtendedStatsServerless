@@ -1,0 +1,56 @@
+import {HttpResponse, isHttpResponse} from "./system.mjs";
+import * as mysql from 'promise-mysql';
+
+export async function loadInsideSystem() {
+    const s = new InsideSystem();
+    if (isHttpResponse(s)) return s;
+    const l1 = await s.loadDatabaseSecrets();
+    return l1 || s;
+}
+
+/**
+ * The equivalent of the System class for Lambdas inside the VPC.
+ * These Lambdas are different in that they will have access to the database, but not to Secrets Manager etc, so
+ * rather than shoehorn them into the same class they can have their own.
+ */
+export class InsideSystem {
+    private mysqlHost: string | undefined;
+    private mysqlUsername: string | undefined;
+    private mysqlPassword: string | undefined;
+    private mysqlDatabase: string | undefined;
+
+    async loadDatabaseSecrets(): Promise<HttpResponse | void> {
+        this.mysqlHost = process.env.MYSQL_HOST;
+        this.mysqlUsername = process.env.MYSQL_USERNAME;
+        this.mysqlPassword = process.env.MYSQL_PASSWORD;
+        this.mysqlDatabase = process.env.MYSQL_DATABASE;
+    }
+
+    async getConnection(): Promise<mysql.Connection> {
+        const params = {
+            host: this.mysqlHost,
+            user: this.mysqlUsername,
+            password: this.mysqlPassword,
+            database: this.mysqlDatabase
+        };
+        return mysql.createConnection(params);
+    }
+
+    async asyncReturnWithConnection<T>(func: (conn: mysql.Connection) => PromiseLike<T>): Promise<T> {
+        const connection = await this.getConnection();
+        try {
+            return await func(connection);
+        } finally {
+            if (connection) connection.destroy();
+        }
+    }
+
+    async asyncWithConnection(func: (conn: mysql.Connection) => PromiseLike<void>): Promise<void> {
+        const connection = await this.getConnection();
+        try {
+            await func(connection);
+        } finally {
+            if (connection) connection.destroy();
+        }
+    }
+}
