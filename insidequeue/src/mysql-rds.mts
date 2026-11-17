@@ -639,7 +639,7 @@ async function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: strin
         undefined, undefined, geekid);
 }
 
-export async function doListToProcess(conn: mysql.Connection, count: number, processMethods: string[], updateLastScheduled: boolean): Promise<ToProcessElement[]> {
+export async function doListToProcess(conn: mysql.Connection, count: number, processMethods: string[]): Promise<ToProcessElement[]> {
     let query: ToProcessElement[];
     if (processMethods.length > 0) {
         query = await doListToProcessByMethod(conn, count, processMethods);
@@ -664,10 +664,6 @@ export async function doListToProcess(conn: mysql.Connection, count: number, pro
         query = query.slice(0, good);
         console.log(`Only processing ${query.length} files right now`);
     }
-    if (updateLastScheduled) {
-        const urls = query.map(element => element.url);
-        await doUpdateLastScheduledForUrls(conn, urls);
-    }
     return query;
 }
 
@@ -681,7 +677,7 @@ async function doListToProcessByMethod(conn: mysql.Connection, count: number, pr
     return (await conn.query(sql, [processMethods, count])).map((row: ToProcessElement) => row);
 }
 
-async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string[]) {
+export async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string[]) {
     const sqlOne = "update files set last_scheduled = now() where url = ?";
     const sqlMany = "update files set last_scheduled = now() where url in (?)";
     if (urls.length === 0) {

@@ -35,7 +35,7 @@ import {
     doMarkPlaysUrlProcessed,
     doProcessDesignerResult,
     doProcessPublisherResult, doReprocessPlays, doRebuildMaterialisedViews, doMarkDesignerDoesNotExist,
-    doMarkPublisherDoesNotExist
+    doMarkPublisherDoesNotExist, doUpdateLastScheduledForUrls
 } from "./mysql-rds.mjs";
 import {invokeLambdaAsync, listAdd, sendMessage, sendToQueueWithDelay} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
@@ -91,7 +91,13 @@ async function main() {
     await flushLogging();
 }
 
-async function scheduleProcessing(system: System, element: ToProcessElement, retry: boolean): Promise<ToProcessElement | undefined> {
+interface PlayedYearsEvent {
+    geek: string;
+    geekid: number;
+    fileId: number;
+}
+
+async function scheduleProcessing(element: ToProcessElement, retry: boolean): Promise<ToProcessElement | undefined> {
     const sch = retry ? "rescheduling" : "scheduling";
 
     if (element.processMethod === METHOD_PROCESS_USER || element.processMethod === METHOD_PROCESS_GAME ||
@@ -101,45 +107,11 @@ async function scheduleProcessing(system: System, element: ToProcessElement, ret
         return element;
     } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
         console.log(`* updating played years for ${element.geek} ${element.geekid}`);
-        await updatePlayedYears(system, element.geek, element.geekid, element.id);
+        // await updatePlayedYears(system, element.geek, element.geekid, element.id);
+        const event: PlayedYearsEvent = { geek: element.geek, geekid: element.geekid, fileId: element.id };
+        await invokeLambdaAsync("downloader_insideProcessPlayedYears", event);
         return undefined;
     }
-}
-
-async function updatePlayedYears(system: System, geek: string, geekid: number, fileId: number) {
-    const sql = "delete from files where processMethod = 'processPlays' and geek = ?";
-    await system.withConnectionAsync(conn => conn.query(sql, [ geek ]));
-    const thisYear = (new Date()).getFullYear();
-
-    const periods = [
-        { start: "0000-0-0", end: "1979-12-31" },
-        { start: "1980-0-0", end: "1989-12-31" },
-        { start: "1990-0-0", end: "1999-12-31" },
-    ];
-    let y = 2000;
-    while (y <= thisYear) {
-        periods.push({ start: `${y}-0-0`, end: `${y}-12-31` });
-        y++;
-    }
-    const index = (await system.returnWithConnection(async conn => {
-        return [...await conn.query("select trim(url) u from files where processMethod = 'processYear' and geek = ?", [geek])] as { u: string }[];
-    })).map(row => row.u);
-    for (const p of periods) {
-        const range = `${p.start}=${p.end}=${geek}`;
-        if (index.indexOf(range) >= 0) continue;
-        const year = parseInt(p.start.substring(0, 4));
-        const insertSql = "insert into files (url, processMethod, geek, geekid, lastupdate, tillNextUpdate, description, bggid, year) values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        const insertParams = [range, "processYear", geek, geekid, null, null, `Plays from ${p.start} until ${p.end}`, 0, year];
-        await system.withConnectionAsync(async conn => await conn.query(insertSql, insertParams));
-    }
-    const nextUpdate = new Date();
-    nextUpdate.setFullYear(thisYear + 1);
-    nextUpdate.setMonth(0);
-    nextUpdate.setDate(2);
-    const updateSql = "update files set nextUpdate = ?, lastUpdate = ? where id = ?";
-    const updateParams = [ nextUpdate, new Date(), fileId ];
-    await system.withConnectionAsync(async conn => await conn.query(updateSql, updateParams));
-    await sendMessage(system, [geek], ["updates"], { message: "Updated your years played."});
 }
 
 async function getRetries(system: System): Promise<ToProcessElement[]> {
@@ -166,22 +138,30 @@ async function noMessages(system: System, howManyToDo: number): Promise<void> {
     if (retries.length > 0) {
         for (const element of retries) {
             console.log(`Processing retry ${element.url}`);
-            await scheduleProcessing(system, element, true);
+            await scheduleProcessing(element, true);
         }
     }
     const geeksThatDontExist = await system.returnWithConnection(getGeeksThatDontExist);
     const todo: ToProcessElement[] =
         await system.returnWithConnection(conn =>
-            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed", "processYear", "processDesigner", "processPublisher"], true));
+            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed", "processYear", "processDesigner", "processPublisher"]));
     const batch: ToProcessElement[] = [];
+    const throttle: ProcessMethod[] = [];
     for (const element of todo) {
         if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
             // this shouldn't happen.
             log(`Geek ${element.geek} doesn't even exist.`);
             await system.withConnectionAsync(conn => doMarkUrlProcessed(conn, element.processMethod as ProcessMethod, element.url));
+        } else if (throttle.indexOf(element.processMethod as ProcessMethod) < 0) {
+            const e = await scheduleProcessing(element, false);
+            if (e) {
+                batch.push(e);
+            } else {
+                throttle.push(element.processMethod as ProcessMethod);
+                await system.withConnectionAsync(async conn => await doUpdateLastScheduledForUrls(conn, [element.url]));
+            }
         } else {
-            const e = await scheduleProcessing(system, element, false);
-            if (e) batch.push(e);
+            console.log(`Throttled ${element.processMethod} ${element.url}`);
         }
     }
     if (batch.length === 0) {
@@ -190,6 +170,7 @@ async function noMessages(system: System, howManyToDo: number): Promise<void> {
         if (batch.length < howManyToDo) {
             console.log(`Only found ${batch.length} files to send to prehandle.`);
         }
+        await system.withConnectionAsync(async conn => await doUpdateLastScheduledForUrls(conn, batch.map(element => element.url)));
         await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PREHANDLE, batch);
     }
 }
