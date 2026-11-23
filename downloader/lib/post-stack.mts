@@ -110,10 +110,19 @@ for (const e of response.Exports) {
         });
         const r3 = await lClient.send(lCmd);
         console.log(r3.$metadata.httpStatusCode);
-    } else if (e.Name === "downloader-BGGDownloaderMappingUUID") {
-        // turn on the BGG downloader lambda processing from its queue
-        // console.log("Remenber to turn on BGG downloader queue");
-        console.log("Turning on BGG downloader queue");
+    // } else if (e.Name === "downloader-BGGDownloaderMappingUUID") {
+    //     // turn on the BGG downloader lambda processing from its queue
+    //     // console.log("Remenber to turn on BGG downloader queue");
+    //     console.log("Turning on BGG downloader queue");
+    //     const lCmd = new UpdateEventSourceMappingCommand({
+    //         Enabled: true,
+    //         UUID: e.Value
+    //     });
+    //     const r3 = await lClient.send(lCmd);
+    //     console.log(r3.$metadata.httpStatusCode);
+    } else if (e.Name === "downloader-WriteMappingUUID") {
+        // turn on the write lambda processing from its queue
+        console.log("Turning on write queue");
         const lCmd = new UpdateEventSourceMappingCommand({
             Enabled: true,
             UUID: e.Value

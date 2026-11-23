@@ -12,6 +12,7 @@ import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as scheduler from "aws-cdk-lib/aws-scheduler";
 import * as targets from "aws-cdk-lib/aws-scheduler-targets";
 import * as sources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as logs from "aws-cdk-lib/aws-logs";
 import {COMPONENT, DEPLOYMENT_BUCKET} from "./metadata.mts";
 
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
@@ -21,7 +22,7 @@ let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
 let CONFIRM_LAMBDA: lambda.IFunction = undefined;
 let ACCESS_DYNAMO: iam.PolicyDocument = undefined;
-let DOWNLOADER_QUEUE: string | undefined;
+let DOWNLOADER_QUEUE_FIFO: string | undefined;
 
 export const RUNTIME = lambda.Runtime.NODEJS_24_X;
 // bgg - access BoardGameGeek, needs to be public
@@ -73,7 +74,18 @@ export class MiscStack extends cdk.Stack {
   }
 
   defineAuthStateMachine(threadFunc: lambda.Function): sfn.StateMachine {
+    const authLogs = new logs.LogGroup(this, "AuthStateMachineLogs", {
+      retention: logs.RetentionDays.ONE_WEEK,
+    });
     return new sfn.StateMachine(this, 'authStateMachine', {
+      stateMachineName: "authStateMachineExpress",
+      stateMachineType: sfn.StateMachineType.EXPRESS,
+      timeout: Duration.minutes(5),
+      logs: {
+        destination: authLogs,
+        level: sfn.LogLevel.ERROR,
+        includeExecutionData: true,
+      },
       definitionBody: sfn.DefinitionBody.fromChainable(
           new tasks.LambdaInvoke(this, "threadTask", {
             lambdaFunction: threadFunc,
@@ -89,7 +101,18 @@ export class MiscStack extends cdk.Stack {
   }
 
   defineCountsStateMachine(cwFunction: lambda.Function, countFunction: lambda.Function) {
+    const countsLogs = new logs.LogGroup(this, "CountsStateMachineLogs", {
+      retention: logs.RetentionDays.ONE_WEEK,
+    });
     return new sfn.StateMachine(this, 'countsStateMachine', {
+      stateMachineName: "countsStateMachineExpress",
+      stateMachineType: sfn.StateMachineType.EXPRESS,
+      timeout: Duration.minutes(5),
+      logs: {
+        destination: countsLogs,
+        level: sfn.LogLevel.ERROR,
+        includeExecutionData: true,
+      },
       definitionBody: sfn.DefinitionBody.fromChainable(
           new tasks.LambdaInvoke(this, "cwCountTask", {
             lambdaFunction: cwFunction,
@@ -215,7 +238,7 @@ export class MiscStack extends cdk.Stack {
     if (opts.indexOf("downloader") >= 0) {
       const access = new iam.PolicyStatement();
       access.addActions("sqs:SendMessage");
-      access.addResources(DOWNLOADER_QUEUE);
+      access.addResources(DOWNLOADER_QUEUE_FIFO);
       policies[`policy_${name}_dlq`] = new iam.PolicyDocument({
         statements: [access]
       });
@@ -296,7 +319,7 @@ export class MiscStack extends cdk.Stack {
     PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", "subnet-44646e1d");
     ZIP_BUCKET = s3.Bucket.fromBucketName(this, "bucket", DEPLOYMENT_BUCKET);
     CONFIRM_LAMBDA = lambda.Function.fromFunctionName(this, "confirmFunc", "auth_confirm");
-    DOWNLOADER_QUEUE = cdk.Fn.importValue('downloader-OutputQueueARN');
+    DOWNLOADER_QUEUE_FIFO = cdk.Fn.importValue('downloader-OutputFifoQueueARN');
   }
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -322,6 +345,10 @@ export class MiscStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'MessageQueue', {
       value: messageQueue.queueUrl,
       exportName: 'misc-MessageQueueURL'
+    });
+    new cdk.CfnOutput(this, 'MessageQueueARN', {
+      value: messageQueue.queueArn,
+      exportName: 'misc-MessageQueueARN'
     });
 
     let messageLambda: lambda.IFunction = this.defineLambda("misc_message", "message.handler", ["dynamo","single","sqs","ssm","message"], "public", 7);

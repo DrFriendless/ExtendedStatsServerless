@@ -1,11 +1,14 @@
 import {HttpResponse, isHttpResponse} from "./system.mjs";
+import * as sqs from "@aws-sdk/client-sqs";
 import * as mysql from 'promise-mysql';
+import {WebsockMessage} from "./interfaces.mjs";
 
 export async function loadInsideSystem() {
     const s = new InsideSystem();
     if (isHttpResponse(s)) return s;
     const l1 = await s.loadDatabaseSecrets();
-    return l1 || s;
+    if (l1) return l1;
+    return await s.loadQueues();
 }
 
 /**
@@ -18,12 +21,34 @@ export class InsideSystem {
     private mysqlUsername: string | undefined;
     private mysqlPassword: string | undefined;
     private mysqlDatabase: string | undefined;
+    public retryQueue: string | undefined;
+    private messageQueue: string | undefined;
+    private readonly sqsClient =
+        new sqs.SQSClient({ region: process.env.REGION, useDualstackEndpoint: true });
 
     async loadDatabaseSecrets(): Promise<HttpResponse | void> {
         this.mysqlHost = process.env.MYSQL_HOST;
         this.mysqlUsername = process.env.MYSQL_USERNAME;
         this.mysqlPassword = process.env.MYSQL_PASSWORD;
         this.mysqlDatabase = process.env.MYSQL_DATABASE;
+    }
+
+    async loadQueues(): Promise<InsideSystem | HttpResponse> {
+        const response = await this.sqsClient.send(new sqs.ListQueuesCommand({ QueueNamePrefix: "", MaxResults: 20 }));
+        for (const url of response.QueueUrls) {
+            if (url.endsWith("RetryQueue")) {
+                this.retryQueue = url;
+            } else if (url.endsWith("MessageQueue")) {
+                this.messageQueue = url;
+            }
+        }
+        if (!this.retryQueue) {
+            console.log("Error: retry queue not found in InsideSystem");
+        }
+        if (!this.messageQueue) {
+            console.log("Error: message queue not found in InsideSystem");
+        }
+        return this;
     }
 
     async getConnection(): Promise<mysql.Connection> {
@@ -51,6 +76,32 @@ export class InsideSystem {
             await func(connection);
         } finally {
             if (connection) connection.destroy();
+        }
+    }
+
+    async sendMessage(geeks: string[], topics: string[], body: any): Promise<void> {
+        const payload: WebsockMessage = { body, topics, users: geeks };
+        const command = new sqs.SendMessageCommand({
+            QueueUrl: this.messageQueue,
+            MessageBody: JSON.stringify(payload)
+        });
+        try {
+            const resp = await this.sqsClient.send(command);
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    async sendToQueueWithDelay(queueUrl: string, payload: any, delay: number): Promise<void> {
+        const command = new sqs.SendMessageCommand({
+            QueueUrl: queueUrl,
+            DelaySeconds: delay,
+            MessageBody: JSON.stringify(payload)
+        });
+        try {
+            const resp = await this.sqsClient.send(command);
+        } catch (error) {
+            console.log(error);
         }
     }
 }

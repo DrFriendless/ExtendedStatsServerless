@@ -9,7 +9,12 @@ import * as sns from "aws-cdk-lib/aws-sns";
 import * as sources from "aws-cdk-lib/aws-lambda-event-sources";
 import * as events from "aws-cdk-lib/aws-events";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as targets from "aws-cdk-lib/aws-events-targets";
+import * as etargets from "aws-cdk-lib/aws-events-targets";
+import * as targets from "aws-cdk-lib/aws-scheduler-targets";
+import * as sfn from "aws-cdk-lib/aws-stepfunctions";
+import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
+import * as logs from "aws-cdk-lib/aws-logs";
+import * as scheduler from "aws-cdk-lib/aws-scheduler";
 import {CACHE_BUCKET, COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS, INSIDE_LAMBDA_SPECS} from "./metadata.mts";
 
 const RUNTIME = lambda.Runtime.NODEJS_24_X;
@@ -19,7 +24,7 @@ let DATABASE_VPC: ec2.IVpc = undefined;
 let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
-let RDS_SECURITY_GROUP: ec2.ISecurityGroup = undefined;
+let MESSAGE_QUEUE: sqs.IQueue = undefined;
 
 export class DownloadStack extends cdk.Stack {
   defineCacheBucket(name: string): s3.Bucket {
@@ -78,7 +83,8 @@ export class DownloadStack extends cdk.Stack {
         MYSQL_USERNAME: process.env.MYSQL_USERNAME,
         MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
         MYSQL_DATABASE: process.env.MYSQL_DATABASE
-      }
+      },
+      ipv6AllowedForDualStack: true
     }
     const f = new lambda.Function(this, name, opts);
     Tags.of(f).add("component", COMPONENT);
@@ -100,7 +106,40 @@ export class DownloadStack extends cdk.Stack {
     return topic;
   }
 
-  defineDownloaderRole(outputQueue: sqs.IQueue, inputQueue: sqs.IQueue, dlq: sqs.IQueue,
+  defineInsideRole(messageQueue: sqs.IQueue, retryQueue: sqs.IQueue, outputQueue: sqs.IQueue): iam.IRole {
+    const policies: Record<string, iam.PolicyDocument> = {};
+
+    const rdsConnect = new iam.PolicyStatement({
+      actions: ["rds-db:connect"],
+      resources: [
+        `arn:aws:rds-db:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:dbuser:${process.env.DBI_RESOURCE_ID}/extstats_iam`,
+      ],
+    });
+    policies[`policy_rds_db`] = new iam.PolicyDocument({ statements: [rdsConnect] });
+
+    const sendToBGGQueue = new iam.PolicyStatement();
+    sendToBGGQueue.addActions("sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes");
+    sendToBGGQueue.addResources(messageQueue.queueArn, retryQueue.queueArn, outputQueue.queueArn);
+    const sqsList = new iam.PolicyStatement();
+    sqsList.addActions("sqs:ListQueues");
+    sqsList.addResources("*");
+    policies[`policy_inside_queue`] = new iam.PolicyDocument({
+      statements: [sendToBGGQueue, sqsList]
+    });
+
+    const managedPolicies: iam.IManagedPolicy[] = [
+      iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s_inside", "CreateEC2sForLambda"),
+      iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs_inside", "WriteToCloudwatchLogs"),
+    ];
+
+    return new iam.Role(this, `role_inside`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      inlinePolicies: policies,
+      managedPolicies: managedPolicies,
+    });
+  }
+
+  defineDownloaderRole(outputFifoQueue: sqs.IQueue, inputQueue: sqs.IQueue, dlq: sqs.IQueue,
                        cacheBucket: s3.Bucket, topic: sns.Topic): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
@@ -134,7 +173,7 @@ export class DownloadStack extends cdk.Stack {
 
     const sendToBGGQueue = new iam.PolicyStatement();
     sendToBGGQueue.addActions("sqs:SendMessage");
-    sendToBGGQueue.addResources(inputQueue.queueArn, outputQueue.queueArn, dlq.queueArn);
+    sendToBGGQueue.addResources(inputQueue.queueArn, outputFifoQueue.queueArn, dlq.queueArn);
     policies[`policy_bgg_queue`] = new iam.PolicyDocument({
       statements: [sendToBGGQueue]
     });
@@ -151,6 +190,12 @@ export class DownloadStack extends cdk.Stack {
     durableLambda.addResources("*");
     policies[`policy_downloader_durable`] = new iam.PolicyDocument({
       statements: [durableLambda]
+    });
+    const invoke = new iam.PolicyStatement();
+    invoke.addActions("lambda:InvokeFunction");
+    invoke.addResources(`arn:aws:lambda:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:function:downloader_*`);
+    policies[`policy_invoke`] = new iam.PolicyDocument({
+      statements: [invoke]
     });
 
     const useCacheBucket1 = new iam.PolicyStatement();
@@ -182,12 +227,24 @@ export class DownloadStack extends cdk.Stack {
     PRIVATE_SUBNET_A = ec2.Subnet.fromSubnetId(this, "private a", process.env.PRIVATE_A || "bug1");
     PRIVATE_SUBNET_B = ec2.Subnet.fromSubnetId(this, "private b", process.env.PRIVATE_B || "bug2");
     PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", process.env.PRIVATE_C || "bug3");
-    RDS_SECURITY_GROUP = ec2.SecurityGroup.fromSecurityGroupId(this, "rds security group", process.env.RDS_SECURITY_GROUP);
+    MESSAGE_QUEUE = sqs.Queue.fromQueueArn(this, "messageQueueDL", cdk.Fn.importValue("misc-MessageQueueARN"));
   }
 
   defineOutputQueue(): sqs.IQueue {
     return new sqs.Queue(this, "outputQueue", {
       queueName: "downloaderOutputQueue",
+    });
+  }
+
+  defineOutputQueueFifo(): sqs.IQueue {
+    return new sqs.Queue(this, "outputQueueFifo", {
+      queueName: "downloaderOutputQueue.fifo",
+      visibilityTimeout: Duration.seconds(1800),
+      redriveAllowPolicy: {
+        redrivePermission: sqs.RedrivePermission.ALLOW_ALL,
+      },
+      fifo: true,
+      contentBasedDeduplication: true
     });
   }
 
@@ -226,6 +283,22 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
+  defineRuleToStartTasksPipeline(machine: sfn.IStateMachine): void {
+    const schedulerRole = new iam.Role(this, "StartTasksSchedulerRole", {
+      assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com"),
+    });
+    schedulerRole.addToPolicy(new iam.PolicyStatement({
+      actions: ["states:StartExecution"],
+      resources: [machine.stateMachineArn],
+    }));
+
+    new scheduler.Schedule(this, "StartTasksSchedule", {
+      schedule: events.Schedule.cron({ minute: '*' }),
+      target: new targets.StepFunctionsStartExecution(machine, { role: schedulerRole }),
+      description: "Start downloader tasks every minute"
+    });
+  }
+
   defineRuleToUpdateMetadata(func: lambda.IFunction): events.Rule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("lambda:InvokeFunction");
@@ -242,7 +315,7 @@ export class DownloadStack extends cdk.Stack {
 
     return new events.Rule(this, `updateMetadataRule`, {
       schedule: events.Schedule.cron({ hour: '19', minute: '0' }),
-      targets: [ new targets.LambdaFunction(func) ],
+      targets: [ new etargets.LambdaFunction(func) ],
       role: ruleRole
     });
   }
@@ -263,7 +336,7 @@ export class DownloadStack extends cdk.Stack {
 
     return new events.Rule(this, `updateUserListRule`, {
       schedule: events.Schedule.cron({ hour: '7', minute: '0' }),
-      targets: [ new targets.LambdaFunction(func) ],
+      targets: [ new etargets.LambdaFunction(func) ],
       role: ruleRole
     });
   }
@@ -272,24 +345,47 @@ export class DownloadStack extends cdk.Stack {
     super(scope, id, props);
     this.lookupExternalResources();
 
+    // Create the egress-only internet gateway.
+    const eigw = new ec2.CfnEgressOnlyInternetGateway(this, 'EgressOnlyIgw', {
+      vpcId: DATABASE_VPC.vpcId,
+    });
+
+    // Dedicated route table for the Lambda subnets.
+    // No 0.0.0.0/0 route: Lambda ENIs have no public IPv4 address, so the IGW route cannot carry their traffic.
+    const routeTable = new ec2.CfnRouteTable(this, 'LambdaRouteTable', {
+      vpcId: DATABASE_VPC.vpcId,
+      tags: [{ key: 'Name', value: 'lambda-private-rt' }],
+    });
+    new ec2.CfnRoute(this, 'Ipv6EgressRoute', {
+      routeTableId: routeTable.ref,
+      destinationIpv6CidrBlock: '::/0',
+      egressOnlyInternetGatewayId: eigw.ref,
+    });
+
+    for (const s of [{...PRIVATE_SUBNET_A, name: "A"}, {...PRIVATE_SUBNET_B, name: "B"}, {...PRIVATE_SUBNET_C, name: "C"}]) {
+      new ec2.CfnSubnetRouteTableAssociation(this, `RtAssoc-${s.name}`, {
+        subnetId: s.subnetId,
+        routeTableId: routeTable.ref,
+      });
+    }
+
+
     const cacheBucket = this.defineCacheBucket(CACHE_BUCKET);
     const outputQueue = this.defineOutputQueue();
+    const outputQueueFifo = this.defineOutputQueueFifo();
     const playsQueue = this.definePlaysQueue();
     const retryQueue = this.defineRetryQueue();
     const dlq = this.defineDeadLetterQueue();
     const inputQueue = this.defineInputQueue2({ maxReceiveCount: 3, queue: dlq });
 
     const snsTopic = this.defineSnsTopic(process.env.SNS_TOPIC, process.env.SNS_EMAIL);
-    const role = this.defineDownloaderRole(outputQueue, inputQueue, dlq, cacheBucket, snsTopic);
-    let playsLambda: lambda.IFunction = undefined;
+    const role = this.defineDownloaderRole(outputQueueFifo, inputQueue, dlq, cacheBucket, snsTopic);
     let userListLambda: lambda.IFunction = undefined;
     let metadataLambda: lambda.IFunction = undefined;
     let preLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
       const f = this.defineLambda(spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency, spec.durableConfig);
-      if (spec.name.endsWith("_processPlayed")) {
-        playsLambda = f;
-      } else if (spec.name.endsWith("_processUserList")) {
+      if (spec.name.endsWith("_processUserList")) {
         userListLambda = f;
       } else if (spec.name.endsWith("_processMetadata")) {
         metadataLambda = f;
@@ -302,18 +398,26 @@ export class DownloadStack extends cdk.Stack {
       description: "Inside Lambdas: MySQL only",
       allowAllOutbound: true,
     });
+    const insideRole = this.defineInsideRole(MESSAGE_QUEUE, retryQueue, outputQueueFifo);
+    let startTasksLambda: lambda.IFunction = undefined;
+    let writeLambda: lambda.IFunction = undefined;
     for (const spec of INSIDE_LAMBDA_SPECS) {
-      const f = this.defineInsideLambda(spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency, spec.durableConfig, insideLambdaSg);
+      const f = this.defineInsideLambda(spec.name, spec.handler, insideRole, spec.duration, spec.mem, spec.maxConcurrency, spec.durableConfig, insideLambdaSg);
+      if (spec.name.endsWith("StartTasks")) {
+        startTasksLambda = f;
+      } else if (spec.name.endsWith("WriteResults")) {
+        writeLambda = f;
+      }
     }
-    if (playsLambda) {
-      const mapping = new sources.SqsEventSource(playsQueue, {batchSize: 1, enabled: false });
-      playsLambda.addEventSource(mapping);
-      new cdk.CfnOutput(this, 'downloaderPlaysMapping', {
+    if (writeLambda) {
+      const mapping = new sources.SqsEventSource(outputQueueFifo, {batchSize: 10, enabled: false });
+      writeLambda.addEventSource(mapping);
+      new cdk.CfnOutput(this, 'downloaderWriteMapping', {
         value: mapping.eventSourceMappingId,
-        exportName: 'downloader-PlaysMappingUUID'
+        exportName: 'downloader-WriteMappingUUID'
       });
     } else {
-      console.log("There isn't any plays lambda");
+      console.log("There isn't any write lambda");
     }
     if (userListLambda) {
       this.defineRuleToUpdateUserList(userListLambda);
@@ -325,6 +429,40 @@ export class DownloadStack extends cdk.Stack {
     } else {
       console.log("There isn't any metadata lambda");
     }
+    if (startTasksLambda && preLambda) {
+      // TODO
+      const startTasksStep = new tasks.LambdaInvoke(this, "InsideStartTasks", {
+        lambdaFunction: startTasksLambda,
+        payloadResponseOnly: true,
+      });
+      const prehandleStep = new tasks.LambdaInvoke(this, "Prehandle", {
+        lambdaFunction: preLambda,
+        payloadResponseOnly: true,
+      });
+      const pipelineLogs = new logs.LogGroup(this, "StartTasksPipelineLogs", {
+        retention: logs.RetentionDays.ONE_WEEK,
+      });
+
+      const startTasksPipeline = new sfn.StateMachine(this, "StartTasksPipeline", {
+        stateMachineName: "startDownloaderTasksExpress",
+        definitionBody: sfn.DefinitionBody.fromChainable(startTasksStep.next(prehandleStep)),
+        stateMachineType: sfn.StateMachineType.EXPRESS,
+        timeout: Duration.minutes(5),
+        logs: {
+          destination: pipelineLogs,
+          level: sfn.LogLevel.ERROR,
+          includeExecutionData: true,
+        },
+      });
+      this.defineRuleToStartTasksPipeline(startTasksPipeline);
+
+      new cdk.CfnOutput(this, "StartTasksPipelineArn", {
+        value: startTasksPipeline.stateMachineArn,
+        exportName: "downloader-startTasksPipelineARN",
+      });
+    } else {
+      console.log("Could not connect start tasks to prehandle!!!!");
+    }
     new cdk.CfnOutput(this, 'downloaderOutputQueue', {
       value: outputQueue.queueUrl,
       exportName: 'downloader-OutputQueueURL'
@@ -332,6 +470,14 @@ export class DownloadStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'downloaderOutputQueueArn', {
       value: outputQueue.queueArn,
       exportName: 'downloader-OutputQueueARN'
+    });
+    new cdk.CfnOutput(this, 'downloaderOutputFifoQueue', {
+      value: outputQueueFifo.queueUrl,
+      exportName: 'downloader-OutputFifoQueueURL'
+    });
+    new cdk.CfnOutput(this, 'downloaderOutputFifoQueueArn', {
+      value: outputQueueFifo.queueArn,
+      exportName: 'downloader-OutputFifoQueueARN'
     });
     new cdk.CfnOutput(this, 'downloaderPlaysQueue', {
       value: playsQueue.queueUrl,

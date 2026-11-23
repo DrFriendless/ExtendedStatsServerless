@@ -2,31 +2,50 @@
 
 import { SQSClient, SendMessageCommand, SendMessageCommandOutput } from "@aws-sdk/client-sqs";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { log } from "./logging.mjs";
 
 import {copyRequestStats, splitYmd} from "./library.mjs";
 import {
     ProcessGameResult, RequestStats, FileToProcess, Metadata, ProcessCollectionResult, ProcessUserResult,
     CleanUpCollectionResult, QueueMessage, ProcessPlaysForPeriodResult, PlayDataResult, ProcessDesignerResult,
-    ProcessPublisherResult
-} from 'extstats-core';
+    ProcessPublisherResult, UpdatePlayedYearsResult
+} from './interfaces.mjs';
 import {System} from "./system.mjs";
 
 // Create an Amazon S3 service client object.
-const sqsClient = new SQSClient({ region: process.env.REGION });
+const sqsClient = new SQSClient({ region: process.env.REGION, useDualstackEndpoint: true });
 
-async function sendToDownloaderQueue(system: System, body: QueueMessage, details: string | undefined = undefined): Promise<void> {
+// async function sendToDownloaderQueue(system: System, body: QueueMessage, details: string | undefined = undefined): Promise<void> {
+//     const b = JSON.stringify(body);
+//     if (b.length > 260000) {
+//         // exceed SendMessage size
+//         console.log(`SQS message size exceeded: ${b.length} ${body.discriminator} ${details || ""}`);
+//         return;
+//     } else {
+//         // console.log(b);
+//     }
+//     const command = new SendMessageCommand({
+//         QueueUrl: system.downloaderQueue,
+//         MessageBody: b,
+//     });
+//     const dispatchResult: SendMessageCommandOutput = await sqsClient.send(command);
+//     if (dispatchResult.$metadata.httpStatusCode !== 200) {
+//         await system.publishError(JSON.stringify(dispatchResult), "sendToDownloaderQueue");
+//     }
+// }
+
+async function sendToDownloaderFifoQueue(system: System, body: QueueMessage, details: string | undefined = undefined): Promise<void> {
     const b = JSON.stringify(body);
     if (b.length > 260000) {
         // exceed SendMessage size
-        log(`SQS message size exceeded: ${b.length} ${body.discriminator} ${details || ""}`);
+        console.log(`SQS message size exceeded: ${b.length} ${body.discriminator} ${details || ""}`);
         return;
     } else {
         // console.log(b);
     }
     const command = new SendMessageCommand({
-        QueueUrl: system.downloaderQueue,
+        QueueUrl: system.downloaderQueueFifo,
         MessageBody: b,
+        MessageGroupId: body.discriminator
     });
     const dispatchResult: SendMessageCommandOutput = await sqsClient.send(command);
     if (dispatchResult.$metadata.httpStatusCode !== 200) {
@@ -35,75 +54,75 @@ async function sendToDownloaderQueue(system: System, body: QueueMessage, details
 }
 
 export async function dispatchUpdateUserList(system: System, users: string[]): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "UpdateUserListMessage", users });
+    await sendToDownloaderFifoQueue(system, { discriminator: "UpdateUserListMessage", users });
 }
 
 export async function dispatchEnsureGames(system: System, gameIds: number[]): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "EnsureGamesMessage", gameIds });
+    await sendToDownloaderFifoQueue(system, { discriminator: "EnsureGamesMessage", gameIds });
 }
 
 export function dispatchUpdateMetadata(system: System, metadata: Metadata): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "UpdateMetadataMessage", metadata });
+    return sendToDownloaderFifoQueue(system, { discriminator: "UpdateMetadataMessage", metadata });
 }
 
 export function dispatchUpdateTop50(system: System, top50: number[]): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "UpdateTop50Message", top50 });
+    return sendToDownloaderFifoQueue(system, { discriminator: "UpdateTop50Message", top50 });
 }
 
 export function dispatchNoSuchGame(system: System, gameId: number): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "NoSuchGameMessage", gameId });
+    return sendToDownloaderFifoQueue(system, { discriminator: "NoSuchGameMessage", gameId });
 }
 
 export function dispatchNoSuchUser(system: System, geek: string): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "NoSuchGeekMessage", geek });
+    return sendToDownloaderFifoQueue(system, { discriminator: "NoSuchGeekMessage", geek });
 }
 
 export function dispatchSlowDown(system: System): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "SlowDownMessage" });
+    return sendToDownloaderFifoQueue(system, { discriminator: "SlowDownMessage" });
 }
 
 export function dispatchProcessGameResult(system: System, result: ProcessGameResult): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "GameResultMessage", result }, result.url);
+    return sendToDownloaderFifoQueue(system, { discriminator: "GameResultMessage", result }, result.url);
 }
 
 export async function dispatchDesignerData(system: System, result: ProcessDesignerResult): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "DesignerResultMessage", result }, result.url);
+    await sendToDownloaderFifoQueue(system, { discriminator: "DesignerResultMessage", result }, result.url);
 }
 
 export async function dispatchNoSuchDesigner(system: System, bggId: number): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "NoSuchDesignerMessage", bggId  });
+    await sendToDownloaderFifoQueue(system, { discriminator: "NoSuchDesignerMessage", bggId  });
 }
 
 export async function dispatchPublisherData(system: System, result: ProcessPublisherResult): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "PublisherResultMessage", result }, result.url);
+    await sendToDownloaderFifoQueue(system, { discriminator: "PublisherResultMessage", result }, result.url);
 }
 
 export async function dispatchNoSuchPublisher(system: System, bggId: number): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "NoSuchPublisherMessage", bggId });
+    await sendToDownloaderFifoQueue(system, { discriminator: "NoSuchPublisherMessage", bggId });
 }
 
 export function dispatchProcessUserResult(system: System, result: ProcessUserResult): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "UserResultMessage", result }, result.url);
+    return sendToDownloaderFifoQueue(system, { discriminator: "UserResultMessage", result }, result.url);
 }
 
 export function dispatchProcessCollectionUpdateGames(system: System, result: ProcessCollectionResult): Promise<void> {
-    return sendToDownloaderQueue(system, { discriminator: "CollectionResultMessage", result }, result.geek);
+    return sendToDownloaderFifoQueue(system, { discriminator: "CollectionResultMessage", result }, result.geek);
 }
 
 export async function dispatchMarkAsProcessed(system: System, fileDetails: FileToProcess): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "MarkAsProcessedMessage", context: "", fileDetails });
+    await sendToDownloaderFifoQueue(system, { discriminator: "MarkAsProcessedMessage", context: "", fileDetails });
 }
 
 export async function dispatchMarkAsUnprocessed(system: System, fileDetails: FileToProcess): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "MarkAsUnprocessedMessage", context: "", fileDetails });
+    await sendToDownloaderFifoQueue(system, { discriminator: "MarkAsUnprocessedMessage", context: "", fileDetails });
 }
 
 export async function dispatchMarkAsTryAgainTomorrow(system: System, fileDetails: FileToProcess): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "MarkAsTryAgainMessage", context: "", fileDetails });
+    await sendToDownloaderFifoQueue(system, { discriminator: "MarkAsTryAgainMessage", context: "", fileDetails });
 }
 
 export async function dispatchProcessCleanUpCollection(system: System, params: CleanUpCollectionResult): Promise<void> {
-    await sendToDownloaderQueue(system, { discriminator: "CleanUpCollectionMessage", params }, params.url);
+    await sendToDownloaderFifoQueue(system, { discriminator: "CleanUpCollectionMessage", params }, params.url);
 }
 
 async function saveToCache(system: System, key: string, body: string) {
@@ -126,6 +145,10 @@ async function saveToCache(system: System, key: string, body: string) {
     }
 }
 
+export async function dispatchPlayedYears(system: System, result: UpdatePlayedYearsResult): Promise<void> {
+    await sendToDownloaderFifoQueue(system, { discriminator: "UpdatePlayedYears", result });
+}
+
 export async function dispatchPlaysForPeriodResult(system: System, result: ProcessPlaysForPeriodResult): Promise<void> {
     const stats = copyRequestStats(result);
     const b = JSON.stringify(result).length;
@@ -145,18 +168,17 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
             ps.push(p);
             playsByDate[ymd.toString()] = ps;
         }
-        console.log(countByDate);
         if (Object.keys(countByDate).length === 1) {
-            log(`Plays for ${result.url} are concentrated on one day, and have size ${b}`);
+            console.log(`Plays for ${result.url} are concentrated on one day, and have size ${b}`);
             const withoutLocations = removeLocations(result.plays);
             const newResult = { ...result, plays: withoutLocations };
             const b2 = JSON.stringify(newResult).length;
             if (b2 <= 260000) {
-                log(`Removing locations for ${result.url}`);
-                await sendToDownloaderQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: newResult }, result.url);
+                console.log(`Removing locations for ${result.url}`);
+                await sendToDownloaderFifoQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: newResult }, result.url);
             } else {
-                log(`Dropping plays for ${result.url}`);
-                await sendToDownloaderQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: { ...result, plays: [] } }, result.url);
+                console.log(`Dropping plays for ${result.url}`);
+                await sendToDownloaderFifoQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: { ...result, plays: [] } }, result.url);
             }
         }
         dates.sort();
@@ -184,9 +206,9 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
             await emit(result.processMethod, chunkStart, result.endYmdInc, result.geek, chunkPlays, stats);
         }
         // the inside queue has not seen a result for the whole year, so it doesn't know to mark the URL as processed
-        await sendToDownloaderQueue(system, { discriminator: "MarkPlaysForPeriodProcessed", url: result.url });
+        await sendToDownloaderFifoQueue(system, { discriminator: "MarkPlaysForPeriodProcessed", url: result.url });
     } else {
-        await sendToDownloaderQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: result }, result.url);
+        await sendToDownloaderFifoQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: result }, result.url);
     }
 
     function addDashes(ymd: number): string {
@@ -220,7 +242,7 @@ export async function dispatchPlaysForPeriodResult(system: System, result: Proce
             processMethod, geek, startYmdInc: symd, endYmdInc: eymd, url, plays, ...stats
         };
         console.log(JSON.stringify(playsResult));
-        await sendToDownloaderQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: playsResult }, url);
+        await sendToDownloaderFifoQueue(system, { discriminator: "PlaysForPeriodResultMessage", plays: playsResult }, url);
     }
 
     function removeLocations(plays: PlayDataResult[]): PlayDataResult[] {

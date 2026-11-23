@@ -1,6 +1,12 @@
-import { CollectionGameResult, ProcessCollectionResult, ProcessGameResult, ProcessUserResult, RequestStats } from "extstats-core";
 import { parseStringPromise } from 'xml2js';
 import {log} from "./logging.mjs";
+import {
+    CollectionGameResult,
+    ProcessCollectionResult,
+    ProcessGameResult,
+    ProcessUserResult,
+    RequestStats
+} from "./interfaces.mjs";
 
 type USER_PAGE_ERROR = "ComeBackLater" | "TooBig" | "InvalidUsername" | "RateLimitExceeded" | "IncorrectDOM";
 
@@ -26,8 +32,7 @@ export async function extractUserCollectionFromPage(geek: string, pageContent: s
         return "IncorrectDOM";
     }
     if (!dom.items.item || dom.items.item.length === 0) {
-        console.log("Found no games in collection");
-        log("Found no games in collection for " + geek);
+        console.log("Found no games in collection for " + geek);
     }
     const items: CollectionGameResult[] = [];
     const byId: Record<string, Partial<CollectionGameResult>> = {};

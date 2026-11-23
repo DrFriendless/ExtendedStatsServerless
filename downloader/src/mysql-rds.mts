@@ -1,4 +1,28 @@
 import mysql = require('promise-mysql');
+import {
+    CollectionGameResult,
+    FriendlessMetrics, MetadataRuleResult,
+    PlayDataResult, PlaysDataForWarTable, PlaysRow, ProcessDesignerResult, ProcessGameResult,
+    ProcessMethod, ProcessPlaysForPeriodResult, ProcessPublisherResult, RankingTableDatabaseRow,
+    SeriesMetadataResult, ToProcessElement, WarTableDatabaseRow,
+} from "./interfaces.mjs";
+import {cdf, eqSet, invcdf, listIntersect, listMinus, parseYmd, splitYmd} from "./library.mjs";
+import { ExpansionData, UserConfig } from "extstats-core";
+import {doNotNormalise, normalise} from "./plays.mjs";
+
+// longest possible MySQL time is 838:59:59 hours: http://dev.mysql.com/doc/refman/5.5/en/date-and-time-type-overview.html
+const TILL_NEXT_UPDATE: Record<ProcessMethod, string> = {
+    "processCollection" : "72:00:00",
+    "processMarket" : "72:00:00",
+    "processPlayed" : "72:00:00",
+    "processGame" : "838:00:00",
+    "processTop50" : "72:00:00",
+    "processFrontPage" : "24:00:00",
+    "processUser": "838:00:00",
+    "processPlays": undefined as string,
+    "processDesigner": "838:00:00",
+    "processPublisher": undefined as string
+};
 
 export async function getGeekId(conn: mysql.Connection, geek: string): Promise<number | undefined> {
     const getIdSql = "select id from geeks where geeks.username = ?";
@@ -9,3 +33,971 @@ export async function getGeekId(conn: mysql.Connection, geek: string): Promise<n
     }
     return results[0]["id"];
 }
+
+export async function getGeeksThatDontExist(conn: mysql.Connection): Promise<string[]> {
+    const sql = "select geek from not_geeks";
+    return (await conn.query(sql)).map((row: { geek: string }) => row.geek);
+}
+
+export async function doMarkUrlProcessed(conn: mysql.Connection, processMethod: ProcessMethod, url: string) {
+    const delta = tillNextUpdate(processMethod);
+    const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
+    await conn.query(sqlSet, [delta, url, processMethod]);
+}
+
+export async function doMarkPlaysUrlProcessed(conn: mysql.Connection, url: string): Promise<void> {
+    const processMethod = "processYear";
+    const now = new Date();
+    const endYmd = url.split("=")[1];
+    const end = parseYmd(endYmd);
+    if (!end) return;
+    const daysSince = (now.getTime() - end.getTime())/1000 / 1440;
+    if (daysSince < 14) {
+        await doMarkUrlProcessedWithUpdate(conn, processMethod, url, "72:00:00");
+    } else if (daysSince < 30) {
+        await doMarkUrlProcessedWithUpdate(conn, processMethod, url, "168:00:00");
+    } else {
+        await doMarkUrlProcessedNoUpdate(conn, processMethod, url);
+    }
+}
+
+function about3Days(): string {
+    const minutes = 3600 + Math.floor(Math.random() * 1440);
+    const ms = minutes % 60;
+    return "" + Math.floor(minutes / 60) + ":" + (ms < 10 ? "0" : "") + ms + ":00";
+}
+
+function about30Days() {
+    const minutes = 43200 + Math.floor(Math.random() * 7000);
+    const ms = minutes % 60;
+    return "" + Math.floor(minutes / 60) + ":" + (ms < 10 ? "0" : "") + ms + ":00";
+}
+
+function tillNextUpdate(processMethod: ProcessMethod): string | undefined {
+    const orig = TILL_NEXT_UPDATE[processMethod];
+    return (orig === "72:00:00") ? about3Days() : (orig === "838:00:00") ? about30Days() : orig;
+}
+
+export async function doListToProcess(conn: mysql.Connection, count: number, processMethods: string[]): Promise<ToProcessElement[]> {
+    let query = await doListToProcessByMethod(conn, count, processMethods);
+    let risk = 0;
+    let good = 0;
+    for (const q of query) {
+        if (q.processMethod === 'processYear') {
+            risk += 7;
+        } else {
+            risk++;
+        }
+        if (risk <= count || good == 0) {
+            good++;
+        } else {
+            break;
+        }
+    }
+    if (good < query.length) {
+        query = query.slice(0, good);
+        console.log(`Only processing ${query.length} files right now`);
+    }
+    return query;
+}
+
+async function doListToProcessByMethod(conn: mysql.Connection, count: number, processMethods: string[]): Promise<ToProcessElement[]> {
+    const sql = "select * from files where processMethod in (?) and (lastUpdate is null || (nextUpdate is not null && nextUpdate < now())) and (last_scheduled is null || TIMESTAMPDIFF(MINUTE, last_scheduled, now()) >= 1440) limit ?";
+    return (await conn.query(sql, [processMethods, count])).map((row: ToProcessElement) => row);
+}
+
+export async function doUpdateLastScheduledForUrls(conn: mysql.Connection, urls: string[]) {
+    const sqlOne = "update files set last_scheduled = now() where url = ?";
+    const sqlMany = "update files set last_scheduled = now() where url in (?)";
+    if (urls.length === 0) {
+        return;
+    } else if (urls.length === 1) {
+        await conn.query(sqlOne, urls);
+    } else {
+        await conn.query(sqlMany, [urls]);
+    }
+}
+
+export async function doProcessGameResult(conn: mysql.Connection, data: ProcessGameResult): Promise<void> {
+    await doUpdateGame(conn, data);
+    await doEnsureDesigners(conn, data.designers, data.gameId, data.name);
+    await doEnsurePublishers(conn, data.publishers, data.gameId, data.name);
+    await doRecordGameExpansions(conn, data.gameId, data.expansions);
+    await doMarkUrlProcessed(conn, "processGame", data.url);
+}
+
+export async function doRebuildMaterialisedViews(conn: mysql.Connection): Promise<void> {
+    await conn.query("TRUNCATE TABLE nickels_and_dimes");
+    await conn.query("INSERT INTO nickels_and_dimes select game bggid, sum(quantity) q, year, geek from plays_normalised group by year, bggid, geek");
+}
+
+export async function doReprocessPlays(conn: mysql.Connection, geek: string): Promise<void> {
+    const geekId = await getGeekId(conn, geek);
+    const t0 = (new Date()).getTime();
+    const expansionData = await loadExpansionData(conn); // 2.1 sec
+    const t1 = (new Date()).getTime();
+    const ymSql = "select distinct year y, month m from plays where geek = ?";
+    const playsMonths = (await conn.query(ymSql, [geekId])) as { y: number, m: number}[];
+    const t2 = (new Date()).getTime();
+    const deleteSql = "delete from plays_normalised where geek = ?";
+    await conn.query(deleteSql, [geekId]);
+    const t3 = (new Date()).getTime();
+    await doNormalisePlaysForYear(conn, geekId, geek, playsMonths, expansionData);
+    const t4 = (new Date()).getTime();
+    console.log(`doReprocessPlays ${t1-t0} ${t2-t1} ${t3-t2} ${t4-t3}`);
+    await doUpdateFrontPageGeek(conn, geek);
+}
+
+async function doUpdateFrontPageGeek(conn: mysql.Connection, geekName: string) {
+    const geekId = await getGeekId(conn, geekName);
+    const top50Id = await getIdForSeries(conn, "BGG Top 50");
+    const top50 = await getGamesForSeries(conn, top50Id);
+    const geekRows: { owned: number, want: number, wish: number, trade: number, prevowned: number, preordered: number }[] =
+        await conn.query("select owned, want, wish, trade, prevowned, preordered from geekgames where geekId = ?", [geekId]);
+    const owned = geekRows.filter(row => row.owned > 0).length;
+    const want = geekRows.filter(row => row.want > 0).length;
+    const wish = geekRows.filter(row => row.wish > 0).length;
+    const trade = geekRows.filter(row => row.trade > 0).length;
+    const prevOwned = geekRows.filter(row => row.prevowned > 0).length;
+    const preordered = geekRows.filter(row => row.preordered > 0).length;
+    let top50Count = 0;
+    if (top50.length > 0) {
+        const sql = "select distinct game from plays_normalised where geek = ? and game in (?);";
+        top50Count = (await conn.query(sql, [geekId, top50])).length;
+    }
+    const playsDataForWarTable: PlaysDataForWarTable = await doGatherPlaysDataForWarTable(conn, geekId);
+    const fm = calcFriendlessMetrics(playsDataForWarTable.uses);
+    const fpg: WarTableDatabaseRow = {
+        geek: geekId,
+        geekName: geekName,
+        totalPlays: playsDataForWarTable.totalPlays,
+        distinctGames: playsDataForWarTable.distinctGames,
+        top50: top50Count,
+        sdj: playsDataForWarTable.sdj,
+        owned: owned,
+        want: want,
+        wish: wish,
+        trade: trade,
+        prevOwned: prevOwned,
+        friendless: fm.friendless,
+        cfm: fm.cfm,
+        utilisation: fm.utilisation,
+        tens: playsDataForWarTable.tens,
+        zeros: playsDataForWarTable.zeros,
+        ext100: playsDataForWarTable.ext100,
+        hindex: playsDataForWarTable.hindex,
+        gindex: playsDataForWarTable.gindex,
+        hrindex: playsDataForWarTable.hrindex,
+        preordered: preordered
+    };
+    const insertSql = "insert into war_table (geek, geekName, totalPlays, distinctGames, top50, sdj, owned, want, wish, " +
+        "trade, prevOwned, friendless, cfm, utilisation, tens, zeros, ext100, hindex, preordered, gindex, hrindex) values " +
+        "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    const updateSql = "update war_table set geekName = ?, totalPlays = ?, distinctGames = ?, top50 = ?, sdj = ?, owned = ?, "
+        + "want = ?, wish = ?, trade = ?, prevOwned = ?, friendless = ?, cfm = ?, utilisation = ?, tens = ?, zeros = ?, "
+        + "ext100 = ?, hindex = ?, preordered = ?, gindex = ?, hrindex = ? where geek = ?";
+    try {
+        await conn.query(insertSql, [fpg.geek, fpg.geekName, fpg.totalPlays, fpg.distinctGames, fpg.top50, fpg.sdj, fpg.owned,
+            fpg.want, fpg.wish, fpg.trade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros,
+            fpg.ext100, fpg.hindex, fpg.preordered, fpg.gindex, fpg.hrindex]);
+    } catch (e) {
+        await conn.query(updateSql, [fpg.geekName, fpg.totalPlays, fpg.distinctGames, fpg.top50, fpg.sdj, fpg.owned,
+            fpg.want, fpg.wish, fpg.trade, fpg.prevOwned, fpg.friendless, fpg.cfm, fpg.utilisation, fpg.tens, fpg.zeros,
+            fpg.ext100, fpg.hindex, fpg.preordered, fpg.gindex, fpg.hrindex, fpg.geek]);
+    }
+}
+
+function calcFriendlessMetrics(uses: number[]): FriendlessMetrics {
+    const LAMBDA = Math.log(0.1) / -10.0;
+    let tens = 0;
+    let zeros = 0;
+    for (const u of uses) {
+        if (u >= 10) {
+            tens++;
+        } else if (u === 0) {
+            zeros++;
+        }
+    }
+    let friendless;
+    let cfm = 0;
+    let utilisation = 0;
+    if (uses.length === 0) {
+        friendless = 0;
+    } else if (uses.length === tens) {
+        friendless = uses[uses.length - 1];
+    } else {
+        friendless = uses[uses.length - tens - 1];
+    }
+    if (friendless === 0) friendless = tens - zeros;
+    if (uses.length > 0) {
+        let total = 0;
+        for (const u of uses) {
+            total += cdf(u, LAMBDA);
+        }
+        utilisation = Math.round(total * 10000 / uses.length + Number.EPSILON) / 100;
+        cfm = Math.round(invcdf(total / uses.length, LAMBDA) * 100) / 100;
+    }
+    return { utilisation, cfm, friendless };
+}
+
+async function loadExpansionData(conn: mysql.Connection): Promise<ExpansionData> {
+    return new ExpansionData(await conn.query("select basegame, expansion from expansions"));
+}
+
+export async function doProcessCollectionCleanup(conn: mysql.Connection, geek: string, items: number[], url: string): Promise<void> {
+    const geekid = await getGeekId(conn, geek);
+    await doRestrictCollectionToGames(conn, geekid, items);
+    await doMarkUrlProcessed(conn, "processCollection", url);
+    await doUpdateFrontPageGeek(conn, geek);
+    await doUpdateNormalisedRankings(conn, geek);
+}
+
+async function doRestrictCollectionToGames(conn: mysql.Connection, geekid: number, items: number[]): Promise<void> {
+    const deleteStatementSome = "delete from geekgames where geekid = ? and game not in (?)";
+    const deleteStatementOne = "delete from geekgames where geekid = ? and game != ?";
+    const deleteStatementNone = "delete from geekgames where geekid = ?";
+    let deleteStatement;
+    let params;
+    if (items.length === 0) {
+        deleteStatement = deleteStatementNone;
+        params = [geekid];
+    } else if (items.length == 1) {
+        deleteStatement = deleteStatementOne;
+        params = [geekid, items[0]];
+    } else {
+        deleteStatement = deleteStatementSome;
+        params = [geekid, items];
+    }
+    await conn.query(deleteStatement, params);
+}
+
+export async function doUpdateGamesForGeek(conn: mysql.Connection, geek: string, games: CollectionGameResult[]) {
+    const geekId = await getGeekId(conn, geek);
+    const notExist = await getGamesThatDontExist(conn);
+    for (const game of games) {
+        if (notExist.indexOf(game.gameId) >= 0) continue;
+        await doUpdateGeekgame(conn, geekId, game);
+    }
+}
+
+async function doUpdateGeekgame(conn: mysql.Connection, geekId: number, game: CollectionGameResult) {
+    const insertSql = "insert into geekgames (geekId, game, rating, owned, want, wish, trade, prevowned, wanttobuy, wanttoplay, preordered) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    const updateSql = "update geekgames set rating = ?, owned = ?, want = ?, wish = ?, trade = ?, prevowned = ?, wanttobuy = ?, wanttoplay = ?, preordered = ? where game = ? and geekid = ?";
+    const updateResult = await conn.query(updateSql, [game.rating, game.owned, game.want, game.wishListPriority, game.forTrade, game.prevOwned,
+        game.wantToBuy, game.wantToPlay, game.preordered, game.gameId, geekId]);
+    if (updateResult["affectedRows"] === 0) {
+        await conn.query(insertSql, [geekId, game.gameId, game.rating, game.owned, game.want, game.wishListPriority,
+            game.forTrade, game.prevOwned, game.wantToBuy, game.wantToPlay, game.preordered]);
+    }
+}
+
+export async function doMarkUrlProcessedWithUpdate(conn: mysql.Connection, processMethod: string, url: string, delta: string) {
+    const sqlSet = "update files set lastUpdate = now(), nextUpdate = addtime(now(), ?) where url = ? and processMethod = ?";
+    await conn.query(sqlSet, [delta, url, processMethod]);
+}
+
+export async function doMarkUrlProcessedNoUpdate(conn: mysql.Connection, processMethod: string, url: string) {
+    const sqlSet = "update files set lastUpdate = now(), nextUpdate = null where url = ? and processMethod = ?";
+    await conn.query(sqlSet, [url, processMethod]);
+}
+
+export async function doMarkUrlUnprocessed(conn: mysql.Connection, processMethod: string, url: string) {
+    const sqlSet = "update files set last_scheduled = null where url = ? and processMethod = ?";
+    await conn.query(sqlSet, [url, processMethod]);
+}
+
+export async function doMarkUrlTryTomorrow(conn: mysql.Connection, processMethod: string, url: string) {
+    const sqlSet = "update files set nextUpdate = addtime(now(), '24:00:00') where url = ? and processMethod = ?";
+    await conn.query(sqlSet, [url, processMethod]);
+}
+
+export async function doMarkGameDoesNotExist(conn: mysql.Connection, bggid: number) {
+    const insertSql = "insert into not_games (bggid) values (?)";
+    const deleteSql1 = "delete from files where processMethod = 'processGame' and bggid = ?";
+    const deleteSql2 = "delete from geekgames where game = ?";
+    try {
+        await conn.query(insertSql, [bggid]);
+    } catch (e) {
+        // ignore error if it's already there
+    }
+    await conn.query(deleteSql1, [bggid]);
+    await conn.query(deleteSql2, [bggid]);
+}
+
+export async function doMarkDesignerDoesNotExist(conn: mysql.Connection, bggid: number) {
+    // just check whether we have data for them anyway, in which case
+    // what you talking about, Willis?
+    const countSql = "select count(*) from designers where bggid = ?";
+    try {
+        const count: number[] = await conn.query(countSql, [bggid]);
+        if (count && count.length > 0 && count[0] > 0) return;
+    } catch (e) {
+        // ignore error if it's already there
+    }
+    const deleteSql1 = "delete from files where processMethod = 'processDesigner' and bggid = ?";
+    const deleteSql2 = "delete from game_designers where designer = ?";
+    await conn.query(deleteSql1, [bggid]);
+    await conn.query(deleteSql2, [bggid]);
+    console.log(`Deleted designer ${bggid}`);
+}
+
+export async function doMarkPublisherDoesNotExist(conn: mysql.Connection, bggid: number) {
+    const countSql = "select count(*) from publishers where bggid = ?";
+    try {
+        const count: number[] = await conn.query(countSql, [bggid]);
+        if (count && count.length > 0 && count[0] > 0) return;
+    } catch (e) {
+        // ignore error if it's already there
+    }
+    const deleteSql1 = "delete from files where processMethod = 'processPublisher' and bggid = ?";
+    const deleteSql2 = "delete from game_publishers where publisher = ?";
+    await conn.query(deleteSql1, [bggid]);
+    await conn.query(deleteSql2, [bggid]);
+    console.log(`Deleted publisher ${bggid}`);
+}
+
+export async function doMarkGeekDoesNotExist(conn: mysql.Connection, geek: string) {
+    const insertSql = "insert into not_geeks (geek) values (?)";
+    const deleteSql1 = "delete from files where geek is not null and geek = ?";
+    const deleteSql2 = "delete from geekgames where geekid not in (select distinct geekid from files)";
+    try {
+        await conn.query(insertSql, [geek]);
+    } catch (e) {
+        // ignore error if it's already there
+    }
+    await conn.query(deleteSql1, [geek]);
+    await conn.query(deleteSql2);
+}
+
+export async function doProcessDesignerResult(conn: mysql.Connection, data: ProcessDesignerResult): Promise<void> {
+    const importanceSql = "select count(game) g from game_designers where designer = ?";
+    const importanceResult = await conn.query(importanceSql, [ data.bggid ]);
+    const importance = importanceResult[0].g;
+    const sql = "update designers set name = ?, importance = ? where bggid = ?";
+    await conn.query(sql, [ data.name, importance, data.bggid ]);
+    await doMarkUrlProcessed(conn, "processDesigner", data.url);
+}
+
+export async function doProcessPublisherResult(conn: mysql.Connection, data: ProcessPublisherResult): Promise<void> {
+    const sql = "update publishers set name = ? where bggid = ?";
+    await conn.query(sql, [ data.name, data.bggid ]);
+    await doMarkUrlProcessedNoUpdate(conn, "processPublisher", data.url);
+}
+
+export async function doUpdatePlaysForPeriod(conn: mysql.Connection, data: ProcessPlaysForPeriodResult) {
+    // console.log(data.geek, data.startYmdInc, data.endYmdInc);
+    const gameIds = [];
+    if (data.plays.includes(null)) return;
+    for (const play of data.plays) {
+        if (gameIds.indexOf(play.gameid) < 0) gameIds.push(play.gameid);
+    }
+    const geekId = await getGeekId(conn, data.geek);
+    if (geekId === undefined) return;
+    const expansionData = await loadExpansionData(conn); // 2.1 sec
+    const notGames = await doEnsureGames(conn, gameIds);
+
+    const end = parseYmd(data.endYmdInc);
+    if (!end) return;
+
+    const playsMonths: { y: number, m: number}[] = [];
+    await doSetGeekPlaysForYear(conn, geekId, data.startYmdInc, data.endYmdInc, data.plays, notGames, playsMonths);
+    await doNormalisePlaysForYear(conn, geekId, data.geek, playsMonths, expansionData);
+    await doMarkPlaysUrlProcessed(conn, data.url);
+    await doUpdateFrontPageGeek(conn, data.geek);
+}
+
+export async function doUpdateMetadata(conn: mysql.Connection, series: SeriesMetadataResult[], rules: MetadataRuleResult[]) {
+    await doUpdateSeries(conn, series);
+    await doUpdateMetadataRules(conn, rules);
+}
+
+async function doUpdateSeries(conn: mysql.Connection, seriesMetada: SeriesMetadataResult[]) {
+    const deleteSql = "delete from series where series_id = ?";
+    const insertSql = "insert into series (series_id, game) values ?";
+    const gamesThatDontExist = await getGamesThatDontExist(conn);
+    for (const sm of seriesMetada) {
+        const sid = await doGetOrCreateSeriesMetadata(conn, sm.name);
+        const gamesToUse = listMinus(sm.games, gamesThatDontExist);
+        await doEnsureGames(conn, gamesToUse);
+        await conn.query(deleteSql, sid);
+        const values = [];
+        for (const game of gamesToUse) {
+            values.push([sid, game]);
+        }
+        await conn.query(insertSql, [values]);
+    }
+}
+
+async function doGetOrCreateSeriesMetadata(conn: mysql.Connection, name: string): Promise<number> {
+    const findSql = "select id from series_metadata where name = ?";
+    const insertSql = "insert into series_metadata (name) values (?)";
+    const findResults = await conn.query(findSql, [name]);
+    if (findResults.length === 0) {
+        await conn.query(insertSql, [name]);
+        // look up the autoincremented ID in the row we just created
+        return (await conn.query(findSql, [name]))[0]["id"];
+    } else {
+        return findResults[0]["id"];
+    }
+}
+
+async function getGamesThatDontExist(conn: mysql.Connection): Promise<number[]> {
+    const sql = "select bggid from not_games";
+    return (await conn.query(sql)).map((row: { bggid: number }) => row.bggid);
+}
+
+// ensure that these games have a row in the database.
+// can't trust that the IDs are actually numbers, TYVM TypeScript.
+export async function doEnsureGames(conn: mysql.Connection, anyIds: any[]): Promise<number[]> {
+    if (anyIds.length === 0) return [];
+    const ids = anyIds.map(x => parseInt(x.toString(), 10));
+    const sqlSome = "select bggid from files where bggid in (?) and processMethod = 'processGame'";
+    const sqlOne = "select bggid from files where bggid = ? and processMethod = 'processGame'";
+    let params;
+    let sql;
+    let sql2;
+    if (ids.length == 1) {
+        sql = sqlOne;
+        sql2 = "select bggid from games where bggid = ?";
+        params = ids;
+    } else {
+        sql = sqlSome;
+        sql2 = "select bggid from games where bggid in (?)";
+        params = [ids];
+    }
+    const found1: number[] = (await conn.query(sql, params)).map((row: { bggid: any }) => parseInt(row.bggid.toString()));
+    const found2: number[] = (await conn.query(sql2, params)).map((row: { bggid: any }) => parseInt(row.bggid.toString()));
+    const found = listIntersect(found1, found2);
+    const notExist = await getGamesThatDontExist(conn);
+    const uniques = Array.from(new Set(listMinus(listMinus(ids, found), notExist)));
+    for (const id of uniques) {
+        await doRecordGame(conn, id);
+    }
+    return listIntersect(ids, notExist);
+}
+
+async function doRecordGame(conn: mysql.Connection, bggid: number) {
+    const url = `https://boardgamegeek.com/xmlapi/boardgame/${bggid}&stats=1`;
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, tillNextUpdate, description, bggid) values (?, ?, ?, ?, ?, ?, ?)";
+    const tillNext = tillNextUpdate("processGame");
+    const insertParams = [url, "processGame", undefined, undefined, tillNext, "Game #" + bggid, bggid];
+    await conn.query(insertSql, insertParams).catch(err => {
+        // console.log(err);
+    });
+    const insertSql2 = "insert into games (bggid, name) values (?,?)";
+    await conn.query(insertSql2, [bggid, "?"]).catch(err => {
+        // console.log(err);
+    });
+    console.log(`Added new game ${bggid}`);
+}
+
+export async function doNormalisePlaysForYear(conn: mysql.Connection, geekId: number, geek: string, playsMonths: { y: number, m: number }[],
+                                              expansionData: ExpansionData) {
+    const selectSql = "select game, playDate, quantity, location from plays where geek = ? and month = ? and year = ?";
+    const insertBasePlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, ymd, expansion_play, location) values ?";
+    const getIdSql = "select id from plays_normalised where game = ? and geek = ? and quantity = ? and year = ? and month = ? and date = ? and expansion_play = 0";
+    const insertExpansionPlaySql = "insert into plays_normalised (game, geek, quantity, year, month, date, ymd, expansion_play, baseplay) values ?";
+    const userConfigData = await conn.query("select configuration from auth where username = ?", [geek]);
+    const userConfigRaw = (userConfigData && userConfigData[0] && userConfigData[0].configuration) ? userConfigData[0].configuration : "{}";
+    const userConfig = typeof userConfigRaw === typeof "" ? JSON.parse(userConfigRaw) : userConfigRaw;
+    const infer: boolean | undefined = new UserConfig(userConfig).get("disambiguation.enable", true);
+    const baseGameDefaults: Record<string, number> = new UserConfig(userConfig).get("disambiguation.defaults", {}) || {};
+
+    for (const {y, m} of playsMonths) {
+        const rows: PlaysRow[] = await conn.query(selectSql, [geekId, m, y]);
+        const normalised = infer ?
+            normalise(rows, geekId, m, y, expansionData, baseGameDefaults) :
+            doNotNormalise(rows, geekId, m, y, expansionData);
+        // insert all of the base plays
+        const basePlays: any[][] = [];
+        for (const np of normalised) {
+            const ymd = np.year * 10000 + np.month * 100 + np.date;
+            basePlays.push([np.game, geekId, np.quantity, np.year, np.month, np.date, ymd, 0, np.location || ""]);
+        }
+        if (basePlays.length > 0) {
+            try {
+                await conn.query(insertBasePlaySql, [basePlays]);
+            } catch (ex) {
+                console.log(ex);
+                throw ex;
+            }
+        }
+        // construct the expansion plays with references to the base plays
+        const expPlays = [];
+        for (const np of normalised) {
+            if (np.expansions.length > 0) {
+                const args = [np.game, geekId, np.quantity, np.year, np.month, np.date];
+                const result = await conn.query(getIdSql, args);
+                if (!result || result.length === 0 || !result[0]) {
+                    continue;
+                }
+                const id = result[0].id;
+                for (const e of np.expansions) {
+                    const ymd = np.year * 10000 + np.month * 100 + np.date;
+                    expPlays.push([e, geekId, np.quantity, np.year, np.month, np.date, ymd, 1, id]);
+                }
+            }
+        }
+        if (expPlays.length > 0) {
+            try {
+                await conn.query(insertExpansionPlaySql, [expPlays]);
+            } catch (ex) {
+                console.log(ex);
+                throw ex;
+            }
+        }
+    }
+}
+
+async function doUpdateGame(conn: mysql.Connection, data: ProcessGameResult) {
+    const insertSql = "insert into games (bggid, name, average, `rank`, yearPublished, minPlayers, maxPlayers, playTime, usersRated, usersTrading, usersWishing, " +
+        "averageWeight, bayesAverage, numComments, usersOwned, subdomain) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    const updateSql = "update games set name = ?, average = ?, `rank` = ?, yearPublished = ?, minPlayers = ?, maxPlayers = ?, playTime = ?, usersRated = ?, usersTrading = ?, usersWishing = ?, " +
+        "averageWeight = ?, bayesAverage = ?, numComments = ?, usersOwned = ?, subdomain = ? where bggid = ?";
+    data.rank = data.rank || 0;
+    data.numComments = data.numComments || 0;
+    try {
+        await conn.query(insertSql, [data.gameId, data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
+            data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
+            data.numComments, data.usersOwned, data.subdomain]);
+    } catch (e) {
+        await conn.query(updateSql, [data.name, data.average, data.rank, data.yearPublished, data.minPlayers,
+            data.maxPlayers, data.playTime, data.usersRated, data.usersTrading, data.usersWishing, data.averageWeight, data.bayesAverage,
+            data.numComments, data.usersOwned, data.subdomain, data.gameId]);
+    }
+    await doSetCategoriesForGame(conn, data.gameId, data.categories);
+    await doSetMechanicsForGame(conn, data.gameId, data.mechanics);
+    await doUpdateRankingTableStatsForGame(conn, data.gameId, data);
+}
+
+async function doEnsureCategory(conn: mysql.Connection, name: string) {
+    const insertSql = "insert into categories (name) values (?)";
+    // very likely already there so ignore any error
+    await conn.query(insertSql, [name]).catch(err => {});
+}
+
+async function doEnsureMechanic(conn: mysql.Connection, name: string) {
+    const insertSql = "insert into mechanics (name) values (?)";
+    // very likely already there so ignore any error
+    await conn.query(insertSql, [name]).catch(err => {});
+}
+
+async function doSetCategoriesForGame(conn: mysql.Connection, game: number, categories: string[]) {
+    const getCatsSqlOne = "select id from categories where name = ?";
+    const getCatsSqlMany = "select id from categories where name in (?)";
+    const deleteAllGameCatsSql = "delete from game_categories where game = ?";
+    const selectSql = "select category from game_categories where game = ?";
+    const insertSql = "insert into game_categories (game, category) values (?,?)";
+    let getCatsSql;
+    let getCatsParams;
+    if (categories.length === 1) {
+        getCatsSql = getCatsSqlOne;
+        getCatsParams = categories;
+    } else if (categories.length > 1) {
+        getCatsSql = getCatsSqlMany;
+        getCatsParams = [categories];
+    } else {
+        await conn.query(deleteAllGameCatsSql, [game]);
+        return;
+    }
+    for (const cat of categories) await doEnsureCategory(conn, cat);
+    const current = (await conn.query(selectSql, game)).map((row: { category: string }) => row.category);
+    const required = (await conn.query(getCatsSql, getCatsParams)).map((row: { id: number }) => row.id);
+    if (!eqSet(new Set(current), new Set(required))) {
+        await conn.query(deleteAllGameCatsSql, [game]);
+        for (const id of required) await conn.query(insertSql, [game, id]);
+    }
+}
+
+async function doSetMechanicsForGame(conn: mysql.Connection, game: number, mechanics: string[]) {
+    const getMecsSqlOne = "select id from mechanics where name = ?";
+    const getMecsSqlMany = "select id from mechanics where name in (?)";
+    const deleteAllGameMecsSql = "delete from game_mechanics where game = ?";
+    const selectSql = "select mechanic from game_mechanics where game = ?";
+    const insertSql = "insert into game_mechanics (game, mechanic) values (?,?)";
+    let getMecsSql;
+    let getMecsParams;
+    if (mechanics.length === 1) {
+        getMecsSql = getMecsSqlOne;
+        getMecsParams = mechanics;
+    } else if (mechanics.length > 1) {
+        getMecsSql = getMecsSqlMany;
+        getMecsParams = [mechanics];
+    } else {
+        await conn.query(deleteAllGameMecsSql, [game]);
+        return;
+    }
+    for (const mec of mechanics) await doEnsureMechanic(conn, mec);
+    const current = (await conn.query(selectSql, game)).map((row: { mechanic: number }) => row.mechanic);
+    const required = (await conn.query(getMecsSql, getMecsParams)).map((row: { id: number }) => row.id);
+    if (!eqSet(new Set(current), new Set(required))) {
+        await conn.query(deleteAllGameMecsSql, [game]);
+        for (const id of required) await conn.query(insertSql, [game, id]);
+    }
+}
+
+async function doEnsureDesigners(conn: mysql.Connection, data: number[] | undefined, bggid: number, gameName: string): Promise<void> {
+    if (!data || !data.length) {
+        console.log(`No designers for ${gameName}`);
+        return;
+    }
+    // remove old designers in case it was incorrect
+    const cleanSql = "delete from game_designers where game = ?";
+    await conn.query(cleanSql, [bggid]);
+    for (const d of data) {
+        const url = `https://boardgamegeek.com/xmlapi/designer/${d}`;
+        // I forget why designers were boring, maybe "traditional", "unknown" etc.
+        const insertSql = "insert into designers (bggid, name, boring, url) values (?, ?, 0, ?)";
+        try {
+            await conn.query(insertSql, [d, "", url]);
+            const insertFile = "insert into files (url, processMethod, description, bggid) values (?, ?, ?, ?)";
+            await conn.query(insertFile, [url, "processDesigner", `Designer ${d}`, d]);
+        } catch (e) {
+            // uniqueness constraint violation usually
+            if (e.code !== "ER_DUP_ENTRY") console.log(e);
+        }
+        const insertSql2 = "insert into game_designers (game, designer) values (?, ?)";
+        try {
+            await conn.query(insertSql2, [bggid, d]);
+        } catch (e) {
+            // not expecting this
+            console.log(e);
+        }
+    }
+}
+
+async function doEnsurePublishers(conn: mysql.Connection, data: number[] | undefined, bggid: number, gameName: string): Promise<void> {
+    if (!data || !data.length) {
+        console.log(`No publishers for ${gameName}`);
+        return;
+    }
+    // remove old publishers in case it was incorrect
+    const cleanSql = "delete from game_publishers where game = ?";
+    await conn.query(cleanSql, [bggid]);
+    for (const d of data) {
+        const url = `https://boardgamegeek.com/xmlapi/publisher/${d}`;
+        const insertSql = "insert into publishers (bggid, name, url) values (?, ?, ?)";
+        try {
+            await conn.query(insertSql, [d, "", url]);
+            const insertFile = "insert into files (url, processMethod, description, bggid) values (?, ?, ?, ?)";
+            await conn.query(insertFile, [url, "processPublisher", `Publisher ${d}`, d]);
+        } catch (e) {
+            // uniqueness constraint violation usually
+            if (e.code !== "ER_DUP_ENTRY") console.log(e);
+        }
+        const insertSql2 = "insert into game_publishers (game, publisher) values (?, ?)";
+        try {
+            await conn.query(insertSql2, [bggid, d]);
+        } catch (e) {
+            // not expecting this
+            console.log(e);
+        }
+    }
+}
+
+export async function doRecordGameExpansions(conn: mysql.Connection, gameId: number, expansions: number[]) {
+    const selectSql = "select expansion from expansions where basegame = ?";
+    const deleteSql = "delete from expansions where basegame = ?";
+    const insertSql = "insert into expansions (basegame, expansion) values (?, ?)";
+    const current = (await conn.query(selectSql, gameId)).map((row: { expansion: number }) => row.expansion);
+    if (!eqSet(new Set(expansions), new Set(current))) {
+        await conn.query(deleteSql, gameId);
+        for (const exp of expansions) {
+            try {
+                await conn.query(insertSql, [gameId, exp]);
+            } catch (e) {
+                // probably foreign key constraint because the expansion is not in the database
+                // I see no need to put it there.
+            }
+        }
+    }
+}
+
+async function getIdForSeries(conn: mysql.Connection, seriesName: string): Promise<number> {
+    const sql = "select id from series_metadata where name = ?";
+    return (await conn.query(sql, [seriesName]))[0]["id"];
+}
+
+async function getGamesForSeries(conn: mysql.Connection, seriesId: number): Promise<number[]> {
+    const sql = "select game from series where series_id = ?";
+    return (await conn.query(sql, [seriesId])).map((row: { game: number }) => row.game);
+}
+
+export async function doGatherPlaysDataForWarTable(conn: mysql.Connection, geekId: number): Promise<PlaysDataForWarTable> {
+    const distinctGameSql = "select count(distinct game) c from plays_normalised where geek = ?";
+    const totalPlaysSql = "select sum(quantity) s from plays_normalised where geek = ? and baseplay is null";
+    const tensSql = "select count(plays.g) t from (select game g, sum(quantity) q from plays_normalised where geek = ? group by game) plays, geekgames where geekgames.geekid = ? and geekgames.game = plays.g and geekgames.owned > 0 and plays.q >= 10";
+    const zerosSql = "select count(game) z from geekgames where geekid = ? and owned > 0 and game not in (select game from plays_normalised where geek = ?)";
+    const hindexSql = "select sum(quantity) q from plays_normalised where geek = ? and expansion_play = 0 group by game order by q desc";
+    const seriesPlaysSql = "select count(distinct series.game) c from plays_normalised,series where series.series_id = ? and series.game = plays_normalised.game and plays_normalised.geek = ?";
+    const usesSql = "select sum(quantity) c from plays_normalised where geek=? and game in (?) group by game order by 1 desc";
+    const ownedSql = "select distinct game from geekgames where owned>0 and geekid = ?";
+    const distinctGames = (await conn.query(distinctGameSql, [geekId]))[0]["c"];
+    const totalPlays = (await conn.query(totalPlaysSql, [geekId]))[0]["s"] || 0;
+    const tens = (await conn.query(tensSql, [geekId, geekId]))[0]["t"];
+    const zeros = (await conn.query(zerosSql, [geekId, geekId]))[0]["z"];
+    const hindexData: number[] = (await conn.query(hindexSql, [geekId])).map((row: { q: number }) => row.q);
+    const {hindex, gindex, hrindex} = calcIndexes(hindexData);
+    const sdjId = await getIdForSeries(conn, "Spiel des Jahre");
+    const sdj = (await conn.query(seriesPlaysSql, [sdjId, geekId]))[0]["c"];
+    const ext100Id = await getIdForSeries(conn, "Extended Stats Top 100");
+    const ext100 = (await conn.query(seriesPlaysSql, [ext100Id, geekId]))[0]["c"];
+    const owned = (await conn.query(ownedSql, [geekId])).map((row: { game: number }) => row.game);
+    const uses = (owned.length === 0) ? [] :
+        (await conn.query(usesSql, [geekId, owned])).map((row: { c: number }) => row.c);
+    while (uses.length < owned.length) uses.push(0);
+    return { totalPlays, distinctGames, tens, zeros, hindex, gindex, hrindex, sdj, ext100, uses };
+}
+
+function calcIndexes(hindexData: number[]) {
+    let hindex = 0;
+    while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
+    let gindex = 0;
+    let gindexTotal = 0;
+    while (hindexData.length > gindex && (gindexTotal + hindexData[gindex] >= (gindex + 1) * (gindex + 1))) {
+        gindexTotal += hindexData[gindex];
+        gindex++;
+    }
+    let n = hindexData.filter(x => x > hindex).length;
+    if (hindexData.length > hindex) n += hindexData[hindex];
+    const hrindex = hindex + n / (2 * hindex + 1);
+    return {hindex, gindex, hrindex};
+}
+
+async function doUpdateUserValues(conn: mysql.Connection, geek: string, bggid: number, country: string) {
+    const sql = "update geeks set country = ?, bggid = ? where username = ?";
+    await conn.query(sql, [country, bggid, geek]);
+}
+
+export async function doUpdateProcessUserResult(conn: mysql.Connection, geek: string, bggid: number, country: string, url: string) {
+    await doUpdateUserValues(conn, geek, bggid, country);
+    await doMarkUrlProcessed(conn, "processUser", url);
+}
+
+export async function doEnsureUsers(conn: mysql.Connection, users: string[]) {
+    const extraSql = "select username from geeks where username not in (?)";
+    const extraUsers = (await conn.query(extraSql, [users])).map((row: { username: string }) => row.username);
+    for (const user of users) {
+        await doEnsureUser(conn, user);
+    }
+    await doDeleteExtraUsers(conn, extraUsers);
+}
+
+async function doDeleteExtraUsers(conn: mysql.Connection, extraUsers: string[]) {
+    console.log("Deleting " + extraUsers.length + " unwanted users.");
+    console.log(extraUsers);
+    const idsToDelete = [];
+    for (const u of extraUsers) {
+        const geekId = await getGeekId(conn, u);
+        idsToDelete.push(geekId);
+    }
+    const deleteOneFile = "delete from files where geekid = ?";
+    const deleteOneFileByName = "delete from files where geek = ?";
+    const deleteOneGeek = "delete from geeks where username = ?";
+    const deleteSomeFiles = "delete from files where geekid in (?)";
+    const deleteSomeFilesByName = "delete from files where geek in (?)";
+    const deleteSomeGeeks = "delete from geeks where username in (?)";
+    const deleteOnePlays = "delete from plays where geek = ?";
+    const deleteSomePlays = "delete from plays where geek in (?)";
+    const deleteOneNormalisedPlays = "delete from plays_normalised where geek = ?";
+    const deleteSomeNormalisedPlays = "delete from plays_normalised where geek in (?)";
+    const deleteOneWarTable = "delete from war_table where geek = ?";
+    const deleteSomeWarTable = "delete from war_table where geek in (?)";
+    const deleteOneGeekGames = "delete from geekgames where geekid = ?";
+    const deleteSomeGeekGames = "delete from geekgames where geekid in (?)";
+    const deleteOneMonthPlayed = "delete from months_played where geek = ?";
+    const deleteSomeMonthsPlayed = "delete from months_played where geek in (?)";
+    if (extraUsers.length === 1) {
+        await conn.query(deleteOneWarTable, idsToDelete);
+        await conn.query(deleteOnePlays, idsToDelete);
+        await conn.query(deleteOneNormalisedPlays, idsToDelete);
+        await conn.query(deleteOneFile, idsToDelete);
+        await conn.query(deleteOneFileByName, extraUsers);
+        await conn.query(deleteOneGeekGames, idsToDelete);
+        await conn.query(deleteOneMonthPlayed, idsToDelete);
+        await conn.query(deleteOneGeek, extraUsers);
+    } else if (extraUsers.length > 0) {
+        await conn.query(deleteSomeWarTable, [idsToDelete]);
+        await conn.query(deleteSomePlays, [idsToDelete]);
+        await conn.query(deleteSomeNormalisedPlays, [idsToDelete]);
+        await conn.query(deleteSomeFiles, [idsToDelete]);
+        await conn.query(deleteSomeFilesByName, [extraUsers]);
+        await conn.query(deleteSomeGeekGames, [idsToDelete]);
+        await conn.query(deleteSomeMonthsPlayed, [idsToDelete]);
+        await conn.query(deleteSomeGeeks, [extraUsers]);
+    }
+}
+
+async function doEnsureUser(conn: mysql.Connection, user: string) {
+    const insertSql = "insert into geeks (username) values (?)";
+    try {
+        await conn.query(insertSql, [user]);
+        console.log("added user " + user);
+    } catch (e) {
+        // user already there
+    }
+    const geekId = await getGeekId(conn, user);
+    await doEnsureFileProcessUser(conn, user, geekId);
+    await doEnsureFileProcessUserCollection(conn, user, geekId);
+    await doEnsureFileProcessUserPlayed(conn, user, geekId);
+}
+
+async function doEnsureFileProcessUser(conn: mysql.Connection, geek: string, geekid: number) {
+    const url = `https://boardgamegeek.com/user/${geek}`;
+    await doRecordFile(conn, url, "processUser", geek, "User's profile", undefined, undefined, undefined, geekid);
+}
+
+async function doEnsureFileProcessUserCollection(conn: mysql.Connection, geek: string, geekid: number) {
+    if (!geek) {
+        throw new Error("cannot process collection for null geek");
+    } else {
+        const url = `https://boardgamegeek.com/xmlapi2/collection?username=${geek}&brief=1&stats=1`;
+        await doRecordFile(conn, url, "processCollection", geek, "User collection - owned, ratings, etc", undefined,
+            undefined, undefined, geekid);
+    }
+}
+
+async function doEnsureFileProcessUserPlayed(conn: mysql.Connection, geek: string, geekid: number) {
+    const url = `https://boardgamegeek.com/plays/bymonth/user/${geek}/subtype/boardgame`;
+    await doRecordFile(conn, url, "processPlayed", geek, "Months in which user has played games", undefined,
+        undefined, undefined, geekid);
+}
+
+async function doRecordFile(conn: mysql.Connection, url: string, processMethod: string, user: string | undefined,
+                            description: string, bggid: number | undefined, month: number | undefined, year: number | undefined,
+                            geekid: number | undefined) {
+    const countSql = "select count(*) from files where url = ? and processMethod = ?";
+    const insertSql = "insert into files (url, processMethod, geek, lastupdate, description, bggid, month, year, geekid) values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    const found = await count(conn, countSql, [url, processMethod]);
+    if (found === 0) {
+        console.log("adding " + url);
+        const insertParams = [url, processMethod, user, undefined, description, bggid, month, year, geekid];
+        try {
+            await conn.query(insertSql, insertParams);
+        } catch (err) {
+            console.log(err);
+        }
+    }
+}
+
+export async function count(conn: mysql.Connection, sql: string, params: any[]): Promise<number> {
+    const result = await conn.query(sql, params);
+    return result[0]["count(*)"];
+}
+
+export async function doUpdateBGGTop50(conn: mysql.Connection, games: number[]) {
+    await doUpdateSeries(conn, [ { name: "BGG Top 50", games } ]);
+}
+
+async function doUpdateNormalisedRankings(conn: mysql.Connection, geekName: string) {
+    const geekId = await getGeekId(conn, geekName);
+    const geekRows: { game: number, rating: number }[] =
+        [... await conn.query("select game, rating from geekgames where geekId = ? and rating > 0", [geekId])];
+    const c = geekRows.length;
+    if (c === 0) return;
+    geekRows.sort((r1, r2) => r2.rating - r1.rating);
+    let currentRating = -1;
+    let numberHigher = 0;
+    let numberProcessed = 0;
+    const normalisedRatingsForGames: Record<string, number> = {};
+    for (const gr of geekRows) {
+        if (currentRating < 0) {
+            currentRating = gr.rating;
+        } else if (gr.rating < currentRating) {
+            numberHigher = numberProcessed;
+            currentRating = gr.rating;
+        }
+        normalisedRatingsForGames[gr.game.toString()] = (c - numberHigher) / c;
+        numberProcessed++;
+    }
+    const ggs: number[] = (await conn.query("select game from geekgames where geekid = ?", [geekId])).map((row: { game: number }) => row.game);
+    for (const gg of ggs) {
+        let nr = normalisedRatingsForGames[gg.toString()];
+        if (nr === undefined) nr = 0;
+        await conn.query("update geekgames set normrating = ? where geekid = ? and game = ?",
+            [ nr, geekId, gg ]);
+    }
+}
+
+async function doUpdateRankingTableStatsForGame(conn: mysql.Connection, game: number, data: ProcessGameResult) {
+    const ratingSql = "select sum(rating), count(rating), sum(normrating) norm from geekgames where game = ? and rating > 0";
+    const insertSql = "insert into ranking_table (game, game_name, total_ratings, num_ratings, bgg_ranking, bgg_rating, normalised_ranking, total_plays, hindex, gindex) values (?,?,?,?,?,?,?,?,?,?)";
+    const updateSql = "update ranking_table set game_name = ?, total_ratings = ?, num_ratings = ?, bgg_ranking = ?, bgg_rating = ?, normalised_ranking = ?, total_plays = ?, hindex = ?, gindex = ? where game = ?";
+    const playsSql = "select sum(quantity) q from plays_normalised where plays_normalised.game = ? group by geek order by q desc";
+    const ratings = await conn.query(ratingSql, [game]);
+    const total = ratings[0]["sum(rating)"];
+    const count = ratings[0]["count(rating)"];
+    const normRating = ratings[0]["norm"];
+    const hindexData: number[] = (await conn.query(playsSql, [game])).map((row: { q: number }) => row.q);
+    let hindex = 0;
+    while (hindexData.length > hindex && hindexData[hindex] > hindex) hindex++;
+    let gindex = 0;
+    let gindexTotal = 0;
+    while (hindexData.length > gindex && (gindexTotal + hindexData[gindex] >= (gindex + 1) * (gindex + 1))) {
+        gindexTotal += hindexData[gindex];
+        gindex++;
+    }
+    const howManyPlays = hindexData.reduce((a, b) => a + b, 0);
+    const row: RankingTableDatabaseRow = {
+        game: game,
+        game_name: data.name,
+        bgg_ranking: data.rank || 1000000,
+        bgg_rating: data.average || 0,
+        normalised_ranking: normRating,
+        total_plays: howManyPlays,
+        total_ratings: total || 0,
+        num_ratings: count,
+        ranking: 0,
+        hindex,
+        gindex
+    };
+    try {
+        await conn.query(insertSql,
+            [row.game, row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.hindex, row.gindex]);
+    } catch (e) {
+        await conn.query(updateSql, [row.game_name, row.total_ratings, row.num_ratings, row.bgg_ranking, row.bgg_rating, row.normalised_ranking, row.total_plays, row.hindex, row.gindex, row.game]);
+    }
+}
+
+async function doUpdateMetadataRules(conn: mysql.Connection, rules: MetadataRuleResult[]) {
+    const deleteSql = "delete from metadata";
+    const insertSql = "insert into metadata  (ruletype, game) values (?,?)";
+    const gamesThatDontExist = await getGamesThatDontExist(conn);
+    const gamesToUse = listMinus(rules.map(r => r.game), gamesThatDontExist);
+    await doEnsureGames(conn, gamesToUse);
+    await conn.query(deleteSql);
+    for (const rule of rules.filter(r => gamesToUse.indexOf(r.game) >= 0)) {
+        await conn.query(insertSql, [rule.rule, rule.game]);
+    }
+}
+
+export async function doSetGeekPlaysForYear(conn: mysql.Connection, geekId: number, startYmdInc: string, endYmdInc: string,
+                                            plays: PlayDataResult[], notGames: number[], playsMonths: { y: number, m: number }[]) {
+    const s = splitYmd(startYmdInc);
+    const e = splitYmd(endYmdInc);
+    const deleteSql = "delete from plays where geek = ? and (year > ? || (year = ? and month >= ?)) and (year < ? || (year = ? and month <= ?))";
+    const deleteSql2 = "delete from plays_normalised where geek = ? and (year > ? || (year = ? and month >= ?)) and (year < ? || (year = ? and month <= ?))";
+    const deleteParams = [ geekId, s.y, s.y, s.m, e.y, e.y, e.m ];
+    const insertSql = "insert into plays (game, geek, playDate, quantity, location, month, year) values ?";
+
+    await conn.query(deleteSql, deleteParams);
+    await conn.query(deleteSql2, deleteParams);
+    const values = [];
+    const yms = new Set<string>();
+    for (const play of plays) {
+        if (notGames.indexOf(play.gameid) >= 0) {
+            continue;
+        }
+        const p = splitYmd(play.date);
+        values.push([play.gameid, geekId, play.date, play.quantity, play.location, p.m, p.y]);
+        const key = `${p.y}-${p.m}`;
+        if (!yms.has(key)) {
+            yms.add(key);
+            playsMonths.push({ y: p.y, m: p.m });
+        }
+    }
+    if (values.length > 0) {
+        await conn.query(insertSql, [values]);
+    }
+}
+

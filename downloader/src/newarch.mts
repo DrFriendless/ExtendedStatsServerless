@@ -1,12 +1,15 @@
 import {HttpResponse, isHttpResponse, loadSystem, System} from "./system.mjs";
-import {ToProcessElement, PlayDataResult, ProcessPlaysForPeriodResult} from "extstats-core";
-import {SendMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 import {
-    ContinuationDownloadRequest,
+    ToProcessElement,
+    PlayDataResult,
+    ProcessPlaysForPeriodResult,
     ContinuationDownloadResponse,
-    DownloadRequest,
-    DownloadResult, URLRequest
-} from "./interfacesv2.mjs";
+    ContinuationDownloadRequest,
+    UpdatePlayedYearsResult,
+    DownloadResult,
+    URLRequest, DownloadRequest, PlayedYearsRequest, RequestStats
+} from "./interfaces.mjs";
+import {SendMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
@@ -15,14 +18,16 @@ import {
 } from "./extraction.mjs";
 import {
     dispatchDesignerData, dispatchEnsureGames, dispatchNoSuchDesigner,
-    dispatchNoSuchGame, dispatchNoSuchPublisher, dispatchPlaysForPeriodResult, dispatchProcessCollectionUpdateGames,
+    dispatchNoSuchGame, dispatchNoSuchPublisher,
+    dispatchPlayedYears, dispatchPlaysForPeriodResult, dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult,
     dispatchProcessUserResult, dispatchPublisherData
 } from "./dispatch.mjs";
-import {between, copyRequestStats, sleep} from "./library.mjs";
+import {between, copyRequestStats, invokeLambdaAsync} from "./library.mjs";
 import {cleanupCollection, splitCollection} from "./functions.mjs";
 import {XMLParser} from "fast-xml-parser";
 
+// Lambda entry point.
 export async function completeProcessUser(event: ContinuationDownloadResponse): Promise<void> {
     const system = await loadSystem();
     if (isHttpResponse(system)) {
@@ -111,7 +116,6 @@ export async function completeProcessCollection(event: ContinuationDownloadRespo
             console.log(`Error: Incorrect DOM for URL ${cx.continuationData.url}`);
             console.log(cx.xml);
         } else if (collection === "ComeBackLater") {
-            await system.loadBGGQueues();
             console.log(`Error: come back later for ${cx.continuationData.geek}`);
             const req = makeDownloadRequest(event.continuationData, "downloader_completeProcessCollection", system.usersToken, event.results[0].url);
             req.attempts = event.attempts;
@@ -121,14 +125,14 @@ export async function completeProcessCollection(event: ContinuationDownloadRespo
             // TODO
         } else {
             const ids = collection.items.map(item => item.gameId);
-            console.log(ids);
+            // console.log(ids);
             // make sure that all of these games are in the database
             // if there are a lot, this lambda might timeout, but next time more of them will be there.
             collection.completed = new Date().getTime();
             await dispatchEnsureGames(system, ids);
-            console.log(`Collection data size ${JSON.stringify(collection).length}`);
+            // console.log(`Collection data size ${JSON.stringify(collection).length}`);
             for (const games of splitCollection(collection)) {
-                console.log(`subcollection data size ${JSON.stringify(games).length}`);
+                // console.log(`subcollection data size ${JSON.stringify(games).length}`);
                 await dispatchProcessCollectionUpdateGames(system, games);
             }
             collection.completed = new Date().getTime();
@@ -161,6 +165,17 @@ export async function completeProcessGame(event: ContinuationDownloadResponse): 
     }
 }
 
+function newStats(): RequestStats {
+    return {
+        requestId: crypto.randomUUID(),
+        initiated: new Date().getTime(),
+        completed: 0,
+        downloaded: 0,
+        scheduled: 0,
+        received: 0
+    }
+}
+
 function makeDownloadRequest(continuationData: any, functionName: string, token: string, url: string): ContinuationDownloadRequest {
     return {
         type: "continuation",
@@ -169,13 +184,8 @@ function makeDownloadRequest(continuationData: any, functionName: string, token:
         requests: [
             {bggApiKey: token, url }
         ],
-        requestId: crypto.randomUUID(),
         attempts: 0,
-        initiated: new Date().getTime(),
-        completed: 0,
-        downloaded: 0,
-        scheduled: 0,
-        received: 0
+        ...newStats()
     };
 }
 
@@ -183,7 +193,8 @@ function makeDownloadRequest(continuationData: any, functionName: string, token:
 export async function prehandle(events: ToProcessElement[]) {
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
-    await system.loadBGGQueues();
+
+    console.log(JSON.stringify(events));
 
     for (const event of events) {
         if (event.processMethod === "processUser") {
@@ -223,7 +234,6 @@ export async function prehandle(events: ToProcessElement[]) {
         } else if (event.processMethod === "processYear") {
             const parts = event.url.split("=");
             const firstPageUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${event.geek}&type=thing&mindate=${parts[0]}&maxdate=${parts[1]}&subtype=boardgame&page=1`;
-            console.log(JSON.stringify(event));
             const req = makeDownloadRequest({
                 geek: event.geek,
                 url: event.url,
@@ -233,8 +243,12 @@ export async function prehandle(events: ToProcessElement[]) {
             }, "downloader_completeProcessPlays", system.extrasToken, firstPageUrl);
             console.log(JSON.stringify(req));
             await sendToInputQueue(system, req);
+        } else if (event.processMethod === "processPlayed") {
+            console.log(`* updating played years for ${event.geek} ${event.geekid}`);
+            const e: PlayedYearsRequest = { geek: event.geek, geekid: event.geekid, fileId: event.id, ...newStats() };
+            await invokeLambdaAsync("downloader_processPlayedYears", e);
         } else {
-            console.log(JSON.stringify(event));
+            console.log("Error: don't know what to do here.");
             // TODO - what else is there?
         }
     }
@@ -245,13 +259,43 @@ function getMaxPagesFromXml(doc: any) {
     return Math.floor((maxEntries + 99) / 100);
 }
 
+// Lambda entry point.
+export async function handleUpdatePlayedYears(event: PlayedYearsRequest) {
+    const system = await loadSystem();
+    if (isHttpResponse(system)) return system;
+
+    const thisYear = (new Date()).getFullYear();
+    const periods = [
+        { start: "0000-0-0", end: "1979-12-31" },
+        { start: "1980-0-0", end: "1989-12-31" },
+        { start: "1990-0-0", end: "1999-12-31" },
+    ];
+    let y = 2000;
+    while (y <= thisYear) {
+        periods.push({ start: `${y}-0-0`, end: `${y}-12-31` });
+        y++;
+    }
+    const nextUpdate = new Date();
+    nextUpdate.setFullYear(thisYear + 1);
+    nextUpdate.setMonth(0);
+    nextUpdate.setDate(2);
+    const result: UpdatePlayedYearsResult = {
+        geek: event.geek,
+        fileId: event.fileId,
+        nextUpdate,
+        periods,
+        ...copyRequestStats(event, { completed: new Date().getTime() })
+    };
+    console.log(JSON.stringify(result));
+    await dispatchPlayedYears(system, result);
+}
+
 export async function completeProcessPlays(event: ContinuationDownloadResponse): Promise<void> {
     const system = await loadSystem();
     if (isHttpResponse(system)) {
         console.log(JSON.stringify(system));
         return;
     }
-    await system.loadBGGQueues();
     console.log(JSON.stringify(event));
     event.received = new Date().getTime();
     const stats = copyRequestStats(event, { completed: new Date().getTime() });
@@ -344,12 +388,7 @@ async function processPlays(system: System, event: ContinuationDownloadResponse,
         endYmdInc: event.continuationData.endYmdInc,
         startYmdInc: event.continuationData.startYmdInc,
         url: event.continuationData.url,
-        // TODO - use real stats
-        initiated: 0,
-        scheduled: 0,
-        received: 0,
-        downloaded: 0,
-        completed: 0
+        ...copyRequestStats(event, { completed: new Date().getTime() })
     }
     console.log(JSON.stringify(result));
     await dispatchPlaysForPeriodResult(system, result);
@@ -390,7 +429,7 @@ async function extractContinuationDataSingle(system: System, event: Continuation
 }
 
 async function retrieveXml(system: System, dlr: DownloadResult): Promise<string | HttpResponse> {
-    console.log(JSON.stringify(dlr));
+    // console.log(JSON.stringify(dlr));
     switch (dlr.type) {
         case "content": return dlr.content;
         case "failure": return "";

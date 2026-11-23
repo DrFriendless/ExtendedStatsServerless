@@ -18,7 +18,6 @@ import {
 } from "extstats-core";
 import {
     doEnsureUsers,
-    doListToProcess,
     doEnsureGames,
     doMarkGameDoesNotExist,
     doMarkUrlProcessed,
@@ -30,30 +29,15 @@ import {
     doUpdateMetadata,
     doUpdateProcessUserResult,
     doMarkGeekDoesNotExist,
-    getGeeksThatDontExist,
     doUpdatePlaysForPeriod,
     doMarkPlaysUrlProcessed,
     doProcessDesignerResult,
     doProcessPublisherResult, doReprocessPlays, doRebuildMaterialisedViews, doMarkDesignerDoesNotExist,
-    doMarkPublisherDoesNotExist, doUpdateLastScheduledForUrls
+    doMarkPublisherDoesNotExist
 } from "./mysql-rds.mjs";
-import {invokeLambdaAsync, listAdd, sendMessage, sendToQueueWithDelay} from "./library.mjs";
+import { listAdd, sendMessage, sendToQueueWithDelay} from "./library.mjs";
 import {loadSystem, System} from "./system.mjs";
 import {flushLogging, initLogging, log} from "./logging.mjs";
-
-const OUTSIDE_PREFIX = "downloader_";
-
-// method names from the database - this is the type of thing we have to do.
-const METHOD_PROCESS_USER = "processUser";
-const METHOD_PROCESS_COLLECTION = "processCollection";
-const METHOD_PROCESS_PLAYED = "processPlayed";
-const METHOD_PROCESS_GAME = "processGame";
-const METHOD_PROCESS_YEAR = "processYear";
-const METHOD_PROCESS_DESIGNER = "processDesigner";
-const METHOD_PROCESS_PUBLISHER = "processPublisher";
-
-// lambda names we expect to see
-const FUNCTION_PREHANDLE = "prehandle";
 
 dotenv.config({ path: ".env", quiet: true });
 
@@ -67,7 +51,7 @@ async function main() {
     await initLogging(system, "InsideQueue");
     let slowdowns = 0;
     const sqsClient = new SQSClient({ region: REGION });
-    let lastTime = new Date().getTime();
+    // let lastTime = new Date().getTime();
     while (true) {
         // console.log(`... waiting for queue with ${slowdowns} slowdowns.`);
         // Credentials are granted to the EC2 hosting this so we don't need to add them here.
@@ -78,101 +62,10 @@ async function main() {
         if (response.Messages) {
             slowdowns += await handleMessages(system, sqsClient, response.Messages, system.downloaderQueue);
         }
-        const thisTime = new Date().getTime();
-        const howManyToDo = Math.floor((thisTime - lastTime) / 6000) - slowdowns;
-        if (howManyToDo > 0) {
-            console.log(`Scheduling ${howManyToDo} tasks after ${thisTime - lastTime} millis`);
-            lastTime = thisTime;
-            await noMessages(system, howManyToDo);
-        }
         await flushLogging();
     }
     log("We terminated.");
     await flushLogging();
-}
-
-interface PlayedYearsEvent {
-    geek: string;
-    geekid: number;
-    fileId: number;
-}
-
-async function scheduleProcessing(element: ToProcessElement, retry: boolean): Promise<ToProcessElement | undefined> {
-    const sch = retry ? "rescheduling" : "scheduling";
-
-    if (element.processMethod === METHOD_PROCESS_USER || element.processMethod === METHOD_PROCESS_GAME ||
-        element.processMethod === METHOD_PROCESS_DESIGNER || element.processMethod === METHOD_PROCESS_PUBLISHER ||
-        element.processMethod === METHOD_PROCESS_COLLECTION || element.processMethod === METHOD_PROCESS_YEAR) {
-        console.log(`${sch} ${element.processMethod} ${element.geek || element.bggid}`);
-        return element;
-    } else if (element.processMethod === METHOD_PROCESS_PLAYED) {
-        console.log(`* updating played years for ${element.geek} ${element.geekid}`);
-        // await updatePlayedYears(system, element.geek, element.geekid, element.id);
-        const event: PlayedYearsEvent = { geek: element.geek, geekid: element.geekid, fileId: element.id };
-        await invokeLambdaAsync("downloader_insideProcessPlayedYears", event);
-        return undefined;
-    }
-}
-
-async function getRetries(system: System): Promise<ToProcessElement[]> {
-    const sqsClient = new SQSClient({ region: REGION });
-    const input: ReceiveMessageCommandInput = { QueueUrl: system.retryQueue, WaitTimeSeconds: 1, MaxNumberOfMessages: 1 };
-    const command = new ReceiveMessageCommand(input);
-    const response = await sqsClient.send(command);
-    const result: ToProcessElement[] = [];
-    if (response.Messages) {
-        console.log(`Found ${response.Messages.length} retries`);
-        for (const m of response.Messages) {
-            const payload: ToProcessElement | undefined = m.Body ? JSON.parse(m.Body) : undefined;
-            if (payload) result.push(payload);
-            await sqsClient.send(new DeleteMessageCommand({ QueueUrl: system.retryQueue, ReceiptHandle: m.ReceiptHandle }));
-        }
-        return result;
-    } else {
-        return [];
-    }
-}
-
-async function noMessages(system: System, howManyToDo: number): Promise<void> {
-    const retries = await getRetries(system);
-    if (retries.length > 0) {
-        for (const element of retries) {
-            console.log(`Processing retry ${element.url}`);
-            await scheduleProcessing(element, true);
-        }
-    }
-    const geeksThatDontExist = await system.returnWithConnection(getGeeksThatDontExist);
-    const todo: ToProcessElement[] =
-        await system.returnWithConnection(conn =>
-            doListToProcess(conn, howManyToDo, ["processUser", "processCollection", "processGame", "processPlayed", "processYear", "processDesigner", "processPublisher"]));
-    const batch: ToProcessElement[] = [];
-    const throttle: ProcessMethod[] = [];
-    for (const element of todo) {
-        if (!!element.geek && geeksThatDontExist.includes(element.geek)) {
-            // this shouldn't happen.
-            log(`Geek ${element.geek} doesn't even exist.`);
-            await system.withConnectionAsync(conn => doMarkUrlProcessed(conn, element.processMethod as ProcessMethod, element.url));
-        } else if (throttle.indexOf(element.processMethod as ProcessMethod) < 0) {
-            const e = await scheduleProcessing(element, false);
-            if (e) {
-                batch.push(e);
-            } else {
-                throttle.push(element.processMethod as ProcessMethod);
-                await system.withConnectionAsync(async conn => await doUpdateLastScheduledForUrls(conn, [element.url]));
-            }
-        } else {
-            console.log(`Throttled ${element.processMethod} ${element.url}`);
-        }
-    }
-    if (batch.length === 0) {
-        console.log("Couldn't find any files to process.");
-    } else {
-        if (batch.length < howManyToDo) {
-            console.log(`Only found ${batch.length} files to send to prehandle.`);
-        }
-        await system.withConnectionAsync(async conn => await doUpdateLastScheduledForUrls(conn, batch.map(element => element.url)));
-        await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PREHANDLE, batch);
-    }
 }
 
 interface SQSMessage {

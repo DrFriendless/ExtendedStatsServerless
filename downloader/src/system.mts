@@ -1,5 +1,5 @@
 import {GetParameterCommand, GetParametersByPathCommand, SSMClient, PutParameterCommand} from "@aws-sdk/client-ssm";
-import {SQSClient, ListQueuesCommand} from "@aws-sdk/client-sqs";
+import {SendMessageCommand, SQSClient, ListQueuesCommand} from "@aws-sdk/client-sqs";
 import {S3Client, GetObjectCommand, PutObjectCommand, PutObjectCommandOutput} from "@aws-sdk/client-s3";
 import {PublishCommand, SNSClient} from "@aws-sdk/client-sns";
 import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
@@ -10,7 +10,16 @@ export async function loadSystem() {
     const s = new System();
     const a = await s.loadSecrets();
     if (isHttpResponse(a)) return a;
+    const b = await s.loadBGGQueues();
+    if (isHttpResponse(b)) return b;
     return await s.loadBGGSecrets();
+}
+
+// this is what the message broker is expecting
+interface WebsockMessage {
+    users: string[];
+    topics: string[];
+    body: any;
 }
 
 export class System {
@@ -19,10 +28,12 @@ export class System {
     snsTopic: string;
     metadataFile: string;
     downloaderQueue: string;
+    downloaderQueueFifo: string;
     inputQueue: string | undefined;
     playsQueue: string | undefined;
     retryQueue: string | undefined;
-    outputQueue: string | undefined;
+    messageQueue: string | undefined;
+
     lastRequestTime: number;
     usersFile: string;
     systemLogGroup: string;
@@ -71,7 +82,11 @@ export class System {
             } else if (url.endsWith("RetryQueue")) {
                 this.retryQueue = url;
             } else if (url.endsWith("OutputQueue")) {
-                this.outputQueue = url;
+                this.downloaderQueue = url;
+            } else if (url.endsWith("OutputQueue.fifo")) {
+                this.downloaderQueueFifo = url;
+            } else if (url.endsWith("MessageQueue")) {
+                this.messageQueue = url;
             }
         }
         return this;
@@ -121,12 +136,6 @@ export class System {
                         break;
                     case `${path}/usersFile`:
                         this.usersFile = p.Value;
-                        break;
-                    case `${path}/queue`:
-                        this.downloaderQueue = p.Value;
-                        break;
-                    case `${path}/playsqueue`:
-                        this.playsQueue = p.Value;
                         break;
                     case `${path}/cache`:
                         this.cacheBucket = p.Value;
@@ -200,6 +209,20 @@ export class System {
             })
         );
         console.log(JSON.stringify(response));
+    }
+
+    async sendMessage(geeks: string[], topics: string[], body: any): Promise<void> {
+        const sqs = new SQSClient({ region: process.env.REGION });
+        const payload: WebsockMessage = { body, topics, users: geeks };
+        const command = new SendMessageCommand({
+            QueueUrl: this.messageQueue,
+            MessageBody: JSON.stringify(payload)
+        });
+        try {
+            const resp = await sqs.send(command);
+        } catch (error) {
+            console.log(error);
+        }
     }
 }
 

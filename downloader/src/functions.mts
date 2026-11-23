@@ -1,11 +1,9 @@
-import {between, copyRequestStats, sleep} from "./library.mjs";
+import {between, copyRequestStats} from "./library.mjs";
 import {
     dispatchMarkAsProcessed,
     dispatchMarkAsTryAgainTomorrow,
     dispatchMarkAsUnprocessed,
-    dispatchPlaysForPeriodResult,
     dispatchProcessCleanUpCollection,
-    dispatchSlowDown,
     dispatchUpdateMetadata,
     dispatchUpdateTop50,
     dispatchUpdateUserList
@@ -13,23 +11,18 @@ import {
 import {
     CleanUpCollectionResult,
     FileToProcess,
-    METADATA_RULE_BASEGAME,
-    MetadataRuleResult, PlayDataResult, ProcessCollectionResult, ProcessPlaysForPeriodResult,
-    SeriesMetadataResult, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
-} from "extstats-core";
+    MetadataRuleResult, ProcessCollectionResult, SeriesMetadataResult, UpdateMetadataMessage, UpdateTop50Message, UpdateUserListMessage
+} from "./interfaces.mjs";
 import {isHttpResponse, loadSystem, System} from "./system.mjs";
-import {flushLogging, initLogging, log} from "./logging.mjs";
-import {XMLParser} from "fast-xml-parser";
 import * as _ from 'lodash-es';
-import {DeleteMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 
 const MAX_GAMES_PER_CALL = 1000;
+const METADATA_RULE_BASEGAME = 1;
 
 // Lambda to get the list of users from pastebin and stick it on a queue to be processed.
 export async function processUserList(_: UpdateUserListMessage) {
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
-    await initLogging(system, "processUserList");
 
     console.log(system.usersFile);
     const resp = await fetch(system.usersFile);
@@ -50,7 +43,6 @@ export async function processUserList(_: UpdateUserListMessage) {
 export async function processMetadata(_: UpdateMetadataMessage) {
     const system = await loadSystem();
     if (isHttpResponse(system)) return system;
-    await initLogging(system, "processMetadata");
 
     const resp = await fetch(system.metadataFile);
     const data = await resp.text();
@@ -80,10 +72,9 @@ export async function processMetadata(_: UpdateMetadataMessage) {
                 }
             }
         }
-        if (!handled) log(`Did not understand metadata: ${line}`);
+        if (!handled) console.log(`Did not understand metadata: ${line}`);
     }
     await dispatchUpdateMetadata(system, { series, rules });
-    await flushLogging();
 }
 
 export async function processBGGTop50(ignored: UpdateTop50Message) {
@@ -105,17 +96,6 @@ export async function processBGGTop50(ignored: UpdateTop50Message) {
     console.log(JSON.stringify(top100));
     const top50 = _.take(top100, 50);
     await dispatchUpdateTop50(system, top50);
-}
-
-async function fetchXMLFromBGG(token: string, url: string, task: object): Promise<string | undefined> {
-    const resp = await fetchFromBGG(token, url);
-    console.log(resp.url, resp.status);
-    const xml = await resp.text();
-    if (xml.indexOf("Rate limit exceeded") >= 0) {
-        log(`Rate limit exceeded downloading ${url}, task was ${JSON.stringify(task)}`);
-        return undefined;
-    }
-    return xml;
 }
 
 async function fetchFromBGG(token: string, url: string): Promise<Response> {
@@ -152,108 +132,4 @@ export function splitCollection(original: ProcessCollectionResult): ProcessColle
     const stats = copyRequestStats(original);
     return _.chunk(original.items, MAX_GAMES_PER_CALL)
         .map(items => { return { geek: original.geek, items: items, ...stats }; });
-}
-
-interface QueueInput {
-    Records: {
-        receiptHandle: string;
-        body: string;
-        awsRegion: string;
-    }[]
-}
-
-export async function processPlayed(event: QueueInput) {
-    const system = await loadSystem();
-    if (isHttpResponse(system)) return system;
-    await initLogging(system, "processPlayed");
-
-    const parser = new XMLParser({
-        ignoreAttributes: false, trimValues: true,
-        isArray: (name, jpath, isLeafNode, isAttribute) => {
-            if (["play","subtype","player","comments"].indexOf(name) >= 0) return true;
-            if (["item","players","subtypes"].indexOf(name) >= 0) return false;
-            if (name.startsWith("@_") || name.startsWith("?")) return false;
-            console.log(name);
-            return false;
-        }
-    });
-
-    console.log(event);
-    for (const record of event.Records) {
-        const invocation = JSON.parse(record.body);
-        const baseUrl = `https://boardgamegeek.com/xmlapi2/plays?username=${invocation.geek}&type=thing&mindate=${invocation.startYmdInc}&maxdate=${invocation.endYmdInc}&subtype=boardgame&page=`;
-        const plays: PlayDataResult[] = [];
-        let maxEntries: number | undefined;
-        let maxPages = 1000;
-        let pageNum = 1;
-        while (pageNum <= maxPages) {
-            await sleep(2000);
-            const url = baseUrl + pageNum;
-            const xml = await fetchXMLFromBGG(system.playsToken, url, invocation);
-            if (!xml) {
-                console.log(`Slowdown on page ${pageNum}`);
-                await dispatchSlowDown(system);
-                return;
-            }
-            const doc = parser.parse(xml);
-            if (maxEntries === undefined) {
-                if (!doc.plays) {
-                    console.log(JSON.stringify(doc));
-                } else {
-                    maxEntries = parseInt(doc.plays['@_total']);
-                    maxPages = Math.floor((maxEntries + 99)/100);
-                    console.log(`maxEntries=${maxEntries} ${maxPages}`);
-                }
-            }
-            if (!maxEntries) break;
-            let playCount = 0;
-            if (!doc.plays || !doc.plays.play) {
-                console.log(`broken on page ${pageNum}`);
-                console.log(xml);
-                break;
-            }
-            for (const play of doc.plays.play) {
-                const p: PlayDataResult = {
-                    quantity: parseInt(play['@_quantity']),
-                    location: play['@_location'],
-                    date: play['@_date'],
-                    gameid: parseInt(play.item['@_objectid']),
-                    id: parseInt(play['@_id'])
-                }
-                if (p.quantity > 0) plays.push(p);
-                playCount++;
-            }
-            console.log(`Page ${pageNum} ${playCount}`);
-            if (playCount === 0) break;
-            pageNum++;
-        }
-        const result: ProcessPlaysForPeriodResult = {
-            processMethod: invocation.processMethod,
-            plays: plays,
-            geek: invocation.geek,
-            endYmdInc: invocation.endYmdInc,
-            startYmdInc: invocation.startYmdInc,
-            url: invocation.url,
-            // TODO - use real stats
-            initiated: 0,
-            scheduled: 0,
-            received: 0,
-            downloaded: 0,
-            completed: 0
-        }
-        await dispatchPlaysForPeriodResult(system, result);
-
-        // ack message
-        const sqsClient = new SQSClient({ region: record.awsRegion });
-        const command = new DeleteMessageCommand({
-            QueueUrl: system.playsQueue,
-            ReceiptHandle: record.receiptHandle
-        });
-        const response = await sqsClient.send(command);
-        console.log(JSON.stringify(response));
-        if (response.$metadata.httpStatusCode !== 200) {
-            await system.publishError(JSON.stringify(response), "processPlayed");
-        }
-    }
-    await flushLogging();
 }
