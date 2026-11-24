@@ -1,4 +1,4 @@
-import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
+import {findMiscSystem, HttpResponse, isHttpResponse} from "./miscsystem.mjs";
 import {
     CloudWatchClient,
     CloudWatchServiceException,
@@ -7,7 +7,7 @@ import {
 } from "@aws-sdk/client-cloudwatch";
 
 export async function handler(ignored: any): Promise<Record<string, number> | HttpResponse> {
-    const system = await findSystem([]);
+    const system = await findMiscSystem([]);
     if (isHttpResponse(system)) return system;
 
     const client = new CloudWatchClient({});

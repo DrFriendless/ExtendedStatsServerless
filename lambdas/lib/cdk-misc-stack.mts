@@ -35,20 +35,6 @@ export const RUNTIME = lambda.Runtime.NODEJS_24_X;
 type OptsType = "bgg" | "db" | "logging" | "cw" | "dynamo" | "single" | "sqs" | "ssm" | "message" | "downloader";
 
 export class MiscStack extends cdk.Stack {
-  // don't do this, it costs too much.
-  // defineVpcEndpoints() {
-  //   DATABASE_VPC.addInterfaceEndpoint("ep", {
-  //     service: ec2.InterfaceVpcEndpointAwsService.SSM,
-  //     open: true,
-  //     ipAddressType: VpcEndpointIpAddressType.IPV4
-  //   })
-  //   DATABASE_VPC.addInterfaceEndpoint("ep2", {
-  //     service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-  //     open: true,
-  //     ipAddressType: VpcEndpointIpAddressType.IPV4
-  //   })
-  // }
-
   defineAccessDynamoPolicy(): iam.PolicyDocument {
     const accessDynamo = new iam.PolicyStatement();
     accessDynamo.addActions(
@@ -70,60 +56,6 @@ export class MiscStack extends cdk.Stack {
     );
     return new iam.PolicyDocument({
       statements: [accessDynamo]
-    });
-  }
-
-  defineAuthStateMachine(threadFunc: lambda.Function): sfn.StateMachine {
-    const authLogs = new logs.LogGroup(this, "AuthStateMachineLogs", {
-      retention: logs.RetentionDays.ONE_WEEK,
-    });
-    return new sfn.StateMachine(this, 'authStateMachine', {
-      stateMachineName: "authStateMachineExpress",
-      stateMachineType: sfn.StateMachineType.EXPRESS,
-      timeout: Duration.minutes(5),
-      logs: {
-        destination: authLogs,
-        level: sfn.LogLevel.ERROR,
-        includeExecutionData: true,
-      },
-      definitionBody: sfn.DefinitionBody.fromChainable(
-          new tasks.LambdaInvoke(this, "threadTask", {
-            lambdaFunction: threadFunc,
-          }).next(
-              new tasks.LambdaInvoke(this, "confirmTask", {
-                lambdaFunction: CONFIRM_LAMBDA,
-              }).next(
-                  new sfn.Succeed(this, "Thread processed")
-              )
-          )
-      ),
-    });
-  }
-
-  defineCountsStateMachine(cwFunction: lambda.Function, countFunction: lambda.Function) {
-    const countsLogs = new logs.LogGroup(this, "CountsStateMachineLogs", {
-      retention: logs.RetentionDays.ONE_WEEK,
-    });
-    return new sfn.StateMachine(this, 'countsStateMachine', {
-      stateMachineName: "countsStateMachineExpress",
-      stateMachineType: sfn.StateMachineType.EXPRESS,
-      timeout: Duration.minutes(5),
-      logs: {
-        destination: countsLogs,
-        level: sfn.LogLevel.ERROR,
-        includeExecutionData: true,
-      },
-      definitionBody: sfn.DefinitionBody.fromChainable(
-          new tasks.LambdaInvoke(this, "cwCountTask", {
-            lambdaFunction: cwFunction,
-          }).next(
-              new tasks.LambdaInvoke(this, "dbCountTask", {
-                lambdaFunction: countFunction,
-              }).next(
-                  new sfn.Succeed(this, "Counts processed")
-              )
-          )
-      ),
     });
   }
 
@@ -304,13 +236,6 @@ export class MiscStack extends cdk.Stack {
     });
   }
 
-  defineMessageQueue(): sqs.Queue {
-    return new sqs.Queue(this, "messageQueue", {
-      queueName: "MessageQueue",
-      visibilityTimeout: Duration.seconds(120)
-    });
-  }
-
   lookupExternalResources() {
     // resources external to this stack
     DATABASE_VPC = ec2.Vpc.fromLookup(this, "vpc", {vpcId: "vpc-5c8a7a3b"});
@@ -326,41 +251,5 @@ export class MiscStack extends cdk.Stack {
     super(scope, id, props);
     this.lookupExternalResources();
     ACCESS_DYNAMO = this.defineAccessDynamoPolicy();
-
-    // the VPC endpoint is so that the Lambdas inside the VPC can see the parameter store which is public.
-    // We don't use it because it's expensive, so the Lambdas inside the VPC have to be given their settings as environment variables.
-    // this.defineVpcEndpoints();
-    const threadFunction = this.defineLambda("misc_auth_thread", "auththread.handler", ["bgg"], "public", 1);
-    const sm = this.defineAuthStateMachine(threadFunction);
-    const rule = this.defineScheduleToInvokeAuth(sm, 1);
-    const countFunction = this.defineLambda("misc_counts", "counts.handler", ["db","dynamo"], "private", 4);
-    const cwFunction = this.defineLambda("misc_cw", "cloudwatch.handler", ["cw"], "public", 5);
-    const sm2 = this.defineCountsStateMachine(cwFunction, countFunction);
-    const rule6 = this.defineScheduleToInvokeCounts(sm2, 6);
-    const messageQueue = this.defineMessageQueue();
-    const dailyFunction = this.defineLambda("misc_daily", "daily.dailyTasks", ["ssm", "downloader"], "public", 8);
-    // schedules are the new way to do rules
-    const schedule7 = this.defineScheduleToInvokeDaily(dailyFunction, 9);
-
-    new cdk.CfnOutput(this, 'MessageQueue', {
-      value: messageQueue.queueUrl,
-      exportName: 'misc-MessageQueueURL'
-    });
-    new cdk.CfnOutput(this, 'MessageQueueARN', {
-      value: messageQueue.queueArn,
-      exportName: 'misc-MessageQueueARN'
-    });
-
-    let messageLambda: lambda.IFunction = this.defineLambda("misc_message", "message.handler", ["dynamo","single","sqs","ssm","message"], "public", 7);
-    if (messageLambda) {
-      const mapping = new sources.SqsEventSource(messageQueue, {batchSize: 10, enabled: false, maxBatchingWindow: Duration.seconds(3) });
-      messageLambda.addEventSource(mapping);
-      new cdk.CfnOutput(this, 'messageMapping', {
-        value: mapping.eventSourceMappingId,
-        exportName: 'misc-MessageMappingUUID'
-      });
-    } else {
-      console.log("There isn't any message lambda");
-    }
   }
 }

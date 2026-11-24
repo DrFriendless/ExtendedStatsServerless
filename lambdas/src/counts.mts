@@ -1,4 +1,4 @@
-import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
+import {findMiscSystem, HttpResponse, isHttpResponse} from "./miscsystem.mjs";
 import {DescribeTableCommand, DynamoDBClient} from "@aws-sdk/client-dynamodb";
 
 interface Counters {
@@ -77,7 +77,7 @@ async function getDynamoDBMetrics(): Promise<{ geek_table: number, connection_ta
 export async function handler(event: { Payload: CloudWatchPayload }): Promise<void | HttpResponse> {
     console.log(event.Payload);
     const cw = event.Payload;
-    const system = await findSystem(["db"]);
+    const system = await findMiscSystem(["db"]);
     if (isHttpResponse(system)) return system;
 
     const { geek_table, connection_table } = await getDynamoDBMetrics();

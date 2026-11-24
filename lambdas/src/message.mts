@@ -2,7 +2,7 @@ import {QueueInput, WebsockMessage,} from "./interfaces.mjs";
 import { DynamoDBClient} from "@aws-sdk/client-dynamodb";
 import { ApiGatewayManagementApi } from "@aws-sdk/client-apigatewaymanagementapi";
 import {DeleteMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
-import {findSystem, isHttpResponse} from "./system.mjs";
+import {findMiscSystem, isHttpResponse} from "./miscsystem.mjs";
 import {
     DynamoDBDocumentClient,
     QueryCommand,
@@ -44,7 +44,7 @@ export async function handler(queueEvent: QueueInput): Promise<void> {
     });
 
     // console.log(JSON.stringify(queueEvent));
-    const system = await findSystem(["message"]);
+    const system = await findMiscSystem(["message"]);
     if (isHttpResponse(system)) return;
 
     const postCalls: Promise<void>[] = [];

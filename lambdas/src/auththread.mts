@@ -1,11 +1,11 @@
 import {APIGatewayProxyEvent} from "aws-lambda";
-import {findSystem, HttpResponse, isHttpResponse} from "./system.mjs";
+import {findMiscSystem, HttpResponse, isHttpResponse} from "./miscsystem.mjs";
 import {XMLParser} from "fast-xml-parser";
 import {PutParameterCommand, SSMClient} from "@aws-sdk/client-ssm";
 
 export async function handler(event: APIGatewayProxyEvent): Promise<any[] | HttpResponse> {
     console.log(JSON.stringify(event));
-    const system = await findSystem(["bgg"]);
+    const system = await findMiscSystem(["bgg"]);
     if (isHttpResponse(system)) return system;
 
     const url = `${system.authcheckThread}&minarticleid=${system.minarticleid}`;

@@ -4,8 +4,8 @@ import * as mysql from 'promise-mysql';
 
 const BGG_SECRETS = "extstats/bgg";
 
-export async function findSystem(opts: string[]): Promise<System | HttpResponse> {
-    const s = new System();
+export async function findMiscSystem(opts: string[]): Promise<MiscSystem | HttpResponse> {
+    const s = new MiscSystem();
     if (opts.includes("bgg")) await s.loadBGGSecrets();
     if (opts.includes("logging")) await s.loadLoggingSecrets();
     if (opts.includes("db")) await s.loadDatabaseSecrets();
@@ -13,7 +13,7 @@ export async function findSystem(opts: string[]): Promise<System | HttpResponse>
     return s;
 }
 
-export class System {
+export class MiscSystem {
     public forumChecker: string | undefined;
     public minarticleid: number;
     public authcheckThread: string | undefined;

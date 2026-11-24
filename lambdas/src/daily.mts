@@ -1,8 +1,8 @@
 import {SendMessageCommand, SendMessageCommandOutput, SQSClient} from "@aws-sdk/client-sqs";
-import {findSystem, isHttpResponse} from "./system.mjs";
+import {findMiscSystem, isHttpResponse} from "./miscsystem.mjs";
 
 export async function dailyTasks(event: any) {
-    const system = await findSystem(["message"]);
+    const system = await findMiscSystem(["message"]);
     if (isHttpResponse(system)) return system;
 
     const body = { discriminator: "RebuildMaterialisedViews" };
