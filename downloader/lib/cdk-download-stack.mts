@@ -19,33 +19,52 @@ import {CACHE_BUCKET, COMPONENT, DEPLOYMENT_BUCKET, LAMBDA_SPECS, INSIDE_LAMBDA_
 
 const RUNTIME = lambda.Runtime.NODEJS_24_X;
 
-// bgg - access BoardGameGeek, needs to be public
-// db - access to the database, needs to be private
-// logging - ability to write to CloudWatch logs
-// cw - ability to read CloudWatch metrics, needs to be public
-// dynamo - access DynamoDB
-// single - max concurrency 1
-// downloader - access to send to downloader queue
-type OptsType = "bgg" | "db" | "logging" | "cw" | "dynamo" | "single" | "sqs" | "ssm" | "message" | "downloader";
-
 let ZIP_BUCKET: s3.IBucket | undefined = undefined;
 let DATABASE_VPC: ec2.IVpc = undefined;
 let PRIVATE_SUBNET_A: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
 let CONFIRM_LAMBDA: lambda.IFunction = undefined;
+// prebuilt permissions
+let LAMBDA_POLICIES: iam.IManagedPolicy[] = [];
+let LAMBDA_POLICIES_WITH_DATABASE: iam.IManagedPolicy[] = [];
+let ACCESS_DYNAMO = defineAccessDynamoPolicy();
+
+function defineAccessDynamoPolicy(): iam.PolicyDocument {
+  const accessDynamo = new iam.PolicyStatement();
+  accessDynamo.addActions(
+      "dynamodb:BatchGetItem",
+      "dynamodb:BatchWriteItem",
+      "dynamodb:ConditionCheckItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:DescribeTable",
+      "dynamodb:GetItem",
+      "dynamodb:GetRecords",
+      "dynamodb:GetShardIterator",
+      "dynamodb:PutItem",
+      "dynamodb:Query",
+      "dynamodb:Scan",
+      "dynamodb:UpdateItem");
+  accessDynamo.addResources(
+      "arn:aws:dynamodb:ap-southeast-2:067508173724:table/websocket_connections",
+      "arn:aws:dynamodb:ap-southeast-2:067508173724:table/geek_connections"
+  );
+  return new iam.PolicyDocument({
+    statements: [accessDynamo]
+  });
+}
 
 // user authenticaion via BGG
 class AuthConstruct extends Construct {
-  constructor(stack: DownloadStack, n: number) {
+  constructor(stack: DownloadStack) {
     super(stack, "authConstruct");
-    const role = this.defineAuthRole(stack, n);
+    const role = this.defineAuthRole(stack);
     const threadFunction = this.defineAuthLambda(stack, role);
     const sm = this.defineAuthStateMachine(stack, threadFunction);
-    const authSchedule = this.defineAuthSchedule(stack, sm, n);
+    this.defineAuthSchedule(stack, sm);
   }
 
-  private defineAuthRole(stack: DownloadStack, n: number): iam.Role {
+  private defineAuthRole(stack: DownloadStack): iam.Role {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
     bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
@@ -60,7 +79,7 @@ class AuthConstruct extends Construct {
     return new iam.Role(stack, `role_auth`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       inlinePolicies: policies,
-      managedPolicies: stack.managedPolicies(n),
+      managedPolicies: LAMBDA_POLICIES,
     });
   }
 
@@ -78,7 +97,7 @@ class AuthConstruct extends Construct {
     return f;
   }
 
-  defineAuthSchedule(stack: cdk.Stack, machine: sfn.IStateMachine, n: number): scheduler.Schedule {
+  defineAuthSchedule(stack: cdk.Stack, machine: sfn.IStateMachine): scheduler.Schedule {
     const st1 = new iam.PolicyStatement();
     st1.addActions("states:StartExecution");
     st1.addResources(machine.stateMachineArn);
@@ -87,10 +106,10 @@ class AuthConstruct extends Construct {
         statements: [st1]
       })
     };
-    const role = new iam.Role(stack, 'assumeAuthRole' + n, {
+    const role = new iam.Role(stack, 'assumeAuthRole', {
       assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
     });
-    return new scheduler.Schedule(stack, `authSchedule${n}`, {
+    return new scheduler.Schedule(stack, `authSchedule`, {
       schedule: events.Schedule.cron({ minute: '0' }),
       target: new targets.StepFunctionsStartExecution(machine, { role }),
       description: "Every hour, check the BGG auth thread."
@@ -127,8 +146,183 @@ class AuthConstruct extends Construct {
 
 // daily tasks
 class DailyConstruct extends Construct {
-  constructor(stack: cdk.Stack) {
+  constructor(stack: cdk.Stack, outputQueueArn: string) {
     super(stack, "dailyConstruct");
+    const role = this.defineDailyRole(stack, "downloader_daily", outputQueueArn);
+    const dailyFunction = this.defineDailyLambda(stack, "downloader_daily", "daily.dailyTasks", role);
+    this.defineScheduleToInvokeDaily(dailyFunction);
+  }
+
+  defineDailyLambda(stack: cdk.Stack, name: string, handler: string, role: iam.Role): lambda.Function {
+    const fProps: lambda.FunctionProps = {
+      functionName: name,
+      runtime: RUNTIME,
+      handler,
+      role: role,
+      code: lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip"),
+      timeout: Duration.seconds(60),
+      allowPublicSubnet: true
+    };
+    const f = new lambda.Function(stack, name, fProps);
+    Tags.of(f).add("component", COMPONENT);
+    return f;
+  }
+
+  private defineDailyRole(stack: cdk.Stack, name: string, outputQueueArn: string): iam.Role {
+    const policies: Record<string, iam.PolicyDocument> = {};
+    const access = new iam.PolicyStatement();
+    access.addActions("sqs:SendMessage");
+    access.addResources(outputQueueArn);
+    policies[`policy_${name}_dlq`] = new iam.PolicyDocument({
+      statements: [access]
+    });
+    const parameters = new iam.PolicyStatement();
+    parameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
+    parameters.addResources(`arn:aws:ssm:${stack.region}:${stack.account}:parameter/extstats/*`);
+    policies[`policy_${name}_ssm`] = new iam.PolicyDocument({
+      statements: [parameters]
+    });
+    return new iam.Role(this, `role_${name}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      inlinePolicies: policies,
+      managedPolicies: LAMBDA_POLICIES,
+    });
+  }
+
+  defineScheduleToInvokeDaily(func: lambda.Function): scheduler.Schedule {
+    const role = new iam.Role(this, 'assumeDailyRole', {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
+    });
+    return new scheduler.Schedule(this, `schedule_daily`, {
+      schedule: scheduler.ScheduleExpression.rate(Duration.hours(24)),
+      description: "Once per day run daily tasks, e.g. rebuild materialised views.",
+      target: new targets.LambdaInvoke(func, { role })
+    });
+  }
+}
+
+class MetricsConstruct extends Construct {
+  constructor(stack: cdk.Stack) {
+    super(stack, "metricsConstruct");
+    const countRole = this.defineCountRole("downloader_counts");
+    const countFunction = this.defineCountLambda(stack, "downloader_counts", "counts.handler", countRole);
+    const cwRole = this.defineCloudwatchRole("downloader_cw");
+    const cwFunction = this.defineCloudwatchLambda(stack, "downloader_cw", "cloudwatch.handler", cwRole);
+    const sm2 = this.defineCountsStateMachine(stack, cwFunction, countFunction);
+    this.defineScheduleToInvokeCounts(sm2);
+  }
+
+  private defineCloudwatchRole(name: string): iam.Role {
+    const policies: Record<string, iam.PolicyDocument> = {};
+    const cwPolicy = new iam.PolicyStatement();
+    cwPolicy.addActions("cloudwatch:ListEntitiesForMetric", "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics",
+        "cloudwatch:GetMetricStream", "cloudwatch:ListMetricStreams", "cloudwatch:ListMetrics");
+    cwPolicy.addResources("*");
+    policies[`policy_${name}_cw`] = new iam.PolicyDocument({ statements: [cwPolicy] });
+    const s3Policy = new iam.PolicyStatement();
+    s3Policy.addActions("s3:ListAllMyBuckets");
+    s3Policy.addResources("*");
+    policies[`policy_${name}_s3`] = new iam.PolicyDocument({ statements: [s3Policy] });
+    return new iam.Role(this, `role_${name}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      inlinePolicies: policies,
+      managedPolicies: LAMBDA_POLICIES,
+    });
+  }
+
+  defineCloudwatchLambda(stack: cdk.Stack, name: string, handler: string, role: iam.Role): lambda.Function {
+    const fProps: lambda.FunctionProps = {
+      functionName: name,
+      runtime: RUNTIME,
+      handler,
+      role: role,
+      code: lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip"),
+      timeout: Duration.seconds(60),
+      allowPublicSubnet: true
+    };
+    const f = new lambda.Function(stack, name, fProps);
+    Tags.of(f).add("component", COMPONENT);
+    return f;
+  }
+
+  defineCountRole(name: string): iam.Role {
+    const policies: Record<string, iam.PolicyDocument> = {};
+    policies[`policy_${name}_dynamo`] = ACCESS_DYNAMO;
+    return new iam.Role(this, `role_${name}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      inlinePolicies: policies,
+      managedPolicies: LAMBDA_POLICIES_WITH_DATABASE,
+    });
+  }
+
+  defineCountLambda(stack: cdk.Stack, name: string, handler: string, role: iam.Role): lambda.Function {
+    const fProps: lambda.FunctionProps = {
+      functionName: name,
+      runtime: RUNTIME,
+      handler,
+      role: role,
+      code: lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip"),
+      timeout: Duration.seconds(60),
+      allowPublicSubnet: true,
+      vpc: DATABASE_VPC,
+      vpcSubnets: {
+        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
+      },
+      environment: {}
+    };
+    fProps.environment.MYSQL_HOST = process.env.MYSQL_HOST;
+    fProps.environment.MYSQL_USERNAME = process.env.MYSQL_USERNAME;
+    fProps.environment.MYSQL_PASSWORD = process.env.MYSQL_PASSWORD;
+    fProps.environment.MYSQL_DATABASE = process.env.MYSQL_DATABASE;
+    const f = new lambda.Function(stack, name, fProps);
+    Tags.of(f).add("component", COMPONENT);
+    return f;
+  }
+
+  defineCountsStateMachine(stack: cdk.Stack, cwFunction: lambda.Function, countFunction: lambda.Function) {
+    const countsLogs = new logs.LogGroup(this, "CountsStateMachineLogs", {
+      retention: logs.RetentionDays.ONE_WEEK,
+    });
+    return new sfn.StateMachine(stack, 'countsStateMachine2', {
+      stateMachineName: "countsStateMachineExpress2",
+      stateMachineType: sfn.StateMachineType.EXPRESS,
+      timeout: Duration.minutes(5),
+      logs: {
+        destination: countsLogs,
+        level: sfn.LogLevel.ERROR,
+        includeExecutionData: true,
+      },
+      definitionBody: sfn.DefinitionBody.fromChainable(
+          new tasks.LambdaInvoke(this, "cwCountTask", {
+            lambdaFunction: cwFunction,
+          }).next(
+              new tasks.LambdaInvoke(this, "dbCountTask", {
+                lambdaFunction: countFunction,
+              }).next(
+                  new sfn.Succeed(this, "Counts processed")
+              )
+          )
+      ),
+    });
+  }
+
+  defineScheduleToInvokeCounts(machine: sfn.IStateMachine): scheduler.Schedule {
+    const st1 = new iam.PolicyStatement();
+    st1.addActions("states:StartExecution");
+    st1.addResources(machine.stateMachineArn);
+    const policies: Record<string, iam.PolicyDocument> = {
+      "policy_invoke_counts_thread": new iam.PolicyDocument({
+        statements: [st1]
+      })
+    };
+    const role = new iam.Role(this, 'assumeCountsRole', {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
+    });
+    return new scheduler.Schedule(this, `countsSchedule`, {
+      schedule: events.Schedule.rate(Duration.minutes(10)),
+      target: new targets.StepFunctionsStartExecution(machine, { role }),
+      description: "Every 10 minutes get data from CloudWatch and store it as observability metrics."
+    });
   }
 }
 
@@ -139,7 +333,7 @@ class NetworkingConstruct extends Construct {
 
     // Dedicated route table for the Lambda subnets.
     // No 0.0.0.0/0 route: Lambda ENIs have no public IPv4 address, so the IGW route cannot carry their traffic.
-    const routeTable = new ec2.CfnRouteTable(this, 'LambdaRouteTable', {
+    const routeTable = new ec2.CfnRouteTable(stack, 'LambdaRouteTable', {
       vpcId: DATABASE_VPC.vpcId,
       tags: [{ key: 'Name', value: 'lambda-private-rt' }],
     });
@@ -167,22 +361,53 @@ class NetworkingConstruct extends Construct {
 
 // websock messaging
 class MessageConstruct extends Construct {
-  public accessDynamo: iam.PolicyDocument;
   public messageQueue: sqs.IQueue;
 
-  constructor(stack: DownloadStack) {
+  constructor(stack: cdk.Stack) {
     super(stack, "messageConstruct");
-    this.accessDynamo = this.defineAccessDynamoPolicy();
     this.messageQueue = this.defineMessageQueue(stack);
+    let role = this.defineMessageRole(stack, "downloader_message");
+    let messageLambda: lambda.IFunction = this.defineMessageLambda(stack, "downloader_message", "message.handler", role);
+    const mapping = new sources.SqsEventSource(this.messageQueue, {batchSize: 10, enabled: true, maxBatchingWindow: Duration.seconds(3) });
+    messageLambda.addEventSource(mapping);
+  }
 
-    let messageLambda: lambda.IFunction = stack.defineLambdaComplicated("downloader_message", "message.handler",
-        ["dynamo","single","sqs","ssm","message"], "public", 7, this.accessDynamo, "");
-    if (messageLambda) {
-      const mapping = new sources.SqsEventSource(this.messageQueue, {batchSize: 10, enabled: true, maxBatchingWindow: Duration.seconds(3) });
-      messageLambda.addEventSource(mapping);
-    } else {
-      console.log("There isn't any message lambda");
-    }
+  private defineMessageRole(stack: cdk.Stack, name: string): iam.Role {
+    const policies: Record<string, iam.PolicyDocument> = {};
+    const parameters1 = new iam.PolicyStatement();
+    parameters1.addActions("execute-api:ManageConnections");
+    parameters1.addResources(`arn:aws:execute-api:${stack.region}:${stack.account}:*`);
+    policies[`policy_${name}_exa`] = new iam.PolicyDocument({
+      statements: [parameters1]
+    });
+    const parameters2 = new iam.PolicyStatement();
+    parameters2.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
+    parameters2.addResources(`arn:aws:ssm:${stack.region}:${stack.account}:parameter/extstats/*`);
+    policies[`policy_${name}_ssm`] = new iam.PolicyDocument({
+      statements: [parameters2]
+    });
+    policies[`policy_${name}_dynamo`] = ACCESS_DYNAMO;
+    return new iam.Role(this, `role_${name}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      inlinePolicies: policies,
+      managedPolicies: LAMBDA_POLICIES,
+    });
+  }
+
+  defineMessageLambda(stack: cdk.Stack, name: string, handler: string, role: iam.Role): lambda.Function {
+    const fProps: lambda.FunctionProps = {
+      functionName: name,
+      runtime: RUNTIME,
+      handler,
+      role: role,
+      code: lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip"),
+      timeout: Duration.seconds(60),
+      allowPublicSubnet: true,
+      reservedConcurrentExecutions: 1
+    };
+    const f = new lambda.Function(stack, name, fProps);
+    Tags.of(f).add("component", COMPONENT);
+    return f;
   }
 
   defineMessageQueue(stack: cdk.Stack): sqs.Queue {
@@ -192,29 +417,7 @@ class MessageConstruct extends Construct {
     });
   }
 
-  defineAccessDynamoPolicy(): iam.PolicyDocument {
-    const accessDynamo = new iam.PolicyStatement();
-    accessDynamo.addActions(
-        "dynamodb:BatchGetItem",
-        "dynamodb:BatchWriteItem",
-        "dynamodb:ConditionCheckItem",
-        "dynamodb:DeleteItem",
-        "dynamodb:DescribeTable",
-        "dynamodb:GetItem",
-        "dynamodb:GetRecords",
-        "dynamodb:GetShardIterator",
-        "dynamodb:PutItem",
-        "dynamodb:Query",
-        "dynamodb:Scan",
-        "dynamodb:UpdateItem");
-    accessDynamo.addResources(
-        "arn:aws:dynamodb:ap-southeast-2:067508173724:table/websocket_connections",
-        "arn:aws:dynamodb:ap-southeast-2:067508173724:table/geek_connections"
-    );
-    return new iam.PolicyDocument({
-      statements: [accessDynamo]
-    });
-  }
+
 }
 
 export class DownloadStack extends cdk.Stack {
@@ -228,33 +431,15 @@ export class DownloadStack extends cdk.Stack {
     CONFIRM_LAMBDA = lambda.Function.fromFunctionName(this, "confirmFunc", "auth_confirm");
   }
 
-
-
-  defineCountsStateMachine(cwFunction: lambda.Function, countFunction: lambda.Function) {
-    const countsLogs = new logs.LogGroup(this, "CountsStateMachineLogs", {
-      retention: logs.RetentionDays.ONE_WEEK,
-    });
-    return new sfn.StateMachine(this, 'countsStateMachine2', {
-      stateMachineName: "countsStateMachineExpress2",
-      stateMachineType: sfn.StateMachineType.EXPRESS,
-      timeout: Duration.minutes(5),
-      logs: {
-        destination: countsLogs,
-        level: sfn.LogLevel.ERROR,
-        includeExecutionData: true,
-      },
-      definitionBody: sfn.DefinitionBody.fromChainable(
-          new tasks.LambdaInvoke(this, "cwCountTask", {
-            lambdaFunction: cwFunction,
-          }).next(
-              new tasks.LambdaInvoke(this, "dbCountTask", {
-                lambdaFunction: countFunction,
-              }).next(
-                  new sfn.Succeed(this, "Counts processed")
-              )
-          )
-      ),
-    });
+  lookupManagedPolicies() {
+    LAMBDA_POLICIES = [
+      iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s", "CreateEC2sForLambda"),
+      iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs", "WriteToCloudwatchLogs"),
+    ];
+    LAMBDA_POLICIES_WITH_DATABASE = [
+      ...LAMBDA_POLICIES,
+      iam.ManagedPolicy.fromManagedPolicyName(this, "dbSecrets", "AccessDatabaseSecrets")
+    ];
   }
 
   defineCacheBucket(name: string): s3.Bucket {
@@ -283,147 +468,6 @@ export class DownloadStack extends cdk.Stack {
     Tags.of(f).add("component", COMPONENT);
     return f;
   }
-
-  private defineComplicatedRole(opts: OptsType[], name: string, n: number, accessDynamo: iam.PolicyDocument, downloaderQueueFifo: string): iam.Role {
-    const policies: Record<string, iam.PolicyDocument> = {};
-    if (opts.indexOf("downloader") >= 0) {
-      const access = new iam.PolicyStatement();
-      access.addActions("sqs:SendMessage");
-      access.addResources(downloaderQueueFifo);
-      policies[`policy_${name}_dlq`] = new iam.PolicyDocument({
-        statements: [access]
-      });
-    }
-    if (opts.indexOf("message") >= 0) {
-      const parameters = new iam.PolicyStatement();
-      parameters.addActions("execute-api:ManageConnections");
-      parameters.addResources(`arn:aws:execute-api:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:*`);
-      policies[`policy_${name}_exa`] = new iam.PolicyDocument({
-        statements: [parameters]
-      });
-    }
-    if (opts.includes("ssm")) {
-      const parameters = new iam.PolicyStatement();
-      parameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
-      parameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/*`);
-      policies[`policy_${name}_ssm`] = new iam.PolicyDocument({
-        statements: [parameters]
-      });
-    }
-    if (opts.includes("bgg")) {
-      const bggParameters = new iam.PolicyStatement();
-      bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
-      bggParameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/authcheck*`);
-      const bggSecrets = new iam.PolicyStatement();
-      bggSecrets.addActions("secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret");
-      bggSecrets.addResources(`arn:aws:secretsmanager:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:secret:extstats/bgg*`);
-
-      policies[`policy_${name}_bgg`] = new iam.PolicyDocument({
-        statements: [bggParameters, bggSecrets]
-      });
-    }
-    if (opts.includes("logging")) {
-      const loggingParameters = new iam.PolicyStatement();
-      loggingParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters");
-      loggingParameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/systemLogGroup*`);
-      const loggingCloudWatch = new iam.PolicyStatement();
-      loggingCloudWatch.addActions("logs:PutLogEvents", "logs:CreateLogStream", "logs:CreateLogGroup");
-      loggingCloudWatch.addResources("*");
-
-      policies[`policy_${name}_logging`] = new iam.PolicyDocument({
-        statements: [loggingCloudWatch]
-      });
-    }
-    if (opts.includes("cw")) {
-      const cwPolicy = new iam.PolicyStatement();
-      cwPolicy.addActions("cloudwatch:ListEntitiesForMetric", "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics",
-          "cloudwatch:GetMetricStream", "cloudwatch:ListMetricStreams", "cloudwatch:ListMetrics");
-      cwPolicy.addResources("*");
-      policies[`policy_${name}_cw`] = new iam.PolicyDocument({ statements: [cwPolicy] });
-      const s3Policy = new iam.PolicyStatement();
-      s3Policy.addActions("s3:ListAllMyBuckets");
-      s3Policy.addResources("*");
-      policies[`policy_${name}_s3`] = new iam.PolicyDocument({ statements: [s3Policy] });
-    }
-    if (opts.indexOf("dynamo") >= 0) {
-      policies[`policy_${name}_dynamo`] = accessDynamo;
-    }
-    return new iam.Role(this, `role_${name}`, {
-      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      inlinePolicies: policies,
-      managedPolicies: this.definePolicies(opts, n),
-    });
-  }
-
-  managedPolicies(n: number) {
-    const managedPolicies: iam.IManagedPolicy[] = [
-      iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s" + n, "CreateEC2sForLambda"),
-      iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs" + n, "WriteToCloudwatchLogs"),
-    ];
-    return managedPolicies;
-  }
-
-  definePolicies(opts: OptsType[], n: number) {
-    const managedPolicies: iam.IManagedPolicy[] = [
-      iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s" + n, "CreateEC2sForLambda"),
-      iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs" + n, "WriteToCloudwatchLogs"),
-    ];
-    if (opts.includes("db")) {
-      managedPolicies.push(iam.ManagedPolicy.fromManagedPolicyName(this, "dbSecrets" + n, "AccessDatabaseSecrets"))
-    }
-    return managedPolicies;
-  }
-
-
-  /**
-   *
-   * @param name
-   * @param handler
-   * @param opts
-   * @param subnetType - public means outside VPC, private means private subnet inside VPC.
-   * @param n - a unique number for every function, used to generate unique names
-   * @param accessDynamo
-   * @param downloaderQueueFifo
-   */
-  defineLambdaComplicated(name: string, handler: string, opts: OptsType[], subnetType: "public" | "private", n: number,
-                          accessDynamo: iam.PolicyDocument, downloaderQueueFifo: string): lambda.Function {
-    const role = this.defineComplicatedRole(opts, name, n, accessDynamo, downloaderQueueFifo);
-    const vpcOpts: Partial<lambda.FunctionProps> = {
-      vpc: DATABASE_VPC,
-      vpcSubnets: {
-        subnets: [ PRIVATE_SUBNET_A, PRIVATE_SUBNET_B, PRIVATE_SUBNET_C ]
-      }
-    };
-    const limitConcurrency: Partial<lambda.FunctionProps> = {
-      reservedConcurrentExecutions: 1
-    }
-    const fProps: lambda.FunctionProps = {
-      functionName: name,
-      runtime: RUNTIME,
-      handler,
-      role: role,
-      code: lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip"),
-      timeout: Duration.seconds(60),
-      allowPublicSubnet: true,
-      environment: {
-        "opts": JSON.stringify(opts),
-        "type": subnetType
-      },
-      ...(subnetType === "public" ? {} : vpcOpts),
-      ...((opts.indexOf("single") >= 0) ? limitConcurrency : {})
-    };
-    if (opts.indexOf("db") >= 0 && subnetType === "private") {
-      // would need a VPC endpoint to get to secrets manager, and we don't want to pay for that
-      fProps.environment.MYSQL_HOST = process.env.MYSQL_HOST;
-      fProps.environment.MYSQL_USERNAME = process.env.MYSQL_USERNAME;
-      fProps.environment.MYSQL_PASSWORD = process.env.MYSQL_PASSWORD;
-      fProps.environment.MYSQL_DATABASE = process.env.MYSQL_DATABASE;
-    }
-    const f = new lambda.Function(this, name, fProps);
-    Tags.of(f).add("component", COMPONENT);
-    return f;
-  }
-
 
   defineInsideLambda(name: string, handler: string, role: iam.IRole, duration: number, mem: number = 128,
                      maxConcurrency: number | undefined, durableConfig: { executionTimeout: Duration } | undefined,
@@ -477,13 +521,13 @@ export class DownloadStack extends cdk.Stack {
     return topic;
   }
 
-  defineInsideRole(messageQueue: sqs.IQueue, retryQueue: sqs.IQueue, outputQueue: sqs.IQueue): iam.IRole {
+  defineInsideRole(stack: cdk.Stack, messageQueue: sqs.IQueue, retryQueue: sqs.IQueue, outputQueue: sqs.IQueue): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
 
     const rdsConnect = new iam.PolicyStatement({
       actions: ["rds-db:connect"],
       resources: [
-        `arn:aws:rds-db:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:dbuser:${process.env.DBI_RESOURCE_ID}/extstats_iam`,
+        `arn:aws:rds-db:${stack.region}:${stack.account}:dbuser:${process.env.DBI_RESOURCE_ID}/extstats_iam`,
       ],
     });
     policies[`policy_rds_db`] = new iam.PolicyDocument({ statements: [rdsConnect] });
@@ -510,15 +554,15 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-  defineDownloaderRole(outputFifoQueue: sqs.IQueue, inputQueue: sqs.IQueue, dlq: sqs.IQueue,
+  defineDownloaderRole(stack: cdk.Stack, outputFifoQueue: sqs.IQueue, inputQueue: sqs.IQueue, dlq: sqs.IQueue,
                        cacheBucket: s3.Bucket, topic: sns.Topic): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
     bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
-    bggParameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/downloader*`);
+    bggParameters.addResources(`arn:aws:ssm:${stack.region}:${stack.account}:parameter/extstats/downloader*`);
     const bggSecrets = new iam.PolicyStatement();
     bggSecrets.addActions("secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret");
-    bggSecrets.addResources(`arn:aws:secretsmanager:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:secret:extstats/bgg*`);
+    bggSecrets.addResources(`arn:aws:secretsmanager:${stack.region}:${stack.account}:secret:extstats/bgg*`);
 
     policies[`policy_downloader_bgg`] = new iam.PolicyDocument({
       statements: [bggParameters, bggSecrets]
@@ -526,7 +570,7 @@ export class DownloadStack extends cdk.Stack {
 
     const loggingParameters = new iam.PolicyStatement();
     loggingParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters");
-    loggingParameters.addResources(`arn:aws:ssm:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:parameter/extstats/systemLogGroup*`);
+    loggingParameters.addResources(`arn:aws:ssm:${stack.region}:${stack.account}:parameter/extstats/systemLogGroup*`);
     const loggingCloudWatch = new iam.PolicyStatement();
     loggingCloudWatch.addActions("logs:PutLogEvents", "logs:CreateLogStream", "logs:CreateLogGroup");
     loggingCloudWatch.addResources("*");
@@ -564,7 +608,7 @@ export class DownloadStack extends cdk.Stack {
     });
     const invoke = new iam.PolicyStatement();
     invoke.addActions("lambda:InvokeFunction");
-    invoke.addResources(`arn:aws:lambda:${process.env.CDK_DEFAULT_REGION}:${process.env.CDK_DEFAULT_ACCOUNT}:function:downloader_*`);
+    invoke.addResources(`arn:aws:lambda:${stack.region}:${stack.account}:function:downloader_*`);
     policies[`policy_invoke`] = new iam.PolicyDocument({
       statements: [invoke]
     });
@@ -578,24 +622,10 @@ export class DownloadStack extends cdk.Stack {
     policies[`policy_cache_bucket`] = new iam.PolicyDocument({
       statements: [useCacheBucket1, useCacheBucket2]
     });
-
-    const managedPolicies: iam.IManagedPolicy[] = [
-      iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s", "CreateEC2sForLambda"),
-      iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs", "WriteToCloudwatchLogs"),
-    ];
-
     return new iam.Role(this, `role_downloader`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       inlinePolicies: policies,
-      managedPolicies: managedPolicies,
-    });
-  }
-
-
-
-  defineOutputQueue(): sqs.IQueue {
-    return new sqs.Queue(this, "outputQueue", {
-      queueName: "downloaderOutputQueue",
+      managedPolicies: LAMBDA_POLICIES,
     });
   }
 
@@ -608,13 +638,6 @@ export class DownloadStack extends cdk.Stack {
       },
       fifo: true,
       contentBasedDeduplication: true
-    });
-  }
-
-  definePlaysQueue(): sqs.IQueue {
-    return new sqs.Queue(this, "playsQueue", {
-      queueName: "downloaderPlaysQueue",
-      visibilityTimeout: Duration.seconds(900),
     });
   }
 
@@ -704,41 +727,10 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-
-
-  defineScheduleToInvokeCounts(machine: sfn.IStateMachine, n: number): scheduler.Schedule {
-    const st1 = new iam.PolicyStatement();
-    st1.addActions("states:StartExecution");
-    st1.addResources(machine.stateMachineArn);
-    const policies: Record<string, iam.PolicyDocument> = {
-      "policy_invoke_counts_thread": new iam.PolicyDocument({
-        statements: [st1]
-      })
-    };
-    const role = new iam.Role(this, 'assumeCountsRole' + n, {
-      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
-    });
-    return new scheduler.Schedule(this, `countsSchedule${n}`, {
-      schedule: events.Schedule.rate(Duration.minutes(10)),
-      target: new targets.StepFunctionsStartExecution(machine, { role }),
-      description: "Every 10 minutes get data from CloudWatch and store it as observability metrics."
-    });
-  }
-
-  defineScheduleToInvokeDaily(func: lambda.Function, n: number): scheduler.Schedule {
-    const role = new iam.Role(this, 'assumeDailyRole' + n, {
-      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
-    });
-    return new scheduler.Schedule(this, `schedule_daily_${n}`, {
-      schedule: scheduler.ScheduleExpression.rate(Duration.hours(24)),
-      description: "Once per day run daily tasks, e.g. rebuild materialised views.",
-      target: new targets.LambdaInvoke(func, { role })
-    });
-  }
-
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
     this.lookupExternalResources();
+    this.lookupManagedPolicies();
 
     const cacheBucket = this.defineCacheBucket(CACHE_BUCKET);
     const outputQueueFifo = this.defineOutputQueueFifo();
@@ -749,10 +741,11 @@ export class DownloadStack extends cdk.Stack {
 
     const networkingConstruct = new NetworkingConstruct(this);
     const messageConstruct = new MessageConstruct(this);
-    const authConstruct = new AuthConstruct(this, 1);
-    const dailyConstruct = new DailyConstruct(this);
+    const authConstruct = new AuthConstruct(this);
+    const dailyConstruct = new DailyConstruct(this, outputQueueFifo.queueArn);
+    const metricsConstruct = new MetricsConstruct(this);
 
-    const role = this.defineDownloaderRole(outputQueueFifo, inputQueue, dlq, cacheBucket, snsTopic);
+    const role = this.defineDownloaderRole(this, outputQueueFifo, inputQueue, dlq, cacheBucket, snsTopic);
     let userListLambda: lambda.IFunction = undefined;
     let metadataLambda: lambda.IFunction = undefined;
     let preLambda: lambda.IFunction = undefined;
@@ -771,7 +764,7 @@ export class DownloadStack extends cdk.Stack {
       description: "Inside Lambdas: MySQL only",
       allowAllOutbound: true,
     });
-    const insideRole = this.defineInsideRole(messageConstruct.messageQueue, retryQueue, outputQueueFifo);
+    const insideRole = this.defineInsideRole(this, messageConstruct.messageQueue, retryQueue, outputQueueFifo);
     let startTasksLambda: lambda.IFunction = undefined;
     let writeLambda: lambda.IFunction = undefined;
     for (const spec of INSIDE_LAMBDA_SPECS) {
@@ -831,16 +824,6 @@ export class DownloadStack extends cdk.Stack {
     } else {
       console.log("Could not connect start tasks to prehandle!!!!");
     }
-
-    const countFunction = this.defineLambdaComplicated("downloader_counts", "counts.handler",
-        ["db","dynamo"], "private", 4, messageConstruct.accessDynamo, outputQueueFifo.queueArn);
-    const cwFunction = this.defineLambdaComplicated("downloader_cw", "cloudwatch.handler",
-        ["cw"], "public", 5, messageConstruct.accessDynamo, outputQueueFifo.queueArn);
-    const sm2 = this.defineCountsStateMachine(cwFunction, countFunction);
-    const countsSchedule = this.defineScheduleToInvokeCounts(sm2, 6);
-    const dailyFunction = this.defineLambdaComplicated("downloader_daily", "daily.dailyTasks",
-        ["ssm", "downloader"], "public", 8, messageConstruct.accessDynamo, outputQueueFifo.queueArn);
-    const dailySchedule = this.defineScheduleToInvokeDaily(dailyFunction, 9);
 
     // Used by the Rust stack
     new cdk.CfnOutput(this, 'downloaderInputQueueArn', {
