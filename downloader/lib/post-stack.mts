@@ -83,37 +83,6 @@ for (const e of response.Exports) {
         });
         const r = await ssmClient.send(ssmCmd);
         console.log(r.$metadata.httpStatusCode);
-    } else if (e.Name === "downloader-MessageMappingUUID") {
-        // turn on the processing from the message queue
-        console.log("Turning on message queue");
-        const lCmd = new UpdateEventSourceMappingCommand({
-            Enabled: true,
-            UUID: e.Value
-        });
-        const r3 = await lClient.send(lCmd);
-        console.log(r3.$metadata.httpStatusCode);
-    } else if (e.Name === "downloader-PlaysQueueURL") {
-        // put the queue URL where insideq can find it
-        console.log("Updating plays queue URL in Parameter Store");
-        const ssmCmd = new PutParameterCommand({
-            Name: "/extstats/downloader/playsqueue",
-            Value: e.Value,
-            Overwrite: true,
-            Type: "String"
-        });
-        const r2 = await ssmClient.send(ssmCmd);
-        console.log(r2.$metadata.httpStatusCode);
-    } else if (e.Name === "downloader-BGGQueueURL") {
-        // put the queue URL where other lambdas can find it
-        console.log("Updating BGG queue URL in Parameter Store");
-        const ssmCmd = new PutParameterCommand({
-            Name: "/extstats/downloader/bggqueue",
-            Value: e.Value,
-            Overwrite: true,
-            Type: "String"
-        });
-        const r2 = await ssmClient.send(ssmCmd);
-        console.log(r2.$metadata.httpStatusCode);
     } else if (e.Name === "downloader-RetryQueueURL") {
         // put the queue URL where insideq can find it
         console.log("Updating retry queue URL in Parameter Store");
@@ -125,24 +94,6 @@ for (const e of response.Exports) {
         });
         const r2 = await ssmClient.send(ssmCmd);
         console.log(r2.$metadata.httpStatusCode);
-    } else if (e.Name === "downloader-PlaysMappingUUID") {
-        // turn on the plays lambda processing from the plays queue
-        console.log("Turning on plays queue");
-        const lCmd = new UpdateEventSourceMappingCommand({
-            Enabled: true,
-            UUID: e.Value
-        });
-        const r3 = await lClient.send(lCmd);
-        console.log(r3.$metadata.httpStatusCode);
-    } else if (e.Name === "downloader-WriteMappingUUID") {
-        // turn on the write lambda processing from its queue
-        console.log("Turning on write queue");
-        const lCmd = new UpdateEventSourceMappingCommand({
-            Enabled: true,
-            UUID: e.Value
-        });
-        const r3 = await lClient.send(lCmd);
-        console.log(r3.$metadata.httpStatusCode);
     } else if (e.Name === "downloader-topicARN") {
         console.log("Updating SNS topic URL in Parameter Store");
         const ssmCmd = new PutParameterCommand({

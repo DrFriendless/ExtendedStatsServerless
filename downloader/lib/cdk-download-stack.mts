@@ -35,15 +35,161 @@ let PRIVATE_SUBNET_B: ec2.ISubnet = undefined;
 let PRIVATE_SUBNET_C: ec2.ISubnet = undefined;
 let CONFIRM_LAMBDA: lambda.IFunction = undefined;
 
-export class DownloadStack extends cdk.Stack {
-  lookupExternalResources() {
-    // resources external to this stack
-    ZIP_BUCKET = s3.Bucket.fromBucketName(this, "bucket", DEPLOYMENT_BUCKET);
-    DATABASE_VPC = ec2.Vpc.fromLookup(this, "vpc", {vpcId: process.env.VPC_ID});
-    PRIVATE_SUBNET_A = ec2.Subnet.fromSubnetId(this, "private a", process.env.PRIVATE_A || "bug1");
-    PRIVATE_SUBNET_B = ec2.Subnet.fromSubnetId(this, "private b", process.env.PRIVATE_B || "bug2");
-    PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", process.env.PRIVATE_C || "bug3");
-    CONFIRM_LAMBDA = lambda.Function.fromFunctionName(this, "confirmFunc", "auth_confirm");
+// user authenticaion via BGG
+class AuthConstruct extends Construct {
+  constructor(stack: DownloadStack, n: number) {
+    super(stack, "authConstruct");
+    const role = this.defineAuthRole(stack, n);
+    const threadFunction = this.defineAuthLambda(stack, role);
+    const sm = this.defineAuthStateMachine(stack, threadFunction);
+    const authSchedule = this.defineAuthSchedule(stack, sm, n);
+  }
+
+  private defineAuthRole(stack: DownloadStack, n: number): iam.Role {
+    const policies: Record<string, iam.PolicyDocument> = {};
+    const bggParameters = new iam.PolicyStatement();
+    bggParameters.addActions("ssm:GetParameter", "ssm:GetParametersByPath", "ssm:GetParameters", "ssm:PutParameter");
+    bggParameters.addResources(`arn:aws:ssm:${stack.region}:${stack.account}:parameter/extstats/authcheck*`);
+    const bggSecrets = new iam.PolicyStatement();
+    bggSecrets.addActions("secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret");
+    bggSecrets.addResources(`arn:aws:secretsmanager:${stack.region}:${stack.account}:secret:extstats/bgg*`);
+
+    policies[`policy_auth_bgg`] = new iam.PolicyDocument({
+      statements: [bggParameters, bggSecrets]
+    });
+    return new iam.Role(stack, `role_auth`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      inlinePolicies: policies,
+      managedPolicies: stack.managedPolicies(n),
+    });
+  }
+
+  defineAuthLambda(stack: cdk.Stack, role: iam.Role): lambda.Function {
+    const fProps: lambda.FunctionProps = {
+      functionName: "downloader_auth_thread",
+      runtime: RUNTIME,
+      handler: "auththread.handler",
+      role: role,
+      code: lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip"),
+      timeout: Duration.seconds(60),
+    };
+    const f = new lambda.Function(stack, "downloader_auth_thread", fProps);
+    Tags.of(f).add("component", COMPONENT);
+    return f;
+  }
+
+  defineAuthSchedule(stack: cdk.Stack, machine: sfn.IStateMachine, n: number): scheduler.Schedule {
+    const st1 = new iam.PolicyStatement();
+    st1.addActions("states:StartExecution");
+    st1.addResources(machine.stateMachineArn);
+    const policies: Record<string, iam.PolicyDocument> = {
+      "policy_invoke_auth_thread": new iam.PolicyDocument({
+        statements: [st1]
+      })
+    };
+    const role = new iam.Role(stack, 'assumeAuthRole' + n, {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
+    });
+    return new scheduler.Schedule(stack, `authSchedule${n}`, {
+      schedule: events.Schedule.cron({ minute: '0' }),
+      target: new targets.StepFunctionsStartExecution(machine, { role }),
+      description: "Every hour, check the BGG auth thread."
+    });
+  }
+
+  defineAuthStateMachine(stack: cdk.Stack, threadFunc: lambda.Function): sfn.StateMachine {
+    const authLogs = new logs.LogGroup(stack, "AuthStateMachineLogs", {
+      retention: logs.RetentionDays.ONE_WEEK,
+    });
+    return new sfn.StateMachine(stack, 'authStateMachine2', {
+      stateMachineName: "authStateMachineExpress2",
+      stateMachineType: sfn.StateMachineType.EXPRESS,
+      timeout: Duration.minutes(5),
+      logs: {
+        destination: authLogs,
+        level: sfn.LogLevel.ERROR,
+        includeExecutionData: true,
+      },
+      definitionBody: sfn.DefinitionBody.fromChainable(
+          new tasks.LambdaInvoke(stack, "threadTask", {
+            lambdaFunction: threadFunc,
+          }).next(
+              new tasks.LambdaInvoke(stack, "confirmTask", {
+                lambdaFunction: CONFIRM_LAMBDA,
+              }).next(
+                  new sfn.Succeed(stack, "Thread processed")
+              )
+          )
+      ),
+    });
+  }
+}
+
+// daily tasks
+class DailyConstruct extends Construct {
+  constructor(stack: cdk.Stack) {
+    super(stack, "dailyConstruct");
+  }
+}
+
+class NetworkingConstruct extends Construct {
+  constructor(stack: cdk.Stack) {
+    super(stack, "networkingConstruct");
+    const eigw = new ec2.CfnEgressOnlyInternetGateway(stack, 'EgressOnlyIgw', { vpcId: DATABASE_VPC.vpcId });
+
+    // Dedicated route table for the Lambda subnets.
+    // No 0.0.0.0/0 route: Lambda ENIs have no public IPv4 address, so the IGW route cannot carry their traffic.
+    const routeTable = new ec2.CfnRouteTable(this, 'LambdaRouteTable', {
+      vpcId: DATABASE_VPC.vpcId,
+      tags: [{ key: 'Name', value: 'lambda-private-rt' }],
+    });
+    new ec2.CfnRoute(this, 'Ipv6EgressRoute', {
+      routeTableId: routeTable.ref,
+      destinationIpv6CidrBlock: '::/0',
+      egressOnlyInternetGatewayId: eigw.ref,
+    });
+
+    for (const s of [{...PRIVATE_SUBNET_A, name: "A"}, {...PRIVATE_SUBNET_B, name: "B"}, {...PRIVATE_SUBNET_C, name: "C"}]) {
+      new ec2.CfnSubnetRouteTableAssociation(this, `RtAssoc-${s.name}`, {
+        subnetId: s.subnetId,
+        routeTableId: routeTable.ref,
+      });
+    }
+
+    new ec2.CfnVPCEndpoint(this, "DynamoDbGatewayEndpoint", {
+      vpcId: DATABASE_VPC.vpcId,
+      serviceName: `com.amazonaws.${stack.region}.dynamodb`,
+      vpcEndpointType: "Gateway",
+      routeTableIds: [routeTable.ref],
+    });
+  }
+}
+
+// websock messaging
+class MessageConstruct extends Construct {
+  public accessDynamo: iam.PolicyDocument;
+  public messageQueue: sqs.IQueue;
+
+  constructor(stack: DownloadStack) {
+    super(stack, "messageConstruct");
+    this.accessDynamo = this.defineAccessDynamoPolicy();
+    this.messageQueue = this.defineMessageQueue(stack);
+
+    let messageLambda: lambda.IFunction = stack.defineLambdaComplicated("downloader_message", "message.handler",
+        ["dynamo","single","sqs","ssm","message"], "public", 7, this.accessDynamo, "");
+    if (messageLambda) {
+      const mapping = new sources.SqsEventSource(this.messageQueue, {batchSize: 10, enabled: true, maxBatchingWindow: Duration.seconds(3) });
+      messageLambda.addEventSource(mapping);
+    } else {
+      console.log("There isn't any message lambda");
+    }
+  }
+
+  defineMessageQueue(stack: cdk.Stack): sqs.Queue {
+    return new sqs.Queue(stack, "messageQueue", {
+      queueName: "WebsockMessageQueue",
+      visibilityTimeout: Duration.seconds(120)
+    });
   }
 
   defineAccessDynamoPolicy(): iam.PolicyDocument {
@@ -69,33 +215,20 @@ export class DownloadStack extends cdk.Stack {
       statements: [accessDynamo]
     });
   }
+}
 
-  defineAuthStateMachine(threadFunc: lambda.Function): sfn.StateMachine {
-    const authLogs = new logs.LogGroup(this, "AuthStateMachineLogs", {
-      retention: logs.RetentionDays.ONE_WEEK,
-    });
-    return new sfn.StateMachine(this, 'authStateMachine2', {
-      stateMachineName: "authStateMachineExpress2",
-      stateMachineType: sfn.StateMachineType.EXPRESS,
-      timeout: Duration.minutes(5),
-      logs: {
-        destination: authLogs,
-        level: sfn.LogLevel.ERROR,
-        includeExecutionData: true,
-      },
-      definitionBody: sfn.DefinitionBody.fromChainable(
-          new tasks.LambdaInvoke(this, "threadTask", {
-            lambdaFunction: threadFunc,
-          }).next(
-              new tasks.LambdaInvoke(this, "confirmTask", {
-                lambdaFunction: CONFIRM_LAMBDA,
-              }).next(
-                  new sfn.Succeed(this, "Thread processed")
-              )
-          )
-      ),
-    });
+export class DownloadStack extends cdk.Stack {
+  lookupExternalResources() {
+    // resources external to this stack
+    ZIP_BUCKET = s3.Bucket.fromBucketName(this, "bucket", DEPLOYMENT_BUCKET);
+    DATABASE_VPC = ec2.Vpc.fromLookup(this, "vpc", {vpcId: process.env.VPC_ID});
+    PRIVATE_SUBNET_A = ec2.Subnet.fromSubnetId(this, "private a", process.env.PRIVATE_A || "bug1");
+    PRIVATE_SUBNET_B = ec2.Subnet.fromSubnetId(this, "private b", process.env.PRIVATE_B || "bug2");
+    PRIVATE_SUBNET_C = ec2.Subnet.fromSubnetId(this, "private c", process.env.PRIVATE_C || "bug3");
+    CONFIRM_LAMBDA = lambda.Function.fromFunctionName(this, "confirmFunc", "auth_confirm");
   }
+
+
 
   defineCountsStateMachine(cwFunction: lambda.Function, countFunction: lambda.Function) {
     const countsLogs = new logs.LogGroup(this, "CountsStateMachineLogs", {
@@ -222,7 +355,15 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-  private definePolicies(opts: OptsType[], n: number) {
+  managedPolicies(n: number) {
+    const managedPolicies: iam.IManagedPolicy[] = [
+      iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s" + n, "CreateEC2sForLambda"),
+      iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs" + n, "WriteToCloudwatchLogs"),
+    ];
+    return managedPolicies;
+  }
+
+  definePolicies(opts: OptsType[], n: number) {
     const managedPolicies: iam.IManagedPolicy[] = [
       iam.ManagedPolicy.fromManagedPolicyName(this, "createEC2s" + n, "CreateEC2sForLambda"),
       iam.ManagedPolicy.fromManagedPolicyName(this, "writeLogs" + n, "WriteToCloudwatchLogs"),
@@ -470,13 +611,6 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-  defineMessageQueue(): sqs.Queue {
-    return new sqs.Queue(this, "messageQueue", {
-      queueName: "WebsockMessageQueue",
-      visibilityTimeout: Duration.seconds(120)
-    });
-  }
-
   definePlaysQueue(): sqs.IQueue {
     return new sqs.Queue(this, "playsQueue", {
       queueName: "downloaderPlaysQueue",
@@ -570,24 +704,7 @@ export class DownloadStack extends cdk.Stack {
     });
   }
 
-  defineScheduleToInvokeAuth(machine: sfn.IStateMachine, n: number): scheduler.Schedule {
-    const st1 = new iam.PolicyStatement();
-    st1.addActions("states:StartExecution");
-    st1.addResources(machine.stateMachineArn);
-    const policies: Record<string, iam.PolicyDocument> = {
-      "policy_invoke_auth_thread": new iam.PolicyDocument({
-        statements: [st1]
-      })
-    };
-    const role = new iam.Role(this, 'assumeAuthRole' + n, {
-      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
-    });
-    return new scheduler.Schedule(this, `authSchedule${n}`, {
-      schedule: events.Schedule.cron({ minute: '0' }),
-      target: new targets.StepFunctionsStartExecution(machine, { role }),
-      description: "Every hour, check the BGG auth thread."
-    });
-  }
+
 
   defineScheduleToInvokeCounts(machine: sfn.IStateMachine, n: number): scheduler.Schedule {
     const st1 = new iam.PolicyStatement();
@@ -623,36 +740,17 @@ export class DownloadStack extends cdk.Stack {
     super(scope, id, props);
     this.lookupExternalResources();
 
-    const accessDynamo = this.defineAccessDynamoPolicy();
     const cacheBucket = this.defineCacheBucket(CACHE_BUCKET);
-    const outputQueue = this.defineOutputQueue();
     const outputQueueFifo = this.defineOutputQueueFifo();
-    const playsQueue = this.definePlaysQueue();
     const retryQueue = this.defineRetryQueue();
     const dlq = this.defineDeadLetterQueue();
     const inputQueue = this.defineInputQueue2({ maxReceiveCount: 3, queue: dlq });
     const snsTopic = this.defineSnsTopic(process.env.SNS_TOPIC, process.env.SNS_EMAIL);
-    const eigw = new ec2.CfnEgressOnlyInternetGateway(this, 'EgressOnlyIgw', { vpcId: DATABASE_VPC.vpcId });
-    const messageQueue = this.defineMessageQueue();
 
-    // Dedicated route table for the Lambda subnets.
-    // No 0.0.0.0/0 route: Lambda ENIs have no public IPv4 address, so the IGW route cannot carry their traffic.
-    const routeTable = new ec2.CfnRouteTable(this, 'LambdaRouteTable', {
-      vpcId: DATABASE_VPC.vpcId,
-      tags: [{ key: 'Name', value: 'lambda-private-rt' }],
-    });
-    new ec2.CfnRoute(this, 'Ipv6EgressRoute', {
-      routeTableId: routeTable.ref,
-      destinationIpv6CidrBlock: '::/0',
-      egressOnlyInternetGatewayId: eigw.ref,
-    });
-
-    for (const s of [{...PRIVATE_SUBNET_A, name: "A"}, {...PRIVATE_SUBNET_B, name: "B"}, {...PRIVATE_SUBNET_C, name: "C"}]) {
-      new ec2.CfnSubnetRouteTableAssociation(this, `RtAssoc-${s.name}`, {
-        subnetId: s.subnetId,
-        routeTableId: routeTable.ref,
-      });
-    }
+    const networkingConstruct = new NetworkingConstruct(this);
+    const messageConstruct = new MessageConstruct(this);
+    const authConstruct = new AuthConstruct(this, 1);
+    const dailyConstruct = new DailyConstruct(this);
 
     const role = this.defineDownloaderRole(outputQueueFifo, inputQueue, dlq, cacheBucket, snsTopic);
     let userListLambda: lambda.IFunction = undefined;
@@ -673,7 +771,7 @@ export class DownloadStack extends cdk.Stack {
       description: "Inside Lambdas: MySQL only",
       allowAllOutbound: true,
     });
-    const insideRole = this.defineInsideRole(messageQueue, retryQueue, outputQueueFifo);
+    const insideRole = this.defineInsideRole(messageConstruct.messageQueue, retryQueue, outputQueueFifo);
     let startTasksLambda: lambda.IFunction = undefined;
     let writeLambda: lambda.IFunction = undefined;
     for (const spec of INSIDE_LAMBDA_SPECS) {
@@ -685,12 +783,8 @@ export class DownloadStack extends cdk.Stack {
       }
     }
     if (writeLambda) {
-      const mapping = new sources.SqsEventSource(outputQueueFifo, {batchSize: 10, enabled: false });
+      const mapping = new sources.SqsEventSource(outputQueueFifo, {batchSize: 10, enabled: true });
       writeLambda.addEventSource(mapping);
-      new cdk.CfnOutput(this, 'downloaderWriteMapping', {
-        value: mapping.eventSourceMappingId,
-        exportName: 'downloader-WriteMappingUUID'
-      });
     } else {
       console.log("There isn't any write lambda");
     }
@@ -738,80 +832,20 @@ export class DownloadStack extends cdk.Stack {
       console.log("Could not connect start tasks to prehandle!!!!");
     }
 
-    const threadFunction = this.defineLambdaComplicated("downloader_auth_thread", "auththread.handler", ["bgg"], "public", 1, accessDynamo, outputQueueFifo.queueArn);
-    const sm = this.defineAuthStateMachine(threadFunction);
-    const rule = this.defineScheduleToInvokeAuth(sm, 1);
-    const countFunction = this.defineLambdaComplicated("downloader_counts", "counts.handler", ["db","dynamo"], "private", 4, accessDynamo, outputQueueFifo.queueArn);
-    const cwFunction = this.defineLambdaComplicated("downloader_cw", "cloudwatch.handler", ["cw"], "public", 5, accessDynamo, outputQueueFifo.queueArn);
+    const countFunction = this.defineLambdaComplicated("downloader_counts", "counts.handler",
+        ["db","dynamo"], "private", 4, messageConstruct.accessDynamo, outputQueueFifo.queueArn);
+    const cwFunction = this.defineLambdaComplicated("downloader_cw", "cloudwatch.handler",
+        ["cw"], "public", 5, messageConstruct.accessDynamo, outputQueueFifo.queueArn);
     const sm2 = this.defineCountsStateMachine(cwFunction, countFunction);
-    const rule6 = this.defineScheduleToInvokeCounts(sm2, 6);
-    const dailyFunction = this.defineLambdaComplicated("downloader_daily", "daily.dailyTasks", ["ssm", "downloader"], "public", 8, accessDynamo, outputQueueFifo.queueArn);
-    // schedules are the new way to do rules
+    const countsSchedule = this.defineScheduleToInvokeCounts(sm2, 6);
+    const dailyFunction = this.defineLambdaComplicated("downloader_daily", "daily.dailyTasks",
+        ["ssm", "downloader"], "public", 8, messageConstruct.accessDynamo, outputQueueFifo.queueArn);
     const dailySchedule = this.defineScheduleToInvokeDaily(dailyFunction, 9);
 
-    let messageLambda: lambda.IFunction = this.defineLambdaComplicated("downloader_message", "message.handler", ["dynamo","single","sqs","ssm","message"], "public", 7, accessDynamo, outputQueueFifo.queueArn);
-    if (messageLambda) {
-      const mapping = new sources.SqsEventSource(messageQueue, {batchSize: 10, enabled: false, maxBatchingWindow: Duration.seconds(3) });
-      messageLambda.addEventSource(mapping);
-      new cdk.CfnOutput(this, 'messageMapping', {
-        value: mapping.eventSourceMappingId,
-        exportName: 'downloader-MessageMappingUUID'
-      });
-    } else {
-      console.log("There isn't any message lambda");
-    }
-
-    new cdk.CfnOutput(this, 'MessageQueue', {
-      value: messageQueue.queueUrl,
-      exportName: 'downloader-MessageQueueURL'
-    });
-    new cdk.CfnOutput(this, 'MessageQueueARN', {
-      value: messageQueue.queueArn,
-      exportName: 'downloader-MessageQueueARN'
-    });
-    new cdk.CfnOutput(this, 'downloaderOutputQueue', {
-      value: outputQueue.queueUrl,
-      exportName: 'downloader-OutputQueueURL'
-    });
-    new cdk.CfnOutput(this, 'downloaderOutputQueueArn', {
-      value: outputQueue.queueArn,
-      exportName: 'downloader-OutputQueueARN'
-    });
-    new cdk.CfnOutput(this, 'downloaderOutputFifoQueue', {
-      value: outputQueueFifo.queueUrl,
-      exportName: 'downloader-OutputFifoQueueURL'
-    });
-    new cdk.CfnOutput(this, 'downloaderOutputFifoQueueArn', {
-      value: outputQueueFifo.queueArn,
-      exportName: 'downloader-OutputFifoQueueARN'
-    });
-    new cdk.CfnOutput(this, 'downloaderPlaysQueue', {
-      value: playsQueue.queueUrl,
-      exportName: 'downloader-PlaysQueueURL'
-    });
-    new cdk.CfnOutput(this, 'downloaderInputQueue', {
-      value: inputQueue.queueUrl,
-      exportName: 'downloader-InputQueueURL'
-    });
+    // Used by the Rust stack
     new cdk.CfnOutput(this, 'downloaderInputQueueArn', {
       value: inputQueue.queueArn,
       exportName: 'downloader-InputQueueARN'
-    });
-    new cdk.CfnOutput(this, 'downloaderRetryQueue', {
-      value: retryQueue.queueUrl,
-      exportName: 'downloader-RetryQueueURL'
-    });
-    new cdk.CfnOutput(this, 'downloaderCache', {
-      value: cacheBucket.bucketArn,
-      exportName: 'downloader-cacheBucketARN'
-    });
-    new cdk.CfnOutput(this, 'downloaderTopic', {
-      value: snsTopic.topicArn,
-      exportName: 'downloader-topicARN'
-    });
-    new cdk.CfnOutput(this, 'downloaderPrelambda', {
-      value: preLambda.functionArn,
-      exportName: 'downloader-prehandle'
     });
   }
 }
