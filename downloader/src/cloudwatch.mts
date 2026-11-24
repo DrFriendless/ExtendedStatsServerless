@@ -1,0 +1,128 @@
+import {findMiscSystem, HttpResponse, isHttpResponse} from "./miscsystem.mjs";
+import {
+    CloudWatchClient,
+    CloudWatchServiceException,
+    GetMetricStatisticsCommand, GetMetricStatisticsCommandInput,
+    Statistic
+} from "@aws-sdk/client-cloudwatch";
+
+export async function handler(ignored: any): Promise<Record<string, number> | HttpResponse> {
+    const system = await findMiscSystem([]);
+    if (isHttpResponse(system)) return system;
+
+    const client = new CloudWatchClient({});
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - 600000);
+    const maximum: { Period: number, StartTime: Date, EndTime: Date, Statistics: Statistic[] } = {
+        Period: 600,
+        StartTime: startTime,
+        EndTime: endTime,
+        Statistics: ["Maximum"]
+    };
+    const average: { Period: number, StartTime: Date, EndTime: Date, Statistics: Statistic[] } = {
+        Period: 600,
+        StartTime: startTime,
+        EndTime: endTime,
+        Statistics: ["Average"]
+    };
+    const inputs: Record<string, GetMetricStatisticsCommandInput> = {
+        "dl_opt_age": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderOutputQueue"}],
+            MetricName: "ApproximateAgeOfOldestMessage",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "dl_opt_length": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderOutputQueue"}],
+            MetricName: "ApproximateNumberOfMessagesVisible",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "dl_ipt_age": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderInputQueue.fifo"}],
+            MetricName: "ApproximateAgeOfOldestMessage",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "dl_ipt_length": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderInputQueue.fifo"}],
+            MetricName: "ApproximateNumberOfMessagesVisible",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "dl_plays_age": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderPlaysQueue"}],
+            MetricName: "ApproximateAgeOfOldestMessage",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "dl_plays_length": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderPlaysQueue"}],
+            MetricName: "ApproximateNumberOfMessagesVisible",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "dl_retry_length": {
+            Dimensions: [{Name: "QueueName", Value: "downloaderRetryQueue"}],
+            MetricName: "ApproximateNumberOfMessagesVisible",
+            Namespace: "AWS/SQS",
+            ...maximum
+        },
+        "db_cpu": {
+            Dimensions: [{Name: "DBInstanceIdentifier", Value: "extended-mysql"}],
+            MetricName: "CPUUtilization",
+            Namespace: "AWS/RDS",
+            ...maximum
+        },
+        "db_credit": {
+            Dimensions: [{Name: "DBInstanceIdentifier", Value: "extended-mysql"}],
+            MetricName: "CPUCreditBalance",
+            Namespace: "AWS/RDS",
+            ...average
+        },
+        "eb2_cpu": {
+            Dimensions: [{Name: "InstanceId", Value: "i-08ee3fc543a784ba9"}],
+            MetricName: "CPUUtilization",
+            Namespace: "AWS/EC2",
+            ...maximum
+        }
+    };
+
+    // can't get this to give me any data
+    // const s3Client = new S3Client({});
+    // const bucketData = await s3Client.send(new ListBucketsCommand());
+    // const dimensions = bucketData.Buckets.map(b => { return { Name: "BucketName", Value: b.Name } });
+    // const bucketSizeCommand = new GetMetricStatisticsCommand({
+    //     // Dimensions: dimensions,
+    //     Dimensions: [ { Name: "StorageType", Value: "STANDARD" } ],
+    //     MetricName: "BucketSizeBytes",
+    //     Namespace: "AWS/S3",
+    //     ...averageLongTime
+    // });
+    // console.log(JSON.stringify(bucketSizeCommand));
+    // const bucketSizes = await client.send(bucketSizeCommand);
+    // console.log(JSON.stringify(bucketSizes));
+
+    const data: Record<string, number> = {};
+    for (const input of Object.entries(inputs)) {
+        try {
+            const command2 = new GetMetricStatisticsCommand(input[1]);
+            const response2 = await client.send(command2);
+            if (response2.Datapoints.length === 0) {
+                console.log(`No value for ${input[0]}`);
+                data[input[0]] = 0;
+            } else {
+                data[input[0]] = Math.round(response2.Datapoints[0][input[1].Statistics[0]]);
+            }
+        } catch (caught) {
+            console.log(caught);
+            if (caught instanceof CloudWatchServiceException) {
+                console.error(`Error from CloudWatch. ${caught.name}: ${caught.message}`);
+            } else {
+                throw caught;
+            }
+        }
+    }
+    console.log(data);
+    return data;
+}

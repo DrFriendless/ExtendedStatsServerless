@@ -79,26 +79,7 @@ function tillNextUpdate(processMethod: ProcessMethod): string | undefined {
 }
 
 export async function doListToProcess(conn: mysql.Connection, count: number, processMethods: string[]): Promise<ToProcessElement[]> {
-    let query = await doListToProcessByMethod(conn, count, processMethods);
-    let risk = 0;
-    let good = 0;
-    for (const q of query) {
-        if (q.processMethod === 'processYear') {
-            risk += 7;
-        } else {
-            risk++;
-        }
-        if (risk <= count || good == 0) {
-            good++;
-        } else {
-            break;
-        }
-    }
-    if (good < query.length) {
-        query = query.slice(0, good);
-        console.log(`Only processing ${query.length} files right now`);
-    }
-    return query;
+    return await doListToProcessByMethod(conn, count, processMethods);
 }
 
 async function doListToProcessByMethod(conn: mysql.Connection, count: number, processMethods: string[]): Promise<ToProcessElement[]> {

@@ -381,3 +381,11 @@ export interface WebsockMessage {
     topics: string[];
     body: any;
 }
+
+export interface QueueInput {
+    Records: {
+        receiptHandle: string;
+        body: string;
+        awsRegion: string;
+    }[]
+}

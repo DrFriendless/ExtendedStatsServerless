@@ -40,6 +40,11 @@ for (const spec of LAMBDA_SPECS) {
 for (const spec of INSIDE_LAMBDA_SPECS) {
     await updateCode(lClient, spec.name, !!spec.durableConfig);
 }
+await updateCode(lClient, "downloader_auth_thread", false);
+await updateCode(lClient, "downloader_counts", false);
+await updateCode(lClient, "downloader_cw", false);
+await updateCode(lClient, "downloader_message", false);
+await updateCode(lClient, "downloader_daily", false);
 
 // set the retention period on the log groups
 console.log("Changing retention period on log groups");
@@ -68,6 +73,25 @@ for (const e of response.Exports) {
         });
         const r2 = await ssmClient.send(ssmCmd);
         console.log(r2.$metadata.httpStatusCode);
+    } else if (e.Name === "downloader-MessageQueueURL") {
+        console.log("Updating Message Queue URL in Parameter Store");
+        const ssmCmd = new PutParameterCommand({
+            Name: "/extstats/misc/messages",
+            Value: e.Value,
+            Overwrite: true,
+            Type: "String"
+        });
+        const r = await ssmClient.send(ssmCmd);
+        console.log(r.$metadata.httpStatusCode);
+    } else if (e.Name === "downloader-MessageMappingUUID") {
+        // turn on the processing from the message queue
+        console.log("Turning on message queue");
+        const lCmd = new UpdateEventSourceMappingCommand({
+            Enabled: true,
+            UUID: e.Value
+        });
+        const r3 = await lClient.send(lCmd);
+        console.log(r3.$metadata.httpStatusCode);
     } else if (e.Name === "downloader-PlaysQueueURL") {
         // put the queue URL where insideq can find it
         console.log("Updating plays queue URL in Parameter Store");
@@ -110,16 +134,6 @@ for (const e of response.Exports) {
         });
         const r3 = await lClient.send(lCmd);
         console.log(r3.$metadata.httpStatusCode);
-    // } else if (e.Name === "downloader-BGGDownloaderMappingUUID") {
-    //     // turn on the BGG downloader lambda processing from its queue
-    //     // console.log("Remenber to turn on BGG downloader queue");
-    //     console.log("Turning on BGG downloader queue");
-    //     const lCmd = new UpdateEventSourceMappingCommand({
-    //         Enabled: true,
-    //         UUID: e.Value
-    //     });
-    //     const r3 = await lClient.send(lCmd);
-    //     console.log(r3.$metadata.httpStatusCode);
     } else if (e.Name === "downloader-WriteMappingUUID") {
         // turn on the write lambda processing from its queue
         console.log("Turning on write queue");

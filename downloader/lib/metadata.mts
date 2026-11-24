@@ -40,5 +40,5 @@ export const LAMBDA_SPECS: LambdaSpec[] = [
 // Lambdas which run in the VPC.
 export const INSIDE_LAMBDA_SPECS: LambdaSpec[] = [
     { name: `${COMPONENT}_insideStartTasks`, handler: "newinside.handleStartTasks", duration: 10, mem: 128, maxConcurrency: undefined },
-    { name: `${COMPONENT}_insideWriteResults`, handler: "newinside.handleWriteResult", duration: 10, mem: 128, maxConcurrency: 1 },
+    { name: `${COMPONENT}_insideWriteResults`, handler: "newinside.handleWriteResult", duration: 30, mem: 256, maxConcurrency: 1 },
 ];

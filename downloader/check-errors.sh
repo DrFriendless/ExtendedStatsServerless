@@ -30,7 +30,7 @@ LOG_GROUPS=(
 )
 
 QUERY='fields @timestamp, @logStream, @message
-| filter @message like /Error/
+| filter @message like /Error/ or @message like /Status: timeout/
 | sort @timestamp desc
 | limit 200'
 
