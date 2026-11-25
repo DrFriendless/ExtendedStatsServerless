@@ -117,7 +117,7 @@ export async function handleStartTasks(event: any): Promise<any> {
 }
 
 async function startTasks(system: InsideSystem): Promise<any> {
-    const howManyToDo = 8;
+    const howManyToDo = 9;
     console.log(`startTasks ${howManyToDo}`);
 
     // TODO - check for things on the retry queue.

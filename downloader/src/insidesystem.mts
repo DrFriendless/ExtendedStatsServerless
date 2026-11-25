@@ -6,9 +6,8 @@ import {WebsockMessage} from "./interfaces.mjs";
 export async function loadInsideSystem() {
     const s = new InsideSystem();
     if (isHttpResponse(s)) return s;
-    const l1 = await s.loadDatabaseSecrets();
-    if (l1) return l1;
-    return await s.loadQueues();
+    await s.loadDatabaseSecrets();
+    return s;
 }
 
 /**
@@ -31,24 +30,8 @@ export class InsideSystem {
         this.mysqlUsername = process.env.MYSQL_USERNAME;
         this.mysqlPassword = process.env.MYSQL_PASSWORD;
         this.mysqlDatabase = process.env.MYSQL_DATABASE;
-    }
-
-    async loadQueues(): Promise<InsideSystem | HttpResponse> {
-        const response = await this.sqsClient.send(new sqs.ListQueuesCommand({ QueueNamePrefix: "", MaxResults: 20 }));
-        for (const url of response.QueueUrls) {
-            if (url.endsWith("RetryQueue")) {
-                this.retryQueue = url;
-            } else if (url.endsWith("MessageQueue")) {
-                this.messageQueue = url;
-            }
-        }
-        if (!this.retryQueue) {
-            console.log("Error: retry queue not found in InsideSystem");
-        }
-        if (!this.messageQueue) {
-            console.log("Error: message queue not found in InsideSystem");
-        }
-        return this;
+        this.retryQueue = process.env.RETRY_QUEUE;
+        this.messageQueue = process.env.MESSAGE_QUEUE;
     }
 
     async getConnection(): Promise<mysql.Connection> {

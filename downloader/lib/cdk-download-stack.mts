@@ -411,7 +411,8 @@ class DownloaderInsideConstruct extends Construct {
     const insideRole = this.defineInsideRole(stack, messageQueue, retryQueue, outputQueue);
     let writeLambda: lambda.IFunction = undefined;
     for (const spec of INSIDE_LAMBDA_SPECS) {
-      const f = this.defineInsideLambda(stack, spec.name, spec.handler, insideRole, spec.duration, spec.mem, spec.maxConcurrency, spec.durableConfig, insideLambdaSg);
+      const f = this.defineInsideLambda(stack, spec.name, spec.handler, insideRole, spec.duration, spec.mem,
+          spec.maxConcurrency, insideLambdaSg, messageQueue.queueArn, retryQueue.queueArn);
       if (spec.name.endsWith("StartTasks")) {
         this.startTasksLambda = f;
       } else if (spec.name.endsWith("WriteResults")) {
@@ -427,10 +428,8 @@ class DownloaderInsideConstruct extends Construct {
   }
 
   defineInsideLambda(stack: cdk.Stack, name: string, handler: string, role: iam.IRole, duration: number, mem: number = 128,
-                     maxConcurrency: number | undefined, durableConfig: { executionTimeout: Duration } | undefined,
-                     insideLambdaSg: ec2.ISecurityGroup): lambda.Function {
+                     maxConcurrency: number | undefined, insideLambdaSg: ec2.ISecurityGroup, messageQueueARN: string, retryQueueARN: string): lambda.Function {
     const code = lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip");
-    const dc = durableConfig ? { durableConfig } : {};
     const vpcOpts: Partial<lambda.FunctionProps> = {
       vpc: DATABASE_VPC,
       vpcSubnets: {
@@ -448,13 +447,14 @@ class DownloaderInsideConstruct extends Construct {
       timeout: Duration.seconds(duration),
       reservedConcurrentExecutions: maxConcurrency,
       memorySize: mem,
-      ...dc,
       ...vpcOpts,
       environment: {
         MYSQL_HOST: process.env.MYSQL_HOST,
         MYSQL_USERNAME: process.env.MYSQL_USERNAME,
         MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
         MYSQL_DATABASE: process.env.MYSQL_DATABASE,
+        RETRY_QUEUE: retryQueueARN,
+        MESSAGE_QUEUE: messageQueueARN,
         AWS_USE_DUALSTACK_ENDPOINT: "true",
       },
       ipv6AllowedForDualStack: true
