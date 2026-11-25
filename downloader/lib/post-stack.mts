@@ -1,4 +1,4 @@
-import {LambdaClient, UpdateEventSourceMappingCommand, UpdateFunctionCodeCommand} from "@aws-sdk/client-lambda";
+import {LambdaClient, UpdateFunctionCodeCommand} from "@aws-sdk/client-lambda";
 import {
     CloudWatchLogsClient,
     DescribeLogGroupsCommand,

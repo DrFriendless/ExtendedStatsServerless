@@ -22,11 +22,11 @@ LOG_GROUPS=(
   "/aws/lambda/downloader_completeProcessPlays"
   "/aws/lambda/downloader_insideWriteResults"
   "/aws/lambda/RustDownloaderStack-rustfndownloadEDF6ACE5-unku0hfrneWa"
-  "/aws/lambda/misc_auth_thread"
-  "/aws/lambda/misc_counts"
-  "/aws/lambda/misc_message"
-  "/aws/lambda/misc_daily"
-  "/aws/lambda/misc_cw"
+  "/aws/lambda/downloader_auth_thread"
+  "/aws/lambda/downloader_counts"
+  "/aws/lambda/downloader_message"
+  "/aws/lambda/downloader_daily"
+  "/aws/lambda/downloader_cw"
 )
 
 QUERY='fields @timestamp, @logStream, @message
