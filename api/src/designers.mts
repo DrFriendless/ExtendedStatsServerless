@@ -3,6 +3,7 @@ import {DesignerResult} from "export";
 import {getGeekId} from "./library.mjs";
 import {makeIndex} from "extstats-core";
 import {APIGatewayProxyEventV2WithRequestContext} from "aws-lambda/trigger/api-gateway-proxy.js";
+import {attachTags} from "./mysql-rds.mjs";
 
 export async function getDesigners(event: APIGatewayProxyEventV2WithRequestContext<any>): Promise<HttpResponse | DesignerResult[]> {
     const system = await findSystem("private", event);
@@ -70,10 +71,15 @@ export async function getDesigners(event: APIGatewayProxyEventV2WithRequestConte
         // gather game data
         const gameSql = "select bggid, name, average bggRating, `rank` bggRanking from games where bggid in (?) and bggid not in (select expansion from expansions)";
         const gameData = await conn.query(gameSql, [resultGames]) as { bggid: number, name: string, bggRating: number, bggRanking: number }[];
-        const gameDataIndex = makeIndex(gameData);
+        const taggedGameData = gameData.map(g => { return {...g, tags: [] as string[] }; });
+        if (system.secureUser) await attachTags(conn, system.secureUser, taggedGameData);
+        const gameDataIndex = makeIndex(taggedGameData);
+        console.log(JSON.stringify(gameDataIndex));
         const geekGameSql = "select game bggid, rating, owned, prevowned, wanttobuy wtb, wanttoplay wtp, want wit from geekgames where geekid = ? and game in (?)";
         const geekGameData = await conn.query(geekGameSql, [geekid, resultGames]) as { bggid: number, rating: number, owned: number, prevowned: number, wtb: number, wtp: number, wit: number }[];
+        if (system.secureUser) await attachTags(conn, system.secureUser, geekGameData);
         const geekGameDataIndex = makeIndex(geekGameData);
+        console.log(JSON.stringify(geekGameDataIndex));
         resultGames.forEach(bggid => {
            const g = gameDataIndex[bggid];
            if (g) {

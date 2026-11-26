@@ -243,15 +243,16 @@ export async function doRetrieveGamesShort(conn: mysql.Connection, ids: number[]
     return ids.map(id => index[id]);
 }
 
-function extractGameData(row: RawGameData, expansionData: ExpansionData): GameData {
-    const e = expansionData.isExpansion(row["bggid"])
-    return { bggid: row["bggid"], usersOwned: row["usersOwned"],
+function extractGameData<T extends RawGameData>(row: T, expansionData: ExpansionData): GameData {
+    const e = expansionData.isExpansion(row["bggid"]);
+    const f = { bggid: row["bggid"], usersOwned: row["usersOwned"],
         bggRanking: row["rank"], rk: row["rank"], bggRating: row["average"], rt: row["average"],
         minPlayers: row["minPlayers"], min: row["minPlayers"], maxPlayers: row["maxPlayers"], max: row["maxPlayers"],
         name: row["name"], n: row["name"], playTime: row["playTime"], pt: row["playTime"],
         subdomain: row["subdomain"],sub: row["subdomain"],
         weight: row["averageWeight"], w: row["averageWeight"], yearPublished: row["yearPublished"], yp: row["yearPublished"],
-        isExpansion: e, e, tags: undefined };
+        isExpansion: e, e, tags: row.tags || undefined };
+    return f;
 }
 
 function extractGameDataShort(row: RawGameData, expansionData: ExpansionData): GameDataShort {
@@ -265,14 +266,12 @@ export async function doGetNews(conn: mysql.Connection): Promise<NewsItem[]> {
     return (await conn.query(sql)).map((it: any) => it as NewsItem);
 }
 
-export async function attachTags(conn: mysql.Connection, secureUser: string, games: { bggid: number, tags: string[] | undefined }[]) {
+export async function attachTags(conn: mysql.Connection, secureUser: string, games: { bggid: number }[]) {
     const geekId = await getGeekId(conn, secureUser);
-    console.log(`attachTags geekId ${geekId}`);
-    console.log(JSON.stringify(games));
     const getTagsSql = "select game bggid, tags from geekgames where tags is not null and geekId = ?";
     const index: Record<string, { bggid: number, tags: string[] | undefined }> = {};
     for (const g of games) {
-        index[g.bggid.toString()] = g;
+        index[g.bggid.toString()] = Object.assign(g, { tags: undefined });
     }
     const data = await conn.query(getTagsSql, [geekId]) as { bggid: number, tags: string }[];
     for (const row of data) {
@@ -280,7 +279,6 @@ export async function attachTags(conn: mysql.Connection, secureUser: string, gam
             index[row.bggid.toString()].tags = JSON.parse(row.tags);
         }
     }
-    console.log(JSON.stringify(games));
 }
 
 export async function getMonthlyPlays(conn: mysql.Connection, geek: string): Promise<MonthlyPlays[]> {

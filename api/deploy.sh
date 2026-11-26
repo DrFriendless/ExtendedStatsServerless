@@ -6,7 +6,6 @@ export AWS="aws --region $AWS_REGION --profile drfriendless --output text --no-c
 
 # upload code to S3
 $AWS s3 cp $COMPONENT.zip s3://$DEPLOYMENT_BUCKET/
-$AWS s3 cp lib/extstats-rust.zip s3://$DEPLOYMENT_BUCKET/
 # deploy the stack
 cdk deploy --profile drfriendless --require-approval never
 success=$?

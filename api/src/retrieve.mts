@@ -409,10 +409,12 @@ export function buildSchema(loaders: Loaders, userData: SecureUserData | undefin
                                 const games = ndGames.map(x => x.bggid);
                                 const gds: GameData[] = await doRetrieveGames(conn, games);
                                 if (userData) await attachTags(conn, userData.user, gds);
-                                return gds.map(async gd => {
+                                const a = gds.map(gd => {
                                     const nd = ndIndex[gd.bggid.toString()] || { bggid: gd.bggid, nickels: 0, dimes: 0 };
                                     return { game: gd, ...nd } as NickelDimeData;
                                 });
+                                console.log(JSON.stringify(a));
+                                return a;
                             }
                         );
                     }
@@ -897,6 +899,7 @@ export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<a
             operationName
         }
     );
+    console.log(JSON.stringify(result));
     if (result.errors) {
         return {
             statusCode: 400,

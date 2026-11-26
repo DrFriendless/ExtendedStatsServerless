@@ -45,6 +45,7 @@ export interface RawGameData {
     averageWeight: number;
     isExpansion: boolean;
     usersOwned: number;
+    tags?: string[];
 }
 
 export interface NormalisedPlay {

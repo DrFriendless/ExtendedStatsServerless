@@ -14,7 +14,6 @@ import * as route53 from "aws-cdk-lib/aws-route53";
 import {
   COMPONENT,
   DEPLOYMENT_BUCKET,
-  EXPRESS_SPECS,
   LAMBDA_ONLY_SPECS,
   LAMBDA_SPECS, RUST_SPECS
 } from "./metadata.mts";
@@ -389,13 +388,5 @@ export class ApiStack extends cdk.Stack {
       value: apiRole.roleArn,
       exportName: 'api-LambdaRoleArn'
     });
-
-    for (const spec of EXPRESS_SPECS) {
-      if (spec.method === "GET") {
-        this.defineExpressRoute(this, spec.key, spec.route, apigw.HttpMethod.GET);
-      } else if (spec.method === "POST") {
-        this.defineExpressRoute(this, spec.key, spec.route, apigw.HttpMethod.POST);
-      }
-    }
   }
 }

@@ -323,6 +323,7 @@ export interface DesignerGameResult {
     wtp: boolean;
     wit: boolean;
     plays: number;
+    tags: string[];
 }
 
 export interface DesignerResult {

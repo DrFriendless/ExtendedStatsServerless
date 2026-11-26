@@ -17,7 +17,6 @@ export async function loadAuth(system: System, username: string): Promise<AuthTa
     const sql = "select username, password, status, created, configuration, lastLogin, loginCount from auth where username = ?";
     return system.asyncReturnWithConnection(async conn => {
         const matches = await conn.query({ sql, values: [ username ] }) as object[];
-        console.log(matches);
         if (matches.length === 0) return undefined;
         return matches[0] as AuthTableRow;
     });
