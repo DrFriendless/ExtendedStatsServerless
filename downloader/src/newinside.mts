@@ -125,7 +125,7 @@ async function startTasks(system: InsideSystem): Promise<any> {
     if (retried && retried.length > 0) {
         for (const m of retried) {
             howManyToDo--;
-            await system.sendToQueueWithDelay(system.inputQueue, m, 0);
+            await system.sendToFifoQueueWithDelay(system.inputQueue, m, 0, "retry");
         }
     }
     if (howManyToDo <= 0) return;
@@ -224,7 +224,7 @@ async function handleQueueMessage(system: InsideSystem, message: QueueMessage) {
                     month: null,
                     year: null
                 };
-                await system.sendToQueueWithDelay(system.inputQueue, toProcess, 5);
+                await system.sendToFifoQueueWithDelay(system.inputQueue, toProcess, 5, "processCollection");
             }
             break;
         case "MarkPlaysForPeriodProcessed":

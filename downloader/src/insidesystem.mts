@@ -99,11 +99,12 @@ export class InsideSystem {
         }
     }
 
-    async sendToQueueWithDelay(queueUrl: string, payload: any, delay: number): Promise<void> {
+    async sendToFifoQueueWithDelay(queueUrl: string, payload: any, delay: number, messageGroup: string): Promise<void> {
         const command = new sqs.SendMessageCommand({
             QueueUrl: queueUrl,
             DelaySeconds: delay,
-            MessageBody: JSON.stringify(payload)
+            MessageBody: JSON.stringify(payload),
+            MessageGroupId: messageGroup
         });
         try {
             const resp = await this.sqsClient.send(command);

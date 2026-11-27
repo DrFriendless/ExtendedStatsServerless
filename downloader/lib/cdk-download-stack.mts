@@ -763,7 +763,7 @@ export class DownloadStack extends cdk.Stack {
     const messageConstruct = new MessageConstruct(this);
     const downloaderOutside = new DownloaderOutsideConstruct(this, messageConstruct.messageQueue);
     const downloaderInside = new DownloaderInsideConstruct(this, messageConstruct.messageQueue, downloaderOutside.retryQueue,
-        downloaderOutside.retryQueue, downloaderOutside.outputQueueFifo, networkingConstruct.insideLambdaSg);
+        downloaderOutside.outputQueueFifo, downloaderOutside.inputQueue, networkingConstruct.insideLambdaSg);
     const authConstruct = new AuthConstruct(this);
     const dailyConstruct = new DailyConstruct(this, downloaderOutside.outputQueueFifo.queueArn);
     const metricsConstruct = new MetricsConstruct(this);
