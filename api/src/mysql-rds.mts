@@ -271,7 +271,7 @@ export async function attachTags(conn: mysql.Connection, secureUser: string, gam
     const getTagsSql = "select game bggid, tags from geekgames where tags is not null and geekId = ?";
     const index: Record<string, { bggid: number, tags: string[] | undefined }> = {};
     for (const g of games) {
-        index[g.bggid.toString()] = Object.assign(g, { tags: undefined });
+        index[g.bggid.toString()] = Object.assign(g, { tags: [] });
     }
     const data = await conn.query(getTagsSql, [geekId]) as { bggid: number, tags: string }[];
     for (const row of data) {

@@ -244,7 +244,7 @@ export interface GameData {
     w: number;
     isExpansion: boolean;
     e: boolean;
-    tags: string[] | undefined;
+    tags: string[];
 }
 
 export interface NickelDimeData {

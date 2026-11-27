@@ -1,5 +1,5 @@
 import * as graphql from "graphql";
-import { GraphQLInputObjectType, GraphQLObjectType } from "graphql";
+import {GraphQLInputObjectType, GraphQLNonNull, GraphQLObjectType} from "graphql";
 import * as mysql from "promise-mysql";
 import {
     attachTags,
@@ -52,7 +52,7 @@ export function createLoaders(system: System): Loaders {
 }
 
 // dataloader objects
-const ListOfString = new graphql.GraphQLList(graphql.GraphQLString!);
+const ListOfString = new graphql.GraphQLList(new GraphQLNonNull(graphql.GraphQLString));
 const ListOfInt = new graphql.GraphQLList(graphql.GraphQLInt!);
 const DesignerType = new graphql.GraphQLObjectType({
     name: "Designer",
@@ -405,16 +405,16 @@ export function buildSchema(loaders: Loaders, userData: SecureUserData | undefin
                         return await loaders.system.asyncReturnWithConnection(
                             async conn => {
                                 const ndGames = await mostNickelsAndDimes(conn, args.count);
-                                const ndIndex = makeIndex(ndGames);
-                                const games = ndGames.map(x => x.bggid);
-                                const gds: GameData[] = await doRetrieveGames(conn, games);
-                                if (userData) await attachTags(conn, userData.user, gds);
-                                const a = gds.map(gd => {
-                                    const nd = ndIndex[gd.bggid.toString()] || { bggid: gd.bggid, nickels: 0, dimes: 0 };
-                                    return { game: gd, ...nd } as NickelDimeData;
-                                });
-                                console.log(JSON.stringify(a));
-                                return a;
+                                // const ndIndex = makeIndex(ndGames);
+                                // const games = ndGames.map(x => x.bggid);
+                                // const gds: GameData[] = await doRetrieveGames(conn, games);
+                                // if (userData) await attachTags(conn, userData.user, gds);
+                                // correct here
+                                // return gds.map(gd => {
+                                //     const nd = ndIndex[gd.bggid.toString()] || { bggid: gd.bggid, nickels: 0, dimes: 0 };
+                                //     return { game: gd, ...nd } as NickelDimeData;
+                                // });
+                                return ndGames.map(g => { return {...g, game: { bggid: g.bggid }} });
                             }
                         );
                     }
@@ -892,14 +892,12 @@ export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<a
             body: ""
         }
     }
-    console.log(query);
     const result = await graphql.graphql({
             schema,
             source: query,
             operationName
         }
     );
-    console.log(JSON.stringify(result));
     if (result.errors) {
         return {
             statusCode: 400,
@@ -915,7 +913,9 @@ export async function retrieve(event: APIGatewayProxyEventV2WithRequestContext<a
 }
 
 async function batchGetGames(system: System, gameIds: number[]): Promise<GameData[]> {
-    return system.asyncReturnWithConnection(async conn => doRetrieveGames(conn, gameIds));
+    const gd = await system.asyncReturnWithConnection(async conn => doRetrieveGames(conn, gameIds));
+    if (system.secureUser) await system.asyncWithConnection(async conn => await attachTags(conn, system.secureUser, gd));
+    return gd;
 }
 
 async function batchGetDesigners(system: System, designerIds: number[]): Promise<DesignerData[]> {

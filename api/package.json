@@ -18,7 +18,7 @@
     "date-arithmetic": "^4.1.0",
     "extstats-core": "file:/home/john/projects/repo/extstats-core-2.0.6.tgz",
     "fast-xml-parser": "^5.10.1",
-    "graphql": "^17.0.2",
+    "graphql": "^17.1.0",
     "lodash-es": "^4.18.1",
     "moo": "^0.5.2",
     "mysql": "^2.18.1",
