@@ -28,6 +28,10 @@ let LAMBDA_POLICIES: iam.IManagedPolicy[] = [];
 let LAMBDA_POLICIES_WITH_DATABASE: iam.IManagedPolicy[] = [];
 let ACCESS_DYNAMO: iam.PolicyDocument = undefined;
 
+function dualStackQueueUrl(stack: cdk.Stack, queue: sqs.IQueue): string {
+  return `https://sqs.${stack.region}.api.aws/${stack.account}/${queue.queueName}`;
+}
+
 function defineAccessDynamoPolicy(stack: cdk.Stack): iam.PolicyDocument {
   const accessDynamo = new iam.PolicyStatement();
   accessDynamo.addActions(
@@ -406,13 +410,14 @@ class MessageConstruct extends Construct {
 class DownloaderInsideConstruct extends Construct {
   public startTasksLambda: lambda.IFunction = undefined;
 
-  constructor(stack: cdk.Stack, messageQueue: sqs.IQueue, retryQueue: sqs.IQueue, outputQueue: sqs.IQueue, insideLambdaSg: ec2.ISecurityGroup) {
+  constructor(stack: cdk.Stack, messageQueue: sqs.IQueue, retryQueue: sqs.IQueue, outputQueue: sqs.IQueue, inputQueue: sqs.IQueue,
+              insideLambdaSg: ec2.ISecurityGroup) {
     super(stack, "downloaderInside");
-    const insideRole = this.defineInsideRole(stack, messageQueue, retryQueue, outputQueue);
+    const insideRole = this.defineInsideRole(stack, messageQueue, retryQueue, outputQueue, inputQueue);
     let writeLambda: lambda.IFunction = undefined;
     for (const spec of INSIDE_LAMBDA_SPECS) {
       const f = this.defineInsideLambda(stack, spec.name, spec.handler, insideRole, spec.duration, spec.mem,
-          spec.maxConcurrency, insideLambdaSg, messageQueue.queueArn, retryQueue.queueArn);
+          spec.maxConcurrency, insideLambdaSg, messageQueue, retryQueue, inputQueue);
       if (spec.name.endsWith("StartTasks")) {
         this.startTasksLambda = f;
       } else if (spec.name.endsWith("WriteResults")) {
@@ -428,7 +433,8 @@ class DownloaderInsideConstruct extends Construct {
   }
 
   defineInsideLambda(stack: cdk.Stack, name: string, handler: string, role: iam.IRole, duration: number, mem: number = 128,
-                     maxConcurrency: number | undefined, insideLambdaSg: ec2.ISecurityGroup, messageQueueARN: string, retryQueueARN: string): lambda.Function {
+                     maxConcurrency: number | undefined, insideLambdaSg: ec2.ISecurityGroup,
+                     messageQueue: sqs.IQueue, retryQueue: sqs.IQueue, inputQueue: sqs.IQueue): lambda.Function {
     const code = lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip");
     const vpcOpts: Partial<lambda.FunctionProps> = {
       vpc: DATABASE_VPC,
@@ -453,8 +459,9 @@ class DownloaderInsideConstruct extends Construct {
         MYSQL_USERNAME: process.env.MYSQL_USERNAME,
         MYSQL_PASSWORD: process.env.MYSQL_PASSWORD,
         MYSQL_DATABASE: process.env.MYSQL_DATABASE,
-        RETRY_QUEUE: retryQueueARN,
-        MESSAGE_QUEUE: messageQueueARN,
+        RETRY_QUEUE: dualStackQueueUrl(stack, retryQueue),
+        MESSAGE_QUEUE: dualStackQueueUrl(stack, messageQueue),
+        INPUT_QUEUE: dualStackQueueUrl(stack, inputQueue),
         AWS_USE_DUALSTACK_ENDPOINT: "true",
       },
       ipv6AllowedForDualStack: true
@@ -464,7 +471,7 @@ class DownloaderInsideConstruct extends Construct {
     return f;
   }
 
-  defineInsideRole(stack: cdk.Stack, messageQueue: sqs.IQueue, retryQueue: sqs.IQueue, outputQueue: sqs.IQueue): iam.IRole {
+  defineInsideRole(stack: cdk.Stack, messageQueue: sqs.IQueue, retryQueue: sqs.IQueue, outputQueue: sqs.IQueue, inputQueue: sqs.IQueue): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
 
     const rdsConnect = new iam.PolicyStatement({
@@ -477,12 +484,9 @@ class DownloaderInsideConstruct extends Construct {
 
     const sendToBGGQueue = new iam.PolicyStatement();
     sendToBGGQueue.addActions("sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes");
-    sendToBGGQueue.addResources(messageQueue.queueArn, retryQueue.queueArn, outputQueue.queueArn);
-    const sqsList = new iam.PolicyStatement();
-    sqsList.addActions("sqs:ListQueues");
-    sqsList.addResources("*");
+    sendToBGGQueue.addResources(messageQueue.queueArn, retryQueue.queueArn, outputQueue.queueArn, inputQueue.queueArn);
     policies[`policy_inside_queue`] = new iam.PolicyDocument({
-      statements: [sendToBGGQueue, sqsList]
+      statements: [sendToBGGQueue]
     });
 
     const managedPolicies: iam.IManagedPolicy[] = [
@@ -505,7 +509,7 @@ class DownloaderOutsideConstruct extends Construct {
   retryQueue: sqs.IQueue = undefined;
   prehandle: lambda.IFunction = undefined;
 
-  constructor(stack: cdk.Stack) {
+  constructor(stack: cdk.Stack, messageQueue: sqs.IQueue) {
     super(stack, "downloaderOutside");
 
     const cacheBucket = this.defineCacheBucket(stack, CACHE_BUCKET);
@@ -514,12 +518,13 @@ class DownloaderOutsideConstruct extends Construct {
     const dlq = this.defineDeadLetterQueue(stack);
     this.inputQueue = this.defineInputQueue2(stack, { maxReceiveCount: 3, queue: dlq });
     const snsTopic = this.defineSnsTopic(process.env.SNS_TOPIC, process.env.SNS_EMAIL);
-    const role = this.defineDownloaderRole(stack, this.outputQueueFifo, this.inputQueue, dlq, cacheBucket, snsTopic);
+    const role = this.defineDownloaderRole(stack, this.outputQueueFifo, this.inputQueue, dlq, this.retryQueue, cacheBucket, snsTopic);
     // Lambdas
     let userListLambda: lambda.IFunction = undefined;
     let metadataLambda: lambda.IFunction = undefined;
     for (const spec of LAMBDA_SPECS) {
-      const f = this.defineLambda(stack, spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency, spec.durableConfig);
+      const f = this.defineLambda(stack, spec.name, spec.handler, role, spec.duration, spec.mem, spec.maxConcurrency,
+          spec.durableConfig, this.retryQueue, messageQueue, this.inputQueue, this.outputQueueFifo);
       if (spec.name.endsWith("_processUserList")) {
         userListLambda = f;
       } else if (spec.name.endsWith("_processMetadata")) {
@@ -622,7 +627,7 @@ class DownloaderOutsideConstruct extends Construct {
     });
   }
 
-  defineDownloaderRole(stack: cdk.Stack, outputFifoQueue: sqs.IQueue, inputQueue: sqs.IQueue, dlq: sqs.IQueue,
+  defineDownloaderRole(stack: cdk.Stack, outputFifoQueue: sqs.IQueue, inputQueue: sqs.IQueue, dlq: sqs.IQueue, retryQueue: sqs.IQueue,
                        cacheBucket: s3.Bucket, topic: sns.Topic): iam.IRole {
     const policies: Record<string, iam.PolicyDocument> = {};
     const bggParameters = new iam.PolicyStatement();
@@ -647,18 +652,11 @@ class DownloaderOutsideConstruct extends Construct {
       statements: [loggingParameters, loggingCloudWatch]
     });
 
-    const sqsStuff = new iam.PolicyStatement();
-    sqsStuff.addActions("sqs:ListQueues");
-    sqsStuff.addResources("*");
-    policies[`policy_sqs_stuff`] = new iam.PolicyDocument({
-      statements: [sqsStuff]
-    });
-
-    const sendToBGGQueue = new iam.PolicyStatement();
-    sendToBGGQueue.addActions("sqs:SendMessage");
-    sendToBGGQueue.addResources(inputQueue.queueArn, outputFifoQueue.queueArn, dlq.queueArn);
+    const sendToQueues = new iam.PolicyStatement();
+    sendToQueues.addActions("sqs:SendMessage");
+    sendToQueues.addResources(inputQueue.queueArn, outputFifoQueue.queueArn, dlq.queueArn, retryQueue.queueArn);
     policies[`policy_bgg_queue`] = new iam.PolicyDocument({
-      statements: [sendToBGGQueue]
+      statements: [sendToQueues]
     });
 
     const sendToSNS = new iam.PolicyStatement();
@@ -697,9 +695,9 @@ class DownloaderOutsideConstruct extends Construct {
     });
   }
 
-
   defineLambda(stack: cdk.Stack, name: string, handler: string, role: iam.IRole, duration: number, mem: number = 128,
-               maxConcurrency: number | undefined, durableConfig: { executionTimeout: Duration } | undefined): lambda.Function {
+               maxConcurrency: number | undefined, durableConfig: { executionTimeout: Duration } | undefined,
+               retryQueue: sqs.IQueue, messageQueue: sqs.IQueue, inputQueue: sqs.IQueue, outputQueue: sqs.IQueue): lambda.Function {
     const code = lambda.Code.fromBucketV2(ZIP_BUCKET, COMPONENT + ".zip");
     const dc = durableConfig ? { durableConfig } : {};
     let opts: lambda.FunctionProps = {
@@ -711,7 +709,13 @@ class DownloaderOutsideConstruct extends Construct {
       timeout: Duration.seconds(duration),
       reservedConcurrentExecutions: maxConcurrency,
       memorySize: mem,
-      ...dc
+      ...dc,
+      environment: {
+        RETRY_QUEUE: retryQueue.queueUrl,
+        MESSAGE_QUEUE: messageQueue.queueUrl,
+        INPUT_QUEUE: inputQueue.queueUrl,
+        OUTPUT_QUEUE: outputQueue.queueUrl
+      }
     }
     const f = new lambda.Function(stack, name, opts);
     Tags.of(f).add("component", COMPONENT);
@@ -755,10 +759,11 @@ export class DownloadStack extends cdk.Stack {
     ACCESS_DYNAMO = defineAccessDynamoPolicy(this);
     this.lookupManagedPolicies();
 
-    const downloaderOutside = new DownloaderOutsideConstruct(this);
     const networkingConstruct = new NetworkingConstruct(this);
     const messageConstruct = new MessageConstruct(this);
-    const downloaderInside = new DownloaderInsideConstruct(this, messageConstruct.messageQueue, downloaderOutside.retryQueue, downloaderOutside.outputQueueFifo, networkingConstruct.insideLambdaSg);
+    const downloaderOutside = new DownloaderOutsideConstruct(this, messageConstruct.messageQueue);
+    const downloaderInside = new DownloaderInsideConstruct(this, messageConstruct.messageQueue, downloaderOutside.retryQueue,
+        downloaderOutside.retryQueue, downloaderOutside.outputQueueFifo, networkingConstruct.insideLambdaSg);
     const authConstruct = new AuthConstruct(this);
     const dailyConstruct = new DailyConstruct(this, downloaderOutside.outputQueueFifo.queueArn);
     const metricsConstruct = new MetricsConstruct(this);

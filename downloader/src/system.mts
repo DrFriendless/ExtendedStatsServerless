@@ -1,5 +1,5 @@
-import {GetParameterCommand, GetParametersByPathCommand, SSMClient, PutParameterCommand} from "@aws-sdk/client-ssm";
-import {SendMessageCommand, SQSClient, ListQueuesCommand} from "@aws-sdk/client-sqs";
+import {GetParameterCommand, GetParametersByPathCommand, SSMClient} from "@aws-sdk/client-ssm";
+import {SendMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 import {S3Client, GetObjectCommand, PutObjectCommand, PutObjectCommandOutput} from "@aws-sdk/client-s3";
 import {PublishCommand, SNSClient} from "@aws-sdk/client-sns";
 import {GetSecretValueCommand, SecretsManagerClient} from "@aws-sdk/client-secrets-manager";
@@ -10,8 +10,7 @@ export async function loadSystem() {
     const s = new System();
     const a = await s.loadSecrets();
     if (isHttpResponse(a)) return a;
-    const b = await s.loadBGGQueues();
-    if (isHttpResponse(b)) return b;
+    s.loadQueues();
     return await s.loadBGGSecrets();
 }
 
@@ -27,14 +26,11 @@ export class System {
     cacheBucket: string;
     snsTopic: string;
     metadataFile: string;
-    downloaderQueue: string;
-    downloaderQueueFifo: string;
+    outputQueue: string | undefined;
     inputQueue: string | undefined;
-    playsQueue: string | undefined;
     retryQueue: string | undefined;
     messageQueue: string | undefined;
 
-    lastRequestTime: number;
     usersFile: string;
     systemLogGroup: string;
     usersToken: string;
@@ -68,49 +64,11 @@ export class System {
         return resp;
     }
 
-    async loadBGGQueues(): Promise<System | HttpResponse> {
-        const sqsClient = new SQSClient({
-            apiVersion: '2014-11-06',
-            region: process.env.AWS_REGION
-        });
-        const response = await sqsClient.send(new ListQueuesCommand({ QueueNamePrefix: "downloader", MaxResults: 10 }));
-        for (const url of response.QueueUrls) {
-            if (url.endsWith("downloaderInputQueue.fifo")) {
-                this.inputQueue = url;
-            } else if (url.endsWith("PlaysQueue")) {
-                this.playsQueue = url;
-            } else if (url.endsWith("RetryQueue")) {
-                this.retryQueue = url;
-            } else if (url.endsWith("OutputQueue")) {
-                this.downloaderQueue = url;
-            } else if (url.endsWith("OutputQueue.fifo")) {
-                this.downloaderQueueFifo = url;
-            } else if (url.endsWith("MessageQueue")) {
-                this.messageQueue = url;
-            }
-        }
-        return this;
-    }
-
-    async loadBGGQueueOwnParameters(): Promise<System | HttpResponse> {
-        const s = await this.getParameter("/extstats/downloader/lastRequestTime");
-        this.lastRequestTime = s ? parseInt(s) : 0;
-        return this;
-    }
-
-    async updateLastRequestTime(lastRequestTime: number): Promise<void> {
-        const ssmClient = new SSMClient({
-            apiVersion: '2014-11-06',
-            region: process.env.AWS_REGION
-        });
-        const response = await ssmClient.send(
-            new PutParameterCommand({
-                Value: lastRequestTime.toString(),
-                Name: "/extstats/downloader/lastRequestTime",
-                Overwrite: true
-            })
-        );
-        console.log(response);
+    loadQueues() {
+        this.retryQueue = process.env.RETRY_QUEUE;
+        this.messageQueue = process.env.MESSAGE_QUEUE;
+        this.inputQueue = process.env.INPUT_QUEUE;
+        this.outputQueue = process.env.OUTPUT_QUEUE;
     }
 
     async loadSecrets(): Promise<System | HttpResponse> {

@@ -1,7 +1,7 @@
 import {HttpResponse, isHttpResponse} from "./system.mjs";
 import * as sqs from "@aws-sdk/client-sqs";
 import * as mysql from 'promise-mysql';
-import {WebsockMessage} from "./interfaces.mjs";
+import {AbstractDownloadRequest, WebsockMessage} from "./interfaces.mjs";
 
 export async function loadInsideSystem() {
     const s = new InsideSystem();
@@ -22,8 +22,12 @@ export class InsideSystem {
     private mysqlDatabase: string | undefined;
     public retryQueue: string | undefined;
     private messageQueue: string | undefined;
+    public inputQueue: string | undefined;
     private readonly sqsClient =
-        new sqs.SQSClient({ region: process.env.REGION, useDualstackEndpoint: true });
+        new sqs.SQSClient({
+            region: process.env.REGION,
+            useDualstackEndpoint: true,
+        });
 
     async loadDatabaseSecrets(): Promise<HttpResponse | void> {
         this.mysqlHost = process.env.MYSQL_HOST;
@@ -32,6 +36,7 @@ export class InsideSystem {
         this.mysqlDatabase = process.env.MYSQL_DATABASE;
         this.retryQueue = process.env.RETRY_QUEUE;
         this.messageQueue = process.env.MESSAGE_QUEUE;
+        this.inputQueue = process.env.INPUT_QUEUE;
     }
 
     async getConnection(): Promise<mysql.Connection> {
@@ -60,6 +65,25 @@ export class InsideSystem {
         } finally {
             if (connection) connection.destroy();
         }
+    }
+
+    async receiveFromRetry(): Promise<AbstractDownloadRequest[]> {
+        const response = await this.sqsClient.send(
+            new sqs.ReceiveMessageCommand({
+                QueueUrl: this.retryQueue,
+                MaxNumberOfMessages: 10,
+                WaitTimeSeconds: 1,      // long polling
+                VisibilityTimeout: 600,   // optional; overrides the queue default
+            })
+        );
+        const results: AbstractDownloadRequest[] = [];
+        const messages = response.Messages ?? [];
+        for (const msg of messages) {
+            console.log(msg.MessageId, msg.Body);
+            results.push(JSON.parse(msg.Body));
+            await this.sqsClient.send(new sqs.DeleteMessageCommand({ QueueUrl: this.retryQueue, ReceiptHandle: msg.ReceiptHandle }));
+        }
+        return results;
     }
 
     async sendMessage(geeks: string[], topics: string[], body: any): Promise<void> {

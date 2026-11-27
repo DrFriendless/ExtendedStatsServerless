@@ -7,31 +7,35 @@ import {copyRequestStats, splitYmd} from "./library.mjs";
 import {
     ProcessGameResult, RequestStats, FileToProcess, Metadata, ProcessCollectionResult, ProcessUserResult,
     CleanUpCollectionResult, QueueMessage, ProcessPlaysForPeriodResult, PlayDataResult, ProcessDesignerResult,
-    ProcessPublisherResult, UpdatePlayedYearsResult
+    ProcessPublisherResult, UpdatePlayedYearsResult, DownloadRequest
 } from './interfaces.mjs';
 import {System} from "./system.mjs";
 
 // Create an Amazon S3 service client object.
 const sqsClient = new SQSClient({ region: process.env.REGION, useDualstackEndpoint: true });
 
-// async function sendToDownloaderQueue(system: System, body: QueueMessage, details: string | undefined = undefined): Promise<void> {
-//     const b = JSON.stringify(body);
-//     if (b.length > 260000) {
-//         // exceed SendMessage size
-//         console.log(`SQS message size exceeded: ${b.length} ${body.discriminator} ${details || ""}`);
-//         return;
-//     } else {
-//         // console.log(b);
-//     }
-//     const command = new SendMessageCommand({
-//         QueueUrl: system.downloaderQueue,
-//         MessageBody: b,
-//     });
-//     const dispatchResult: SendMessageCommandOutput = await sqsClient.send(command);
-//     if (dispatchResult.$metadata.httpStatusCode !== 200) {
-//         await system.publishError(JSON.stringify(dispatchResult), "sendToDownloaderQueue");
-//     }
-// }
+export async function sendToRetryQueue(system: System, body: DownloadRequest): Promise<void> {
+    const b = JSON.stringify(body);
+    const command = new SendMessageCommand({
+        QueueUrl: system.retryQueue,
+        MessageBody: b,
+        MessageGroupId: body.requestId
+    });
+    const dispatchResult: SendMessageCommandOutput = await sqsClient.send(command);
+    if (dispatchResult.$metadata.httpStatusCode !== 200) {
+        console.log(`Error in sendToRetryQueue: ${JSON.stringify(dispatchResult)}`);
+    }
+}
+
+export async function sendToInputQueue(system: System, payload: DownloadRequest): Promise<any> {
+    const sqs = new SQSClient({ region: process.env.REGION });
+    const command = new SendMessageCommand({
+        QueueUrl: system.inputQueue,
+        MessageBody: JSON.stringify(payload),
+        MessageGroupId: "pre_handle"
+    });
+    return await sqs.send(command);
+}
 
 async function sendToDownloaderFifoQueue(system: System, body: QueueMessage, details: string | undefined = undefined): Promise<void> {
     const b = JSON.stringify(body);
@@ -43,13 +47,13 @@ async function sendToDownloaderFifoQueue(system: System, body: QueueMessage, det
         // console.log(b);
     }
     const command = new SendMessageCommand({
-        QueueUrl: system.downloaderQueueFifo,
+        QueueUrl: system.outputQueue,
         MessageBody: b,
         MessageGroupId: body.discriminator
     });
     const dispatchResult: SendMessageCommandOutput = await sqsClient.send(command);
     if (dispatchResult.$metadata.httpStatusCode !== 200) {
-        await system.publishError(JSON.stringify(dispatchResult), "sendToDownloaderQueue");
+        console.log(`Error in sendToDownloaderFifoQueue: ${JSON.stringify(dispatchResult)}`);
     }
 }
 

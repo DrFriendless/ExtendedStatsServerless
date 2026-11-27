@@ -7,13 +7,14 @@ import {
     doMarkPlaysUrlProcessed,
     doMarkPublisherDoesNotExist,
     doMarkUrlProcessed, doMarkUrlTryTomorrow, doProcessCollectionCleanup, doProcessDesignerResult,
-    doProcessGameResult, doProcessPublisherResult, doRebuildMaterialisedViews, doReprocessPlays,
+    doProcessGameResult, doProcessPublisherResult, doRebuildMaterialisedViews, doRecordGameExpansions, doReprocessPlays,
     doUpdateBGGTop50, doUpdateGamesForGeek,
     doUpdateLastScheduledForUrls, doUpdateMetadata, doUpdatePlaysForPeriod, doUpdateProcessUserResult,
     getGeekId,
     getGeeksThatDontExist
 } from "./mysql-rds.mjs";
 import {
+    AbstractDownloadRequest,
     EnsureGamesMessage,
     FileToProcess,
     ProcessMethod,
@@ -23,7 +24,6 @@ import {
     UpdatePlayedYearsResult
 } from "./interfaces.mjs";
 import {listAdd} from "./library.mjs";
-
 
 // method names from the database - this is the type of thing we have to do.
 const METHOD_PROCESS_COLLECTION = "processCollection";
@@ -106,7 +106,7 @@ async function writePlayedYears(system: InsideSystem, event: UpdatePlayedYearsRe
     await system.asyncWithConnection(async conn => await conn.query(updateSql, updateParams));
 }
 
-// invoked periodically to see if the downloader has anything to do.
+// Lambda entry point - invoked periodically to see if the downloader has anything to do.
 export async function handleStartTasks(event: any): Promise<any> {
     const system = await loadInsideSystem();
     if (isHttpResponse(system)) {
@@ -117,10 +117,18 @@ export async function handleStartTasks(event: any): Promise<any> {
 }
 
 async function startTasks(system: InsideSystem): Promise<any> {
-    const howManyToDo = 9;
+    let howManyToDo = 9;
     console.log(`startTasks ${howManyToDo}`);
 
-    // TODO - check for things on the retry queue.
+    // check for things on the retry queue - these have already been through prehandle.
+    const retried: AbstractDownloadRequest[] = await system.receiveFromRetry();
+    if (retried && retried.length > 0) {
+        for (const m of retried) {
+            howManyToDo--;
+            await system.sendToQueueWithDelay(system.inputQueue, m, 0);
+        }
+    }
+    if (howManyToDo <= 0) return;
 
     const geeksThatDontExist = await system.asyncReturnWithConnection(getGeeksThatDontExist);
     const todo: ToProcessElement[] =
@@ -157,15 +165,9 @@ async function startTasks(system: InsideSystem): Promise<any> {
     }
     console.log(JSON.stringify(batch));
     if (batch.length === 0) {
-        // console.log("Couldn't find any files to process.");
         return [];
     } else {
-        // if (batch.length < howManyToDo) {
-        //     console.log(`Only found ${batch.length} files to send to prehandle.`);
-        // }
         await system.asyncWithConnection(async conn => await doUpdateLastScheduledForUrls(conn, batch.map(element => element.url)));
-        // console.log("invoking");
-        // await invokeLambdaAsync(OUTSIDE_PREFIX + FUNCTION_PREHANDLE, batch);
         return batch;
     }
 }
@@ -222,7 +224,7 @@ async function handleQueueMessage(system: InsideSystem, message: QueueMessage) {
                     month: null,
                     year: null
                 };
-                await system.sendToQueueWithDelay(system.retryQueue, toProcess, 45);
+                await system.sendToQueueWithDelay(system.inputQueue, toProcess, 5);
             }
             break;
         case "MarkPlaysForPeriodProcessed":

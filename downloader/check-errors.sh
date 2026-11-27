@@ -21,7 +21,7 @@ LOG_GROUPS=(
   "/aws/lambda/downloader_completeProcessCollection"
   "/aws/lambda/downloader_completeProcessPlays"
   "/aws/lambda/downloader_insideWriteResults"
-  "/aws/lambda/RustDownloaderStack-rustfndownloadEDF6ACE5-unku0hfrneWa"
+  "/aws/lambda/RustDownloaderStack-rustfndownloadEDF6ACE5-bnXj4ueL68xS"
   "/aws/lambda/downloader_auth_thread"
   "/aws/lambda/downloader_counts"
   "/aws/lambda/downloader_message"

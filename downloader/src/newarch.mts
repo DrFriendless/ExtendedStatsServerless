@@ -7,9 +7,8 @@ import {
     ContinuationDownloadRequest,
     UpdatePlayedYearsResult,
     DownloadResult,
-    URLRequest, DownloadRequest, PlayedYearsRequest, RequestStats
+    URLRequest, PlayedYearsRequest, RequestStats
 } from "./interfaces.mjs";
-import {SendMessageCommand, SQSClient} from "@aws-sdk/client-sqs";
 import {
     extractGameDataFromPage,
     extractUserCollectionFromPage,
@@ -21,7 +20,7 @@ import {
     dispatchNoSuchGame, dispatchNoSuchPublisher,
     dispatchPlayedYears, dispatchPlaysForPeriodResult, dispatchProcessCollectionUpdateGames,
     dispatchProcessGameResult,
-    dispatchProcessUserResult, dispatchPublisherData
+    dispatchProcessUserResult, dispatchPublisherData, sendToInputQueue, sendToRetryQueue
 } from "./dispatch.mjs";
 import {between, copyRequestStats, invokeLambdaAsync} from "./library.mjs";
 import {cleanupCollection, splitCollection} from "./functions.mjs";
@@ -119,7 +118,7 @@ export async function completeProcessCollection(event: ContinuationDownloadRespo
             console.log(`Error: come back later for ${cx.continuationData.geek}`);
             const req = makeDownloadRequest(event.continuationData, "downloader_completeProcessCollection", system.usersToken, event.results[0].url);
             req.attempts = event.attempts;
-            await sendToInputQueue(system, req);
+            await sendToRetryQueue(system, req);
         } else if (collection === "TooBig") {
             console.log(`Error: Collection exceeds maximum export size for ${cx.continuationData.geek}`);
             // TODO
@@ -392,16 +391,6 @@ async function processPlays(system: System, event: ContinuationDownloadResponse,
     }
     console.log(JSON.stringify(result));
     await dispatchPlaysForPeriodResult(system, result);
-}
-
-async function sendToInputQueue(system: System, payload: DownloadRequest): Promise<any> {
-    const sqs = new SQSClient({ region: process.env.REGION });
-    const command = new SendMessageCommand({
-        QueueUrl: system.inputQueue,
-        MessageBody: JSON.stringify(payload),
-        MessageGroupId: "pre_handle"
-    });
-    return await sqs.send(command);
 }
 
 async function extractXml(system: System, event: ContinuationDownloadResponse): Promise<string | undefined> {
